@@ -138,7 +138,8 @@ python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0
             bval = bvar[:]
             print '-'*32
             print name
-            lal = list(delta.statistics(aval,bval,epsilon,(amiss,bmiss)).items())
+            lal = list(delta.summarize(aval,bval,epsilon,(amiss,bmiss)).items()) 
+            # lal = list(delta.stats(*delta.diff(aval,bval,epsilon,(amiss,bmiss))).items())
             lal.sort()
             for each in lal:
                 print '  %s: %s' % each

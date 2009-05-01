@@ -18,58 +18,67 @@ def _missing(x,missing_value=None):
         return isnan(x) | (x==missing_value)
     return isnan(x)
 
+def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None)):
+    """
+    take two arrays of similar size and composition
+    return difference array filled with nans where differences aren't valid,
+    good mask where values are finite in both a and b
+    trouble mask where missing values or nans don't match or delta > epsilon
+    (a-notfinite-mask, b-notfinite-mask)
+    (a-missing-mask, b-missing-mask)
+    """
+    shape = a.shape
+    assert(b.shape==shape)
+    assert(a.dtype==b.dtype)
+    anfin, bnfin = ~isfinite(a), ~isfinite(b)
+    amis, bmis = zeros(shape,dtype=bool), zeros(shape,dtype=bool)
+    if amissing is not None:
+        amis[a==amissing] = True
+    if bmissing is not None:
+        bmis[b==bmissing] = True
+    d = empty_like(a)
+    mask = ~(anfin | bnfin | amis | bmis)
+    d[~mask] = nan
+    d[mask] = b[mask] - a[mask]
+    # trouble areas - mismatched nans, mismatched missing-values, differences > epsilon
+    trouble = (anfin ^ bnfin) | (amis ^ bmis) | (abs(d)>epsilon)
+    return d, mask, trouble, (anfin, bnfin), (amis, bmis)
 
-def statistics(a, b, epsilon=0., (amiss,bmiss)=(None,None)):
+def stats(dif, mask, bad, *etc):
+    rms = sum(abs(dif[mask] ** 2)) / dif.size    
+    return {    'rms_diff': rms, 
+                'std_diff': std(dif[mask]), 
+                'mean_diff': mean(dif[mask]), 
+                'median_diff': median(dif[mask]) 
+                }
+
+
+def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None)):
     """return dictionary of similarity statistics
     stats not including 'nan' in name exclude nans in either arrays
     """
-    shape = a.shape
-    aflat = a.flatten()
-    bflat = b.flatten()
-    n_a_missing = 0
-    n_b_missing = 0
-    if amiss is not None:
-        mvm = (amiss==aflat)
-        n_a_missing = mvm.sum()
-        aflat[mvm] = nan
-    if bmiss is not None:
-        mvm = (bmiss==bflat)
-        n_b_missing = mvm.sum()
-        bflat[mvm] = nan
-    dflat = bflat-aflat
-    a_xor_b_finite = sum(isfinite(aflat) ^ isfinite(bflat))
-    del aflat
-    del bflat
-    n = len(dflat)
-    dflat = array(dflat, float64)
-    a_nans = isnan(a.flatten())
-    b_nans = isnan(b.flatten())
-    fin = isfinite(dflat) 
-    
-    dflat = dflat[fin]
-    perc = dflat/a.flatten()[fin]*100.
-    rms = sqrt(sum(dflat*dflat)/float(len(dflat)))  # should n be len(dflat) or n?
-    outside_epsilon = abs(dflat)>epsilon
-    n_o_e = outside_epsilon.sum()
-    
-    return { 'mean_percent_change': perc.mean(),
-             'max_percent_change': abs(perc).max(),
-             'a_xor_b_finite_count': a_xor_b_finite,
-             'mean_diff': dflat.mean(),
-             'std_diff': std(dflat),
-             'max_diff': abs(dflat).max(),
-             'rms_diff': rms,
-             'finite_count': len(dflat),
-             'a_missing_count': n_a_missing,
-             'b_missing_count': n_b_missing,
+    d, mask, trouble, (anfin, bnfin), (amis, bmis) = nfo = diff(a,b,epsilon,(amiss,bmiss))
+    a_xor_b_finite = sum(anfin ^ bnfin)
+    stadic = stats(*nfo)
+    n_o_e = sum(trouble)
+    a_nans = isnan(a)
+    b_nans = isnan(b)
+    n = a.size
+        
+    out = { 'a_xor_b_finite_count': a_xor_b_finite,
+             'finite_count': sum(mask),
+             'a_missing_count': sum(amis),
+             'b_missing_count': sum(bmis),
              'outside_epsilon_count': n_o_e,
              'outside_epsilon_fraction': n_o_e / float(n),
              'max_count': n,
-             'a_nan_count': a_nans.sum(),
-             'b_nan_count': b_nans.sum(),
-             'a_and_b_nan_count': (a_nans & b_nans).sum(),
-             'shape': shape
+             'a_nan_count': sum(a_nans),
+             'b_nan_count': sum(b_nans),
+             'a_and_b_nan_count': sum(a_nans & b_nans),
+             'shape': a.shape
              }
+    out.update(stadic)
+    return out
 
 STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not NaN or +-Inf)",
                     'mean_percent_change': "Percent change from A to B for finite values, averaged",
@@ -78,6 +87,7 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'mean_diff': "Mean difference of finite values",
                     'std_diff': "Stdev of difference of finite values",
                     'max_diff': "Maximum difference of finite values",
+                    'median_diff': "Median difference of finite values",
                     'rms_diff': "RMS difference of finite values",
                     'finite_count': "number of finite values in common between A and B",
                     'outside_epsilon_count': "number of finite differences falling outside epsilon",
