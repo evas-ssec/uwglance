@@ -14,6 +14,7 @@ from pprint import pprint, pformat
 
 import glance.io as io
 import glance.delta as delta
+import glance.plot as plot
 
 LOG = logging.getLogger(__name__)
 
@@ -97,6 +98,29 @@ python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0
             lal = list(io.open(fn)())
             lal.sort()
             print fn + ': ' + ('\n  ' + ' '*len(fn)).join(lal)
+    
+    def sdr_cris(*args):
+        """compare sdr_cris output
+        parameters are variable name followed by detector number
+        sdr_cris desired.h5 actual.h5 ESRealLW 0
+        """
+        afn,bfn = args[:2]
+        LOG.info("opening %s" % afn)
+        a = io.open(afn)
+        LOG.info("opening %s" % bfn)
+        b = io.open(bfn)
+        # shape is [scanline, field, detector, wnum]
+        vname = '/All_Data/CrIS-SDR_All/' + args[2]
+        det_idx = int(args[3])
+        def get(f):
+            spc = f[vname][:,:,det_idx,:]
+            nsl,nfor,nwn = spc.shape
+            return spc.reshape( (nsl*nfor,nwn) )
+        aspc = get(a)
+        bspc = get(b)
+        plot.compare_spectra(bspc,aspc)
+        plot.show()
+        
     
     def stats(*args):
         """create statistics summary of variables

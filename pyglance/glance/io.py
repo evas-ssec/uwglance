@@ -10,6 +10,10 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 import os, sys, logging
 
 from pyhdf.SD import SD,SDC
+try:
+    import h5py
+except ImportError:
+    pass
 
 LOG = logging.getLogger(__name__)
 
@@ -33,8 +37,31 @@ class hdf(SD):
         return getattr(self.select(name),'_FillValue',None)
         
 
+FIXME_IDPS = [ '/All_Data/CrIS-SDR_All/ES' + ri + band for ri in ['Real','Imag'] for band in ['LW','MW','SW'] ] 
+
+
 class h5(object):
-    pass
+    """wrapper for HDF5 datasets
+    """
+    _h5 = None
+    
+    def __init__(self,filename):
+        self._h5 = h5py.File(filename,'r')
+    
+    def __call__(self):
+        "FIXME: this should return the real list of variables, which will include slashes"
+        return set(FIXME_IDPS)
+    
+    @staticmethod
+    def trav(h5,pth): 
+        return reduce( lambda x,a: x[a] if a else x, pth.split('/'), h5)
+        
+    def __getitem__(self,name):
+        return h5.trav(self._h5, name)
+    
+    def missing_value(self, name):
+        return None
+        
 
 def open(pathname):
     cls = globals()[os.path.splitext(pathname)[1][1:]]
