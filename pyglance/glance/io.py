@@ -37,7 +37,7 @@ class hdf(SD):
         return getattr(self.select(name),'_FillValue',None)
         
 
-FIXME_IDPS = [ '/All_Data/CrIS-SDR_All/ES' + ri + band for ri in ['Real','Imag'] for band in ['LW','MW','SW'] ] 
+FIXME_IDPS = [ '/All_Data/CrIS-SDR_All/ES' + ri + band for ri in ['Real','Imaginary'] for band in ['LW','MW','SW'] ] 
 
 
 class h5(object):

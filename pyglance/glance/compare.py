@@ -120,7 +120,46 @@ python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0
         bspc = get(b)
         plot.compare_spectra(bspc,aspc)
         plot.show()
+    
+    def noisecheck(*args):
+        """gives statistics for dataset comparisons against truth with and without noise
+        usage: noisecheck truth-file noise-file actual-file variable1{:epsilon{:missing}} {variable2...}
+        glance noisecheck /Volumes/snaapy/data/justins/abi_graffir/coreg/pure/l2_data/geocatL2.GOES-R.2005155.220000.hdf.gz /Volumes/snaapy/data/justins/abi_graffir/noise/noise1x/l2_data/geocatL2.GOES-R.2005155.220000.hdf 
+        """
+        afn,noizfn,bfn = args[:3]
+        LOG.info("opening truth file %s" % afn)
+        a = io.open(afn)
+        LOG.info("opening actual file %s" % noizfn)
+        noiz = io.open(noizfn)
+        LOG.info("opening noise file %s" % bfn)
+        b = io.open(bfn)
         
+        anames = set(a())
+        bnames = set(b()) 
+        cnames = anames.intersection(bnames) # common names
+        pats = args[3:] or ['.*']
+        names = _parse_varnames( cnames, pats, options.epsilon, options.missing )
+        for name,epsilon,missing in names:
+            avar = a[name]
+            bvar = b[name]
+            nvar = noiz[name]
+            if missing is None:
+                amiss = a.missing_value(name)
+                bmiss = b.missing_value(name)
+            else:
+                amiss,bmiss = missing,missing
+            x = avar[:]
+            y = bvar[:]
+            z = nvar[:]
+            def scat(x,xn,y):
+                from pylab import plot,show,scatter
+                scatter(x,y)
+                show()
+            nfo = delta.rms_corr_withnoise(x,y,z,epsilon,(amiss,bmiss),plot=scat)
+            print '-'*32
+            print name
+            for kv in sorted(nfo.items()):
+                print '  %s: %s' % kv
     
     def stats(*args):
         """create statistics summary of variables

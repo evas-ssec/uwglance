@@ -9,6 +9,9 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys, logging
 from numpy import *
+from scipy.stats import pearsonr, spearmanr, pointbiserialr
+
+compute_r = pointbiserialr
 
 LOG = logging.getLogger(__name__)
 
@@ -44,6 +47,48 @@ def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None)):
     trouble = (anfin ^ bnfin) | (amis ^ bmis) | (abs(d)>epsilon)
     return d, mask, trouble, (anfin, bnfin), (amis, bmis)
 
+def corr(x,y,mask):
+    "compute correlation coefficient"
+    gf = mask.flatten()
+    xf = x.flatten()[gf]
+    yf = y.flatten()[gf]
+    assert(sum(~isfinite(yf))==0)
+    assert(sum(~isfinite(xf))==0)
+    return compute_r(xf,yf)[0]
+
+def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(None,None), plot=None):
+    """ compute RMS and R statistics for truth vs actual and truth+noiz vs actual
+    """
+    x=truth
+    y=actual
+    z=noiz
+    d,good,bad,_,_ = diff(x,y,epsilon,(amissing,bmissing))
+    # compute RMS error
+    rmse = sqrt(sum(d[good]**2)) / d.size
+    gf = good.flatten()
+    # raise NotImplementedError # FIXME we're getting NaN for R
+    xf = x.flatten()[gf]
+    yf = y.flatten()[gf]
+    assert(sum(~isfinite(yf))==0)
+    assert(sum(~isfinite(xf))==0)
+    # compute correlation coefficient
+    r = compute_r(xf,yf)[0]
+    # create xpn, x plus noise
+    xpn = array(x)
+    xpn[good] += z[good]
+    xpnf = xpn.flatten()[gf]
+    # compute RMS error versus noise
+    dpn,good,bad,_,_ = diff(xpn,y,epsilon,(amissing,bmissing))
+    rmsepn = sqrt(sum(dpn[good]**2)) / d.size
+    assert(sum(~isfinite(xpnf))==0)
+    rpn = compute_r(xpnf,yf)[0]
+    if plot: plot(xf,xpnf,yf)
+    return { 'rms_error': rmse,
+             'correlation': r,
+             'rms_error_with_noise': rmsepn,
+             'correlation_with_noise': rpn,
+             }
+
 def stats(dif, mask, bad, *etc):
     rms = sum(abs(dif[mask] ** 2)) / dif.size    
     return {    'rms_diff': rms, 
@@ -51,7 +96,6 @@ def stats(dif, mask, bad, *etc):
                 'mean_diff': mean(dif[mask]), 
                 'median_diff': median(dif[mask]) 
                 }
-
 
 def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None)):
     """return dictionary of similarity statistics
@@ -64,6 +108,7 @@ def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None)):
     a_nans = isnan(a)
     b_nans = isnan(b)
     n = a.size
+    r = corr(a,b,mask)
         
     out = { 'a_xor_b_finite_count': a_xor_b_finite,
              'finite_count': sum(mask),
@@ -75,7 +120,8 @@ def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None)):
              'a_nan_count': sum(a_nans),
              'b_nan_count': sum(b_nans),
              'a_and_b_nan_count': sum(a_nans & b_nans),
-             'shape': a.shape
+             'shape': a.shape,
+             'correlation': r
              }
     out.update(stadic)
     return out
