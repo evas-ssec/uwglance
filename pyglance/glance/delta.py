@@ -11,7 +11,7 @@ import os, sys, logging
 from numpy import *
 from scipy.stats import pearsonr, spearmanr, pointbiserialr
 
-compute_r = pointbiserialr
+compute_r = spearmanr
 
 LOG = logging.getLogger(__name__)
 
