@@ -144,6 +144,7 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'a_nan_count': "number of NaNs in A",
                     'b_nan_count': "number of NaNs in B",
                     'a_and_b_nan_count': "number of NaNs in common between A and B",
+                    'correlation': "Pearson correlation r-coefficient (0.0-1.0) for finite values of A and B",
                     'shape': "shape of A"
                     }
 STATISTICS_DOC_STR = '\n'.join( '%s:\n    %s' % x for x in sorted(list(STATISTICS_DOC.items())) ) + '\n'
