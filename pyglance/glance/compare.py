@@ -11,6 +11,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys, logging, re
 from pprint import pprint, pformat
+import numpy as np
 
 import glance.io as io
 import glance.delta as delta
@@ -47,7 +48,6 @@ def _parse_varnames(names, terms, epsilon=0.0, missing=None):
         return eps, mis
     sel = [ ((x,)+_cvt_em(*em)) for x in names for (t,em) in terms if t(x) ]
     return set(sel)
-    
 
 def main():
     import optparse
@@ -58,6 +58,7 @@ examples:
 
 python -m glance.compare info A.hdf
 python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0'
+python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
 
 """
     parser = optparse.OptionParser(usage)
@@ -72,7 +73,15 @@ python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0
     parser.add_option('-e', '--epsilon', dest="epsilon", type='float', default=0.0,
                     help="set default epsilon value for comparison threshold")   
     parser.add_option('-m', '--missing', dest="missing", type='float', default=None,
-                    help="set default missing-value")   
+                    help="set default missing-value")
+    #plotting related options
+    parser.add_option('-p', '--outputpath', dest="outputpath", type='string', default='./',
+                    help="set path to output directory")
+    parser.add_option('-o', '--longitude', dest="longitudeVar", type='string',
+                    help="set name of longitude variable")
+    parser.add_option('-a', '--latitude', dest="latitudeVar", type='string',
+                    help="set name of latitude variable")
+    
                     
     options, args = parser.parse_args()
     if options.self_test:
@@ -209,7 +218,92 @@ python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0
                 if doc_each: print('    ' + delta.STATISTICS_DOC[each[0]])
         if doc_atend:
             print('\n\n' + delta.STATISTICS_DOC_STR)
+    
+    def plotDiffs(*args) :
+        """create comparison images of various variables
+        This option creates graphical comparisons between variables in the two given hdf files.
+        Images will be created to show the variable data value for each of the two files and to show
+        the difference between them.
+        Variables to be compared may be specified after the names of the two input files. If no variables
+        are specified, all variables that match the shape of the longitude and latitude will be compared.
+        Specified variables that do not exist, do not match the correct data shape, or are the longitude/latitude
+        variables will be ignored.
+        Created images will be stored in the provided path, or if no path is provided, they will be stored
+        in the current directory.
+        The longitude and latitude variables may be specified with --longitude and --latitude
+        If no longitude or latitude are specified the imager_prof_retr_abi_r4_generic1 and
+        imager_prof_retr_abi_r4_generic2 variables will be used.
+        Examples:
+         python -m glance.compare plotDiffs A.hdf B.hdf variable_name_1 variable_name_2 variable_name_3 variable_name_4
+         python -m glance.compare --outputpath=/path/where/output/will/be/placed/ plotDiffs A.hdf B.hdf
+         python -m glance.compare plotDiffs --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
+        """
+        # get the file names the user wants to use and open them up
+        aFileName, bFileName = args[:2]
+        LOG.info("opening %s" % aFileName)
+        aFile = io.open(aFileName)
+        LOG.info("opening %s" % bFileName)
+        bFile = io.open(bFileName)
         
+        # get information about the variables stored in the file
+        aNames = set(aFile())
+        bNames = set(bFile())
+        # get the variable names they have in common
+        commonNames = aNames.intersection(bNames)
+        # pull the ones the user asked for (if they asked for any specifically)
+        requestedNames = args[2:] or ['.*']
+        finalNames = _parse_varnames(commonNames, requestedNames, options.epsilon, options.missing)
+        LOG.debug(str(finalNames))
+        hadUserRequest = (len(args) > 2)
+        
+        # get the output path
+        outputPath = options.outputpath
+        # TODO, should I validate that the output path is a file path?
+        LOG.debug(str(outputPath))
+        
+        # get information about the longitude/latitude data we will be using
+        # to build our plots
+        longitudeVariableName = options.longitudeVar or 'imager_prof_retr_abi_r4_generic1'
+        latitudeVariableName = options.latitudeVar or'imager_prof_retr_abi_r4_generic2'
+        LOG.debug(str("longitude variable: " + longitudeVariableName))
+        LOG.debug(str("latitude variable: " + latitudeVariableName))
+        # get the actual data
+        longitudeA = np.array(aFile[longitudeVariableName][:], dtype=np.float)
+        longitudeB = np.array(bFile[longitudeVariableName][:], dtype=np.float)
+        latitudeA = np.array(aFile[latitudeVariableName][:], dtype=np.float)
+        latitudeB = np.array(bFile[latitudeVariableName][:], dtype=np.float)
+        # TODO validate that the two sets are the same (with .shape)
+        
+        # go through each of the possible variables in our files
+        # and make comparison images for whichever ones we can
+        for name, epsilon, missing in finalNames:
+            
+            # get the data for the variable
+            aData = aFile[name][:]
+            bData = bFile[name][:]
+            
+            # check if this data can be displayed and is
+            # not the lon/lat variable itself
+            if ((aData.shape == bData.shape) and
+                (aData.shape == longitudeA.shape) and
+                (bData.shape == longitudeB.shape) and
+                (name != longitudeVariableName) and
+                (name != latitudeVariableName)) :
+                # since things match, we will try to 
+                # create the images comparing that variable
+                plot.plot_and_save_figure_comparison(aData, bData, name,
+                                                     aFileName, bFileName,
+                                                     latitudeA, longitudeA,
+                                                     outputPath, epsilon,
+                                                     missing)
+                # TODO should I pass both sets of lat/lon?
+            # only log a warning if the user themselves picked the faulty variables
+            elif hadUserRequest :
+                LOG.warn(name + ' could not be plotted. This may be because the data for this variable is not the ' +
+                         'right shape or because the variable is currently selected as the longitude or latitude ' +
+                         'variable for this file.')
+        return
+    
     # def build(*args):
     #     """build summary
     #     build extended info

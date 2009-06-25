@@ -21,9 +21,12 @@ def _missing(x,missing_value=None):
         return isnan(x) | (x==missing_value)
     return isnan(x)
 
-def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None)):
+def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None), ignoreMask=None):
     """
     take two arrays of similar size and composition
+    if an ignoreMask is passed in values in the mask will not be analysed to
+    form the various return masks and the corresponding spots in the
+    "difference" return data array will contain nan values.
     return difference array filled with nans where differences aren't valid,
     good mask where values are finite in both a and b
     trouble mask where missing values or nans don't match or delta > epsilon
@@ -33,16 +36,27 @@ def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None)):
     shape = a.shape
     assert(b.shape==shape)
     assert(a.dtype==b.dtype)
-    anfin, bnfin = ~isfinite(a), ~isfinite(b)
+    
+    # if the ignore mask does not exist, set it to include none of the data
+    if (ignoreMask is None) :
+        ignoreMask = zeros(shape,dtype=bool)
+    
+    # deal with the basic masks
+    anfin, bnfin = ~isfinite(a) & ~ignoreMask, ~isfinite(b) & ~ignoreMask
     amis, bmis = zeros(shape,dtype=bool), zeros(shape,dtype=bool)
     if amissing is not None:
         amis[a==amissing] = True
+        amis[ignoreMask] = False # don't analyse the ignored values
     if bmissing is not None:
         bmis[b==bmissing] = True
+        bmis[ignoreMask] = False # don't analyse the ignored values
+    
+    # build the comparison data that includes the "good" values
     d = empty_like(a)
-    mask = ~(anfin | bnfin | amis | bmis)
+    mask = ~(anfin | bnfin | amis | bmis | ignoreMask)
     d[~mask] = nan
     d[mask] = b[mask] - a[mask]
+    
     # trouble areas - mismatched nans, mismatched missing-values, differences > epsilon
     trouble = (anfin ^ bnfin) | (amis ^ bmis) | (abs(d)>epsilon)
     return d, mask, trouble, (anfin, bnfin), (amis, bmis)
