@@ -9,13 +9,14 @@ Created by rayg Apr 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-import os, sys, logging, re
+import os, sys, logging, re, subprocess, datetime
 from pprint import pprint, pformat
 import numpy as np
 
 import glance.io as io
 import glance.delta as delta
 import glance.plot as plot
+import glance.report as report
 
 LOG = logging.getLogger(__name__)
 
@@ -74,13 +75,19 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                     help="set default epsilon value for comparison threshold")   
     parser.add_option('-m', '--missing', dest="missing", type='float', default=None,
                     help="set default missing-value")
-    #plotting related options
+    #report generation related options
     parser.add_option('-p', '--outputpath', dest="outputpath", type='string', default='./',
                     help="set path to output directory")
     parser.add_option('-o', '--longitude', dest="longitudeVar", type='string',
                     help="set name of longitude variable")
     parser.add_option('-a', '--latitude', dest="latitudeVar", type='string',
                     help="set name of latitude variable")
+    parser.add_option('-i', '--imagesonly', dest="imagesOnly", 
+                      action="store_true", default=False,
+                      help="generate only image files (no html report)")
+    parser.add_option('-r', '--reportonly', dest="htmlOnly", 
+                      action="store_true", default=False,
+                      help="generate only html report files (no images)")
     
                     
     options, args = parser.parse_args()
@@ -218,26 +225,74 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                 if doc_each: print('    ' + delta.STATISTICS_DOC[each[0]])
         if doc_atend:
             print('\n\n' + delta.STATISTICS_DOC_STR)
-    
+
     def plotDiffs(*args) :
-        """create comparison images of various variables
-        This option creates graphical comparisons between variables in the two given hdf files.
-        Images will be created to show the variable data value for each of the two files and to show
-        the difference between them.
+        """generate a set of images comparing two files
+        This option creates a set of graphical comparisons of variables in the two given hdf files.
+        The images detailing the differences between variables in the two hdf files will be
+        generated and saved to disk. 
         Variables to be compared may be specified after the names of the two input files. If no variables
         are specified, all variables that match the shape of the longitude and latitude will be compared.
         Specified variables that do not exist, do not match the correct data shape, or are the longitude/latitude
         variables will be ignored.
-        Created images will be stored in the provided path, or if no path is provided, they will be stored
-        in the current directory.
+        The user may also use the notation variable_name:epsilon:missing_value to specify the acceptible epsilon
+        for comparison and the missing_value which indicates missing data. If one or both of these values is absent
+        (in the case of variable_name:epsilon: variable_name::missing_value or just variable_name) the default value
+        of 0.0 will be used for epsilon and no missing values will be analyzed. 
+        The created images will be stored in the provided path, or if no path is provided, they will be stored in
+        the current directory.
         The longitude and latitude variables may be specified with --longitude and --latitude
         If no longitude or latitude are specified the imager_prof_retr_abi_r4_generic1 and
         imager_prof_retr_abi_r4_generic2 variables will be used.
         Examples:
-         python -m glance.compare plotDiffs A.hdf B.hdf variable_name_1 variable_name_2 variable_name_3 variable_name_4
+         python -m glance.compare plotDiffs A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
          python -m glance.compare --outputpath=/path/where/output/will/be/placed/ plotDiffs A.hdf B.hdf
          python -m glance.compare plotDiffs --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
         """
+        # set the options so that a report will not be generated
+        options.imagesOnly = True
+        
+        # make the images
+        reportGen(*args)
+        
+        return
+
+    def reportGen(*args) :
+        """generate a report comparing two files
+        This option creates a report comparing variables in the two given hdf files.
+        An html report and images detailing the differences between variables in the two hdf files will be
+        generated and saved to disk. The images will be embedded in the report or visible as separate .png files.
+        Variables to be compared may be specified after the names of the two input files. If no variables
+        are specified, all variables that match the shape of the longitude and latitude will be compared.
+        Specified variables that do not exist, do not match the correct data shape, or are the longitude/latitude
+        variables will be ignored.
+        The user may also use the notation variable_name:epsilon:missing_value to specify the acceptible epsilon
+        for comparison and the missing_value which indicates missing data. If one or both of these values is absent
+        (in the case of variable_name:epsilon: variable_name::missing_value or just variable_name) the default value
+        of 0.0 will be used for epsilon and no missing values will be analyzed. 
+        The html report page(s) and any created images will be stored in the provided path, or if no path is provided,
+        they will be stored in the current directory.
+        If for some reason you would prefer to generate the report without images, use the --reportonly option. This
+        option will generate the html report but omit the images. This may be significantly faster, depending on
+        your system, but the differences between the files may be quite a bit more difficult to interpret.
+        The longitude and latitude variables may be specified with --longitude and --latitude
+        If no longitude or latitude are specified the imager_prof_retr_abi_r4_generic1 and
+        imager_prof_retr_abi_r4_generic2 variables will be used.
+        Examples:
+         python -m glance.compare reportGen A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
+         python -m glance.compare --outputpath=/path/where/output/will/be/placed/ reportGen A.hdf B.hdf
+         python -m glance.compare reportGen --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
+         python -m glance.compare reportGen --imagesonly A.hdf B.hdf
+        """
+        # should we generate the report html?
+        shouldGenerateReport = not options.imagesOnly
+        # should we generate the images?
+        shouldGenerateImages = not options.htmlOnly
+        if (not shouldGenerateImages) and (not shouldGenerateReport) :
+            LOG.warn("User selection of no image generation and no report generation will result in no " +
+                     "content being generated. Aborting report generation function.")
+            return
+        
         # get the file names the user wants to use and open them up
         aFileName, bFileName = args[:2]
         LOG.info("opening %s" % aFileName)
@@ -245,11 +300,37 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         LOG.info("opening %s" % bFileName)
         bFile = io.open(bFileName)
         
+        # get the file md5sums for later
+        tempSubProcess = subprocess.Popen("md5sum " + aFileName, shell=True, stdout=subprocess.PIPE)
+        fileAmd5sum = tempSubProcess.communicate()[0].split()[0]
+        LOG.info("file a md5sum: " + str(fileAmd5sum))
+        tempSubProcess = subprocess.Popen("md5sum " + bFileName, shell=True, stdout=subprocess.PIPE)
+        fileBmd5sum = tempSubProcess.communicate()[0].split()[0]
+        LOG.info("file b md5sum: " + str(fileBmd5sum))
+        
+        # get the last modified stamps for our files
+        statsForAFile = os.stat(aFileName)
+        lastModifiedTimeA = datetime.datetime.fromtimestamp(statsForAFile.st_mtime).ctime() # should time zone be forced?
+        LOG.info ("file a was last modified: " + lastModifiedTimeA)
+        statsForBFile = os.stat(bFileName)
+        lastModifiedTimeB = datetime.datetime.fromtimestamp(statsForBFile.st_mtime).ctime() # should time zone be forced?
+        LOG.info ("file b was last modified: " + lastModifiedTimeB)
+        
+        # get machine name
+        currentMachine = os.uname()[1]
+        
+        # get the current user
+        currentUser = os.getlogin()
+        LOG.info ("current user: " + currentUser)
+        
         # get information about the variables stored in the file
         aNames = set(aFile())
         bNames = set(bFile())
         # get the variable names they have in common
         commonNames = aNames.intersection(bNames)
+        # which names are unique to only one of the two files?
+        uniqueToANames = aNames - commonNames
+        uniqueToBNames = bNames - commonNames
         # pull the ones the user asked for (if they asked for any specifically)
         requestedNames = args[2:] or ['.*']
         finalNames = _parse_varnames(commonNames, requestedNames, options.epsilon, options.missing)
@@ -258,11 +339,10 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         
         # get the output path
         outputPath = options.outputpath
-        # TODO, should I validate that the output path is a file path?
         LOG.debug(str(outputPath))
         
         # get information about the longitude/latitude data we will be using
-        # to build our plots
+        # to build our report
         longitudeVariableName = options.longitudeVar or 'imager_prof_retr_abi_r4_generic1'
         latitudeVariableName = options.latitudeVar or'imager_prof_retr_abi_r4_generic2'
         LOG.debug(str("longitude variable: " + longitudeVariableName))
@@ -272,10 +352,21 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         longitudeB = np.array(bFile[longitudeVariableName][:], dtype=np.float)
         latitudeA = np.array(aFile[latitudeVariableName][:], dtype=np.float)
         latitudeB = np.array(bFile[latitudeVariableName][:], dtype=np.float)
-        # TODO validate that the two sets are the same (with .shape)
+        
+        # build a mask of our spacially invalid data so we can ask our
+        # comparison tool to ignore it
+        invalidLatitude = (latitudeA < -90) | (latitudeA > 90)
+        invalidLongitude = (longitudeA < -180)   | (longitudeA > 180)
+        spaciallyInvalidMask = invalidLatitude | invalidLongitude
+        numberOfSpaciallyInvalidPts = spaciallyInvalidMask[spaciallyInvalidMask].ravel().shape[0]
+        totalNumPts = spaciallyInvalidMask.shape[0] * spaciallyInvalidMask.shape[1]
+        percentageOfSpaciallyInvalidPts = 100.0 * float(numberOfSpaciallyInvalidPts) / float(totalNumPts)
+        
+        # set some things up to hold info for our reports
+        variableComparisons = {}
         
         # go through each of the possible variables in our files
-        # and make comparison images for whichever ones we can
+        # and make a report section with images for whichever ones we can
         for name, epsilon, missing in finalNames:
             
             # get the data for the variable
@@ -289,21 +380,58 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                 (bData.shape == longitudeB.shape) and
                 (name != longitudeVariableName) and
                 (name != latitudeVariableName)) :
-                # since things match, we will try to 
-                # create the images comparing that variable
-                plot.plot_and_save_figure_comparison(aData, bData, name,
-                                                     aFileName, bFileName,
-                                                     latitudeA, longitudeA,
-                                                     outputPath, epsilon,
-                                                     missing)
-                # TODO should I pass both sets of lat/lon?
+                
+                # if we should be making images, then make them for this variable
+                if (shouldGenerateImages) :
+                    # create the images comparing that variable
+                    plot.plot_and_save_figure_comparison(aData, bData, name,
+                                                         aFileName, bFileName,
+                                                         latitudeA, longitudeA,
+                                                         spaciallyInvalidMask,
+                                                         outputPath, epsilon,
+                                                         missing, True)
+                    # TODO, if it seems like people don't always want the little
+                    # images for diffPlot, wire it up so this can be turned off
+                
+                # generate the report for this variable
+                if (shouldGenerateReport) :
+                    # get the current time
+                    currentTime = datetime.datetime.ctime(datetime.datetime.now())
+                    #get info on the variable
+                    variableStats = delta.summarize(aData, bData, epsilon, (missing, missing))
+                    # hang on to our good % and our epsilon value to describe our comparison
+                    variableComparisons[name] = ((1.0 - variableStats['outside_epsilon_fraction']) * 100.0, epsilon)
+                    print ('generating report for: ' + name)
+                    report.generate_and_save_variable_report(aFileName, bFileName, fileAmd5sum, fileBmd5sum, name,
+                                                             outputPath, name + ".html",
+                                                             epsilon, missing, variableStats, shouldGenerateImages,
+                                                             lastModifiedTimeA, lastModifiedTimeB, currentTime,
+                                                             currentUser, currentMachine)
+                    
             # only log a warning if the user themselves picked the faulty variables
             elif hadUserRequest :
-                LOG.warn(name + ' could not be plotted. This may be because the data for this variable is not the ' +
+                LOG.warn(name + ' could not be compared. This may be because the data for this variable is not the ' +
                          'right shape or because the variable is currently selected as the longitude or latitude ' +
                          'variable for this file.')
+        
+        # generate our overall summary report
+        if (shouldGenerateReport) :
+            print ('generating summary report')
+            # get the current time
+            currentTime = datetime.datetime.ctime(datetime.datetime.now())
+            report.generate_and_save_summary_report(aFileName, bFileName, fileAmd5sum, fileBmd5sum, outputPath, 'index.html',
+                                                    longitudeVariableName, latitudeVariableName,
+                                                    variableComparisons,
+                                                    lastModifiedTimeA, lastModifiedTimeB, currentTime,
+                                                    currentUser, currentMachine,
+                                                    percentageOfSpaciallyInvalidPts,
+                                                    uniqueToANames, uniqueToBNames, commonNames)
+            # make the glossary
+            print ('generating glossary')
+            report.generate_and_save_doc_page(delta.STATISTICS_DOC, outputPath)
+        
         return
-    
+
     # def build(*args):
     #     """build summary
     #     build extended info

@@ -1,0 +1,65 @@
+<title>${variableName} Variable Comparison</title>
+</head>
+<body>
+    
+    <h1>${variableName} Variable Comparison</h1>
+    
+    <p>
+        comparison produced ${currentTime} by user ${currentUser} on ${currentMachine}
+    </p>
+    
+    <p>
+        file A: ${fileAName} <br>
+        md5sum for file A: ${aMD5SUM} <br>
+        last modified: ${lastModifiedTimeA}
+    </p>
+    <p>
+        file B: ${fileBName} <br>
+        md5sum for file B: ${bMD5SUM} <br>
+        last modified: ${lastModifiedTimeB}
+    </p>
+    
+    % if shouldIncludeImages :
+        <h3>Original Data</h3>
+        <p>
+            <a href="./${variableName}.A.png"><img src="./${variableName}.A.small.png"></a>
+            <a href="./${variableName}.B.png"><img src="./${variableName}.B.small.png"></a>
+        </p>
+    % endif
+    
+    <h3>Comparison Information</h3>
+    
+    ## comparison parameters
+    <p>
+        variable name: ${variableName} <br>
+        epsilon value: ${epsilon} <br>
+        "missing" data value:
+        % if missingDataValue is None :
+            None
+        % else :
+            ${missingDataValue}
+        % endif
+    </p>
+    
+    <h3>Statistical Summary</h3>
+    <p>
+        <blockquote>
+            % for statName, statValue in statsData.items() :
+                ${statName}<a href="./doc.html">*</a>: ${statValue} <br> 
+            % endfor
+        </blockquote>
+    </p>
+    
+    % if shouldIncludeImages :
+    <p>
+        
+        <a href="./${variableName}.Diff.png"><img src="./${variableName}.Diff.small.png"></a>
+        <a href="./${variableName}.Trouble.png"><img src="./${variableName}.Trouble.small.png"></a>
+        <a href="./${variableName}.Hist.png"><img src="./${variableName}.Hist.small.png"></a>
+        <a href="./${variableName}.Scatter.png"><img src="./${variableName}.Scatter.small.png"></a>
+    </p>
+    % endif
+    
+</body>
+</html>
+

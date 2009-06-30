@@ -36,138 +36,6 @@ mediumGrayColorMapData = {
 }
 mediumGrayColorMap = colors.LinearSegmentedColormap('mediumGrayColorMap', mediumGrayColorMapData, 256)
 
-def spectral_diff_plot( mean_diff, std_diff, max_diff, min_diff, acceptable_diff=None, x=None ):
-    """plot spectral difference in current axes, wrapped in std
-    >>> x = arange(0,9,0.1)
-    >>> y1 = sin(x)
-    >>> y2 = sin(x+0.05)
-    >>> d = y2-y1
-    >>> s = std(d)
-    >>> spectral_diff_plot( d, s, array([0.1] * len(d)), x=x )
-    """
-    cla()
-    if x is None: x = range(len(mean_diff))
-    if acceptable_diff is not None:
-        plot(x, acceptable_diff, 'g.', hold=True, alpha=0.2)
-        plot(x, -acceptable_diff, 'g.', hold=True, alpha=0.2)
-    plot(x, mean_diff+std_diff, 'r', hold=True, alpha=0.5)
-    plot(x,min_diff,'b')
-    plot(x,max_diff,'b')
-    plot(x, mean_diff-std_diff, 'r', hold=True, alpha=0.5)
-    plot(x, mean_diff, 'k', hold=True)
-
-def compare_spectra(actual, desired=None, acceptable=None, x=None):
-    """ given an actual[spectrum][wnum], desired[spectrum][wnum], plot comparisons of differences
-    """
-    delta = actual-desired if (desired is not None) else actual
-    d_mean = mean(delta,axis=0)
-    d_max = delta.max(axis=0)
-    d_min = delta.min(axis=0)
-    d_std = std(delta,axis=0)
-    des_mean = mean(desired,axis=0)
-    subplot(211)
-    cla()
-    if x is None: x = range(len(des_mean))
-    # plot(x,des_mean+d_max,'b')
-    # plot(x,des_mean+d_min,'b')
-    plot(x,des_mean,'k')
-    grid()
-    title("mean spectrum")
-    subplot(212)
-    spectral_diff_plot(d_mean, d_std, d_max, d_min, acceptable, x)
-    grid()
-    title("difference min-max (blue), mean (black), mean +/- std (red)")
-    
-def plot_and_save_figure_comparison(aData, bData, variableName,
-                                    fileAName, fileBName,
-                                    latitudeData, longitudeData, outputPath,
-                                    epsilon, missing) :
-    """
-    given two files, and information on what to compare, make comparison
-    figures and save them to the given output graph.
-    Four figures will be generated, one for each file, a comparison image
-    that represents the amount of difference in that variable between the
-    two files, and an image highlighting the trouble spots where the
-    difference exceeds epsilon or there are missing or nan values in one
-    or both of the files
-    """
-    print("Creating figures for: " + variableName)
-    
-    # build a mask of our spacially invalid data so we can ask our
-    # comparison tool to ignore it
-    invalidLatitude = (latitudeData < -90) | (latitudeData > 90)
-    invalidLongitude = (longitudeData < -180)   | (longitudeData > 180)
-    spaciallyInvalidMask = invalidLatitude | invalidLongitude
-    
-    # compare the two data sets to get our difference data and trouble info
-    rawDiffData, goodMask, troubleMask, (aNotFiniteMask, bNotFiniteMask), \
-    (aMissingMask, bMissingMask) = delta.diff(aData, bData, epsilon, (missing,missing), spaciallyInvalidMask)
-    diffData = abs(rawDiffData) # we want to show the distance between our two, rather than which one's bigger
-    # mark where our invalid data is for each of the files (a and b) 
-    invalidDataMaskA = aMissingMask | aNotFiniteMask
-    invalidDataMaskB = bMissingMask | bNotFiniteMask
-    # this mask potentially represents data we don't want to try to plot in our diff because it may be malformed
-    everyThingWrongButEpsilon = spaciallyInvalidMask | invalidDataMaskA | invalidDataMaskB
-    # use an exclusive or to get a mask for just the points deemed "bad" by epsilon comparison
-    tooDifferentMask = everyThingWrongButEpsilon ^ troubleMask
-
-    # calculate the bounding range for the display
-    # this is in the form [longitude min, longitude max, latitude min, latitude max]
-    visibleAxes = [_min_with_mask(longitudeData, spaciallyInvalidMask),
-                   _max_with_mask(longitudeData, spaciallyInvalidMask),
-                   _min_with_mask(latitudeData, spaciallyInvalidMask),
-                   _max_with_mask(latitudeData, spaciallyInvalidMask)]
-    
-    # make the three figures
-    print("\tcreating image of file a")
-    figureA = _create_mapped_figure(aData, latitudeData, longitudeData, visibleAxes,
-                                    (variableName + "\nin File A"),
-                                    invalidMask=(spaciallyInvalidMask | invalidDataMaskA))
-    print("\tcreating image of file b")
-    figureB = _create_mapped_figure(bData, latitudeData, longitudeData, visibleAxes,
-                                    (variableName + "\nin File B"),
-                                    invalidMask=(spaciallyInvalidMask | invalidDataMaskB))
-    print("\tcreating image of the amount of difference")
-    figureDiff = _create_mapped_figure(diffData, latitudeData, longitudeData, visibleAxes,
-                                       ("Amount of difference in\n" + variableName),
-                                       invalidMask=(everyThingWrongButEpsilon))
-    # this figure is more complex because we want to mark the trouble points on it
-    print("\tcreating image marking trouble data")
-    figureBadDataInDiff = _create_mapped_figure(bData, latitudeData, longitudeData, visibleAxes,
-                                                ("Areas of trouble data in\n" + variableName),
-                                                spaciallyInvalidMask | invalidDataMaskB,
-                                                mediumGrayColorMap, troubleMask)
-    # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
-    print("\tcreating histogram of the amount of difference")
-    numBinsToUse = 50
-    diffHistogramFigure = _create_histogram(rawDiffData[~everyThingWrongButEpsilon].ravel(), numBinsToUse,
-                                            ("Difference in\n" + variableName),
-                                            ('Value of (Data File B - Data File A) at a Data Point (in ' + str(numBinsToUse) + ' bins)'),
-                                            ('Number of Data Points with a Given Difference'))
-    
-    # TEMP scatter plot test of file a and b comparison
-    print("\tcreating scatter plot of file a values vs file b values")
-    diffScatterPlot = _create_scatter_plot(aData[~everyThingWrongButEpsilon].ravel(), bData[~everyThingWrongButEpsilon].ravel(),
-                                           "Value in File A vs Value in File B", "File A Value", "File B Value",
-                                           tooDifferentMask[~everyThingWrongButEpsilon].ravel())
-    
-    # save the figures to disk
-    print("Saving figures for: " + variableName)
-    print("\tsaving image of file a")
-    figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200)
-    print("\tsaving image of file b")
-    figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=200)
-    print("\tsaving image of the amount of difference")
-    figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=200)
-    print("\tsaving image marking trouble data")
-    figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=200)
-    print("\tsaving histogram of the amount of difference")
-    diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=200)
-    print("\tsaving scatter plot of file a values vs file b values")
-    diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=200)
-    
-    return
-
 # build a scatter plot of the x,y points
 def _create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None) :
     # make the figure
@@ -284,6 +152,144 @@ def _min_with_mask(data, mask) :
 # get the max, ignoring the stuff in mask
 def _max_with_mask(data, mask) :
     return data[~mask].ravel()[data[~mask].argmax()]
+
+def spectral_diff_plot( mean_diff, std_diff, max_diff, min_diff, acceptable_diff=None, x=None ):
+    """plot spectral difference in current axes, wrapped in std
+    >>> x = arange(0,9,0.1)
+    >>> y1 = sin(x)
+    >>> y2 = sin(x+0.05)
+    >>> d = y2-y1
+    >>> s = std(d)
+    >>> spectral_diff_plot( d, s, array([0.1] * len(d)), x=x )
+    """
+    cla()
+    if x is None: x = range(len(mean_diff))
+    if acceptable_diff is not None:
+        plot(x, acceptable_diff, 'g.', hold=True, alpha=0.2)
+        plot(x, -acceptable_diff, 'g.', hold=True, alpha=0.2)
+    plot(x, mean_diff+std_diff, 'r', hold=True, alpha=0.5)
+    plot(x,min_diff,'b')
+    plot(x,max_diff,'b')
+    plot(x, mean_diff-std_diff, 'r', hold=True, alpha=0.5)
+    plot(x, mean_diff, 'k', hold=True)
+
+def compare_spectra(actual, desired=None, acceptable=None, x=None):
+    """ given an actual[spectrum][wnum], desired[spectrum][wnum], plot comparisons of differences
+    """
+    delta = actual-desired if (desired is not None) else actual
+    d_mean = mean(delta,axis=0)
+    d_max = delta.max(axis=0)
+    d_min = delta.min(axis=0)
+    d_std = std(delta,axis=0)
+    des_mean = mean(desired,axis=0)
+    subplot(211)
+    cla()
+    if x is None: x = range(len(des_mean))
+    # plot(x,des_mean+d_max,'b')
+    # plot(x,des_mean+d_min,'b')
+    plot(x,des_mean,'k')
+    grid()
+    title("mean spectrum")
+    subplot(212)
+    spectral_diff_plot(d_mean, d_std, d_max, d_min, acceptable, x)
+    grid()
+    title("difference min-max (blue), mean (black), mean +/- std (red)")
+    
+def plot_and_save_figure_comparison(aData, bData, variableName,
+                                    fileAName, fileBName,
+                                    latitudeData, longitudeData,
+                                    spaciallyInvalidMask,
+                                    outputPath, epsilon, missing,
+                                    makeSmall=False) :
+    """
+    given two files, and information on what to compare, make comparison
+    figures and save them to the given output graph.
+    Four figures will be generated, one for each file, a comparison image
+    that represents the amount of difference in that variable between the
+    two files, and an image highlighting the trouble spots where the
+    difference exceeds epsilon or there are missing or nan values in one
+    or both of the files
+    """
+    print("Creating figures for: " + variableName)
+    
+    # compare the two data sets to get our difference data and trouble info
+    rawDiffData, goodMask, troubleMask, (aNotFiniteMask, bNotFiniteMask), \
+    (aMissingMask, bMissingMask) = delta.diff(aData, bData, epsilon, (missing,missing), spaciallyInvalidMask)
+    diffData = abs(rawDiffData) # we want to show the distance between our two, rather than which one's bigger
+    # mark where our invalid data is for each of the files (a and b) 
+    invalidDataMaskA = aMissingMask | aNotFiniteMask
+    invalidDataMaskB = bMissingMask | bNotFiniteMask
+    # this mask potentially represents data we don't want to try to plot in our diff because it may be malformed
+    everyThingWrongButEpsilon = spaciallyInvalidMask | invalidDataMaskA | invalidDataMaskB
+    # use an exclusive or to get a mask for just the points deemed "bad" by epsilon comparison
+    tooDifferentMask = everyThingWrongButEpsilon ^ troubleMask
+
+    # calculate the bounding range for the display
+    # this is in the form [longitude min, longitude max, latitude min, latitude max]
+    visibleAxes = [_min_with_mask(longitudeData, spaciallyInvalidMask),
+                   _max_with_mask(longitudeData, spaciallyInvalidMask),
+                   _min_with_mask(latitudeData, spaciallyInvalidMask),
+                   _max_with_mask(latitudeData, spaciallyInvalidMask)]
+    
+    # make the three figures
+    print("\tcreating image of file a")
+    figureA = _create_mapped_figure(aData, latitudeData, longitudeData, visibleAxes,
+                                    (variableName + "\nin File A"),
+                                    invalidMask=(spaciallyInvalidMask | invalidDataMaskA))
+    print("\tcreating image of file b")
+    figureB = _create_mapped_figure(bData, latitudeData, longitudeData, visibleAxes,
+                                    (variableName + "\nin File B"),
+                                    invalidMask=(spaciallyInvalidMask | invalidDataMaskB))
+    print("\tcreating image of the amount of difference")
+    figureDiff = _create_mapped_figure(diffData, latitudeData, longitudeData, visibleAxes,
+                                       ("Amount of difference in\n" + variableName),
+                                       invalidMask=(everyThingWrongButEpsilon))
+    # this figure is more complex because we want to mark the trouble points on it
+    print("\tcreating image marking trouble data")
+    figureBadDataInDiff = _create_mapped_figure(bData, latitudeData, longitudeData, visibleAxes,
+                                                ("Areas of trouble data in\n" + variableName),
+                                                spaciallyInvalidMask | invalidDataMaskB,
+                                                mediumGrayColorMap, troubleMask)
+    # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
+    print("\tcreating histogram of the amount of difference")
+    numBinsToUse = 50
+    diffHistogramFigure = _create_histogram(rawDiffData[~everyThingWrongButEpsilon].ravel(), numBinsToUse,
+                                            ("Difference in\n" + variableName),
+                                            ('Value of (Data File B - Data File A) at a Data Point (in ' + str(numBinsToUse) + ' bins)'),
+                                            ('Number of Data Points with a Given Difference'))
+    
+    # TEMP scatter plot test of file a and b comparison
+    print("\tcreating scatter plot of file a values vs file b values")
+    diffScatterPlot = _create_scatter_plot(aData[~everyThingWrongButEpsilon].ravel(), bData[~everyThingWrongButEpsilon].ravel(),
+                                           "Value in File A vs Value in File B", "File A Value", "File B Value",
+                                           tooDifferentMask[~everyThingWrongButEpsilon].ravel())
+    
+    # save the figures to disk
+    print("Saving figures for: " + variableName)
+    print("\tsaving image of file a")
+    figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200) 
+    print("\tsaving image of file b")
+    figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=200) 
+    print("\tsaving image of the amount of difference")
+    figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=200) 
+    print("\tsaving image marking trouble data")
+    figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=200) 
+    print("\tsaving histogram of the amount of difference")
+    diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=200) 
+    print("\tsaving scatter plot of file a values vs file b values")
+    diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=200) 
+    
+    # also save smaller versions of the figures if the parameter says the caller wants us to
+    if (makeSmall) :
+        print("\tsaving smaller versions of images")
+        figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=50)
+        figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=50)
+        figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=50)
+        figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=50)
+        diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=50)
+        diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=50)
+    
+    return
 
 if __name__=='__main__':
     import doctest

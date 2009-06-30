@@ -22,6 +22,7 @@ setup( name="glance",
        zip_safe = True,
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
        packages = find_packages('.'),
-       install_requires=[ 'numpy' ]
+       install_requires=[ 'numpy' ],
+       package_data = {'': ['*.txt'], }
        )
 

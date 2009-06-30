@@ -1,0 +1,90 @@
+<title>Spacial File Comparison</title>
+</head>
+<body>
+    
+    <h2>Comparison Summary</h2>
+    
+    <p>
+        comparison produced ${currentTime} by user ${currentUser} on ${currentMachine}
+    </p>
+    
+    <p>
+        file A: ${fileAName} <br>
+        md5sum for file A: ${aMD5SUM} <br>
+        last modified: ${lastModifiedTimeA}
+    </p>
+    <p>
+        file B: ${fileBName} <br>
+        md5sum for file B: ${bMD5SUM} <br>
+        last modified: ${lastModifiedTimeB}
+    </p>
+    <p>
+        longitude: ${longitudeName} <br>
+        latitude: ${latitudeName} <br>
+    </p>
+    
+    ## report the percentage of spacially invalid points
+    % if not (percentSpaciallyInvalidPts is None) :
+        <p>
+            spacially invalid data: ${percentSpaciallyInvalidPts}%
+        </p>
+    % endif
+    
+    <h3>Compared Variables</h3>
+    
+    ## report on all the variables that were compared and give a basic stat idea of how well they did
+    <blockquote>
+        <p>
+            % for variableName, info in sorted(list(comparedVariables.items())) :
+                Variable: <a href="${variableName | u}.html">${variableName}</a> <br>
+                Epsilon used: ${info[1]} <br>
+                Finite values within one epsilon of difference: ${info[0]}% <br>
+                <br>
+            % endfor
+        </p>
+    </blockquote>
+    
+    ## report the names of variables shared between the two files
+    % if len(sharedVars) > 0 :
+        <h3>Shared Variables</h3>
+        <p>
+            The following variables were common to both files: <br>
+            <blockquote>
+                % for varName in sharedVars :
+                    ${varName} <br>
+                % endfor
+            </blockquote>
+        </p>
+    % endif
+    
+    ## check to see if there are any unique variables we need to report
+    % if (len(uniqueToAVars) > 0) | (len(uniqueToBVars) > 0) :
+        <h3>Unique Variables</h3>
+        
+        % if (len(uniqueToAVars) != 0) :
+            <p>
+                Variables only found in file A:
+                <blockquote>
+                    %for varName in uniqueToAVars :
+                        ${varName} <br>
+                    % endfor
+                </blockquote>
+            </p>
+        % endif
+        
+        % if (len(uniqueToBVars) != 0) :
+            <p>
+                Variables only found in file B:
+                <blockquote>
+                    %for varName in uniqueToBVars :
+                        ${varName} <br>
+                    % endfor
+                </blockquote>
+            </p>
+        % endif
+    
+    % endif
+    
+</body>
+</html>
+
