@@ -398,7 +398,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                     # get the current time
                     currentTime = datetime.datetime.ctime(datetime.datetime.now())
                     #get info on the variable
-                    variableStats = delta.summarize(aData, bData, epsilon, (missing, missing))
+                    variableStats = delta.summarize(aData, bData, epsilon, (missing, missing), spaciallyInvalidMask)
                     # hang on to our good % and our epsilon value to describe our comparison
                     variableComparisons[name] = ((1.0 - variableStats['outside_epsilon_fraction']) * 100.0, epsilon)
                     print ('generating report for: ' + name)

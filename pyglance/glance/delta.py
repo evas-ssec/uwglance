@@ -111,11 +111,11 @@ def stats(dif, mask, bad, *etc):
                 'median_diff': median(dif[mask]) 
                 }
 
-def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None)):
+def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None), ignoreMask=None):
     """return dictionary of similarity statistics
     stats not including 'nan' in name exclude nans in either arrays
     """
-    d, mask, trouble, (anfin, bnfin), (amis, bmis) = nfo = diff(a,b,epsilon,(amiss,bmiss))
+    d, mask, trouble, (anfin, bnfin), (amis, bmis) = nfo = diff(a,b,epsilon,(amiss,bmiss),ignoreMask)
     a_xor_b_finite = sum(anfin ^ bnfin)
     stadic = stats(*nfo)
     n_o_e = sum(trouble)
