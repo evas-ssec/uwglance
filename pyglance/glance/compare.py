@@ -88,6 +88,9 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
     parser.add_option('-r', '--reportonly', dest="htmlOnly", 
                       action="store_true", default=False,
                       help="generate only html report files (no images)")
+# this option will be added in the future
+#    parser.add_option('-c', '--configfile', dest="configFile", type='string',
+#                      help="set optional configuration file")
     
                     
     options, args = parser.parse_args()
