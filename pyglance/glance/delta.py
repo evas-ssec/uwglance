@@ -123,6 +123,8 @@ def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None), ignoreMask=None):
     b_nans = isnan(b)
     n = a.size
     r = corr(a,b,mask)
+    n_perfect = sum(a[~ignoreMask] == b[~ignoreMask])
+    f_perfect = n_perfect / float(n)
         
     out = { 'a_xor_b_finite_count': a_xor_b_finite,
              'finite_count': sum(mask),
@@ -130,11 +132,14 @@ def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None), ignoreMask=None):
              'b_missing_count': sum(bmis),
              'outside_epsilon_count': n_o_e,
              'outside_epsilon_fraction': n_o_e / float(n),
+             'trouble_points_count': n_o_e,
              'max_count': n,
              'a_nan_count': sum(a_nans),
              'b_nan_count': sum(b_nans),
              'a_and_b_nan_count': sum(a_nans & b_nans),
              'shape': a.shape,
+             'perfect_count': n_perfect,
+             'perfect_fraction': f_perfect,
              'correlation': r
              }
     out.update(stadic)
@@ -152,12 +157,15 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'finite_count': "number of finite values in common between A and B",
                     'outside_epsilon_count': "number of finite differences falling outside epsilon",
                     'outside_epsilon_fraction': "fraction of values falling outside epsilon (outside_epsilon_count/max_count)",
+                    'trouble_points_count': "number of pairs of data points in A and B with mismatching finite-ness or a difference falling outside epsilon",
                     'max_count': "number of values (cumprod(shape))",
                     'a_missing_count': "number of values flagged missing in A",
                     'b_missing_count': "number of values flagged missing in B",
                     'a_nan_count': "number of NaNs in A",
                     'b_nan_count': "number of NaNs in B",
                     'a_and_b_nan_count': "number of NaNs in common between A and B",
+                    'perfect_count': "number of perfectly matched data points between A and B",
+                    'perfect_fraction': "fraction of values perfectly matching between A and B",
                     'correlation': "Pearson correlation r-coefficient (0.0-1.0) for finite values of A and B",
                     'shape': "shape of A"
                     }

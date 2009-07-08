@@ -11,8 +11,18 @@ import os, sys, logging
 
 from pkg_resources import resource_string
 from mako.template import Template
+import types as types
+import numpy as np
 
 LOG = logging.getLogger(__name__)
+
+# TODO, this should be overridable in the config file when there is one
+floatFormat = '%.4g'
+formattingSettings = {
+                      types.FloatType: floatFormat,
+                      np.float32: floatFormat,
+                      np.float64: floatFormat
+                      }
 
 # make and save an html page using a mako template, put all the data you need
 # in the template into the kwargs
@@ -26,6 +36,21 @@ def _make_and_save_page (fullFilePath, templateFileNameToUse, **kwargs) :
     
     return
 
+def make_formatted_display_string(displayData) :
+    '''
+    given a piece of data return a display string
+    '''
+    displayString = ''
+    
+    # check to see if there is a format string to use
+    if type(displayData) in formattingSettings :
+        formatStr = formattingSettings[type(displayData)]
+        displayString = formatStr % displayData
+    else :
+        displayString = str(displayData)
+    
+    return displayString
+
 def generate_and_save_summary_report(fileAName, fileBName,
                                      aMD5SUM, bMD5SUM,
                                      outputPath, reportFileName,
@@ -34,7 +59,11 @@ def generate_and_save_summary_report(fileAName, fileBName,
                                      lastModifiedTimeA, lastModifiedTimeB,
                                      currentTime, currentUser,
                                      currentMachine,
-                                     percentSpaciallyInvalidPts=None,
+                                     numSpaciallyInvalidOnlyInA=None,
+                                     numSpaciallyInvalidOnlyInB=None,
+                                     percentSpaciallyInvalidPtsInA=None,
+                                     percentSpaciallyInvalidPtsInB=None,
+                                     percentSpaciallyInvalidPtsInBoth=None,
                                      uniqueToAVars=[], uniqueToBVars=[], sharedVars=[]) :
     """
     given two files, and information about them, save a summary of their comparison
@@ -49,7 +78,11 @@ def generate_and_save_summary_report(fileAName, fileBName,
               'bMD5SUM': bMD5SUM,
               'longitudeName': longitudeName,
               'latitudeName': latitudeName,
-              'percentSpaciallyInvalidPts': percentSpaciallyInvalidPts,
+              'numSpacInvInA': numSpaciallyInvalidOnlyInA,
+              'numSpacInvInB': numSpaciallyInvalidOnlyInB,
+              'perSpacInvPtsInA': percentSpaciallyInvalidPtsInA,
+              'perSpacInvPtsInB': percentSpaciallyInvalidPtsInB,
+              'perSpacInvPtsInBoth': percentSpaciallyInvalidPtsInBoth,
               'uniqueToAVars': uniqueToAVars,
               'uniqueToBVars': uniqueToBVars,
               'sharedVars': sharedVars,

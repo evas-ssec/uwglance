@@ -50,6 +50,84 @@ def _parse_varnames(names, terms, epsilon=0.0, missing=None):
     sel = [ ((x,)+_cvt_em(*em)) for x in names for (t,em) in terms if t(x) ]
     return set(sel)
 
+def _setup_file(fileNameAndPath, prefexText='') :
+    '''
+    open the provided file name/path and extract information on the md5sum and last modification time
+    optional prefext text may be passed in for informational output formatting
+    '''
+    # open the file
+    LOG.info(prefexText + "opening " + fileNameAndPath)
+    fileObject = io.open(fileNameAndPath)
+    
+    # get the file md5sum
+    tempSubProcess = subprocess.Popen("md5sum " + fileNameAndPath, shell=True, stdout=subprocess.PIPE)
+    fileMD5SUM = tempSubProcess.communicate()[0].split()[0]
+    LOG.info(prefexText + "file md5sum: " + str(fileMD5SUM))
+    
+    # get the last modified stamp
+    statsForFile = os.stat(fileNameAndPath)
+    lastModifiedTime = datetime.datetime.fromtimestamp(statsForFile.st_mtime).ctime() # should time zone be forced?
+    LOG.info (prefexText + "file was last modified: " + lastModifiedTime)
+    
+    return fileObject, fileMD5SUM, lastModifiedTime
+
+# TODO in the future this should take information from a config file as well
+def _resolve_names(fileAObject, fileBObject, epsilon, missing, requestedNamesFromCommandLine) :
+    """
+    figure out which names the two files share and which are unique to each file, as well as which names
+    were requested and are in both sets
+    
+    Note: if we ever need a variable with different names in file A and B to be comparable, this logic
+    will need to be changed.
+    """
+    # get information about the variables stored in the files
+    aNames = set(fileAObject())
+    bNames = set(fileBObject())
+    
+    # get the variable names they have in common
+    commonNames = aNames.intersection(bNames)
+    # which names are unique to only one of the two files?
+    uniqueToANames = aNames - commonNames
+    uniqueToBNames = bNames - commonNames
+    
+    # figure out which set should be selected based on the user requested names
+    finalNames = _parse_varnames(commonNames, requestedNamesFromCommandLine, epsilon, missing)
+    LOG.debug("Final selected set of variables to analyze:")
+    LOG.debug(str(finalNames))
+    
+    return finalNames, commonNames, uniqueToANames, uniqueToBNames
+
+def _get_and_analyze_lon_lat (fileObject, latitudeVariableName, longitudeVariableName) :
+    """
+    get the longitude and latitude data from the given file, assuming they are in the given variable names
+    and analyze them to identify spacially invalid data (ie. data that would fall off the earth)
+    """
+    # get the data from the file
+    longitudeData = np.array(fileObject[longitudeVariableName][:], dtype=np.float)
+    latitudeData  = np.array(fileObject[latitudeVariableName][:],  dtype=np.float)
+    
+    # build a mask of our spacially invalid data
+    invalidLatitude = (latitudeData < -90) | (latitudeData > 90)
+    invalidLongitude = (longitudeData < -180)   | (longitudeData > 180)
+    spaciallyInvalidMask = invalidLatitude | invalidLongitude
+    
+    # analyze our spacially invalid data
+    percentageOfSpaciallyInvalidPts, numberOfSpaciallyInvalidPts = _get_percentage_from_mask(spaciallyInvalidMask)
+    
+    return longitudeData, latitudeData, spaciallyInvalidMask, numberOfSpaciallyInvalidPts, percentageOfSpaciallyInvalidPts
+
+def _get_percentage_from_mask(dataMask) :
+    """
+    given a mask that marks the elements we want the percentage of as True (and is the size of our original data),
+    figure out what percentage of the whole they are
+    """
+    numMarkedDataPts = len(dataMask[dataMask].ravel())
+    dataShape = dataMask.shape
+    totalDataPts = dataShape[0] * dataShape[1]
+    percentage = 100.0 * float(numMarkedDataPts) / float(totalDataPts)
+    
+    return percentage, numMarkedDataPts
+
 def main():
     import optparse
     usage = """
@@ -245,8 +323,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         The created images will be stored in the provided path, or if no path is provided, they will be stored in
         the current directory.
         The longitude and latitude variables may be specified with --longitude and --latitude
-        If no longitude or latitude are specified the imager_prof_retr_abi_r4_generic1 and
-        imager_prof_retr_abi_r4_generic2 variables will be used.
+        If no longitude or latitude are specified the pixel_latitude and pixel_longitude variables will be used.
         Examples:
          python -m glance.compare plotDiffs A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
          python -m glance.compare --outputpath=/path/where/output/will/be/placed/ plotDiffs A.hdf B.hdf
@@ -279,8 +356,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         option will generate the html report but omit the images. This may be significantly faster, depending on
         your system, but the differences between the files may be quite a bit more difficult to interpret.
         The longitude and latitude variables may be specified with --longitude and --latitude
-        If no longitude or latitude are specified the imager_prof_retr_abi_r4_generic1 and
-        imager_prof_retr_abi_r4_generic2 variables will be used.
+        If no longitude or latitude are specified the pixel_latitude and pixel_longitude variables will be used.
         Examples:
          python -m glance.compare reportGen A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
          python -m glance.compare --outputpath=/path/where/output/will/be/placed/ reportGen A.hdf B.hdf
@@ -296,75 +372,87 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                      "content being generated. Aborting report generation function.")
             return
         
-        # get the file names the user wants to use and open them up
+        # get the file names the user wants to use
         aFileName, bFileName = args[:2]
-        LOG.info("opening %s" % aFileName)
-        aFile = io.open(aFileName)
-        LOG.info("opening %s" % bFileName)
-        bFile = io.open(bFileName)
-        
-        # get the file md5sums for later
-        tempSubProcess = subprocess.Popen("md5sum " + aFileName, shell=True, stdout=subprocess.PIPE)
-        fileAmd5sum = tempSubProcess.communicate()[0].split()[0]
-        LOG.info("file a md5sum: " + str(fileAmd5sum))
-        tempSubProcess = subprocess.Popen("md5sum " + bFileName, shell=True, stdout=subprocess.PIPE)
-        fileBmd5sum = tempSubProcess.communicate()[0].split()[0]
-        LOG.info("file b md5sum: " + str(fileBmd5sum))
-        
-        # get the last modified stamps for our files
-        statsForAFile = os.stat(aFileName)
-        lastModifiedTimeA = datetime.datetime.fromtimestamp(statsForAFile.st_mtime).ctime() # should time zone be forced?
-        LOG.info ("file a was last modified: " + lastModifiedTimeA)
-        statsForBFile = os.stat(bFileName)
-        lastModifiedTimeB = datetime.datetime.fromtimestamp(statsForBFile.st_mtime).ctime() # should time zone be forced?
-        LOG.info ("file b was last modified: " + lastModifiedTimeB)
+        # now open the files and get some basic info on them
+        LOG.info("Processing File A:")
+        aFile, fileAmd5sum, lastModifiedTimeA = _setup_file(aFileName, "\t")
+        LOG.info("Processing File B:")
+        bFile, fileBmd5sum, lastModifiedTimeB = _setup_file(bFileName, "\t")
         
         # get machine name
         currentMachine = os.uname()[1]
-        
+        LOG.info("current machine: " + currentMachine)
         # get the current user
         currentUser = os.getlogin()
         LOG.info ("current user: " + currentUser)
         
-        # get information about the variables stored in the file
-        aNames = set(aFile())
-        bNames = set(bFile())
-        # get the variable names they have in common
-        commonNames = aNames.intersection(bNames)
-        # which names are unique to only one of the two files?
-        uniqueToANames = aNames - commonNames
-        uniqueToBNames = bNames - commonNames
-        # pull the ones the user asked for (if they asked for any specifically)
-        requestedNames = args[2:] or ['.*']
-        finalNames = _parse_varnames(commonNames, requestedNames, options.epsilon, options.missing)
-        LOG.debug(str(finalNames))
+        # get information about the names the user requested
         hadUserRequest = (len(args) > 2)
+        requestedNames = args[2:] or ['.*']
+        finalNames, commonNames, uniqueToANames, uniqueToBNames = \
+                _resolve_names(aFile, bFile, options.epsilon, options.missing, requestedNames)
         
         # get the output path
         outputPath = options.outputpath
-        LOG.debug(str(outputPath))
+        LOG.debug("output path: " + str(outputPath))
         
         # get information about the longitude/latitude data we will be using
         # to build our report
-        longitudeVariableName = options.longitudeVar or 'imager_prof_retr_abi_r4_generic1'
-        latitudeVariableName = options.latitudeVar or'imager_prof_retr_abi_r4_generic2'
+        longitudeVariableName = options.longitudeVar or 'pixel_longitude'
+        latitudeVariableName = options.latitudeVar or'pixel_latitude'
         LOG.debug(str("longitude variable: " + longitudeVariableName))
         LOG.debug(str("latitude variable: " + latitudeVariableName))
-        # get the actual data
-        longitudeA = np.array(aFile[longitudeVariableName][:], dtype=np.float)
-        longitudeB = np.array(bFile[longitudeVariableName][:], dtype=np.float)
-        latitudeA = np.array(aFile[latitudeVariableName][:], dtype=np.float)
-        latitudeB = np.array(bFile[latitudeVariableName][:], dtype=np.float)
         
-        # build a mask of our spacially invalid data so we can ask our
-        # comparison tool to ignore it
-        invalidLatitude = (latitudeA < -90) | (latitudeA > 90)
-        invalidLongitude = (longitudeA < -180)   | (longitudeA > 180)
-        spaciallyInvalidMask = invalidLatitude | invalidLongitude
-        numberOfSpaciallyInvalidPts = spaciallyInvalidMask[spaciallyInvalidMask].ravel().shape[0]
-        totalNumPts = spaciallyInvalidMask.shape[0] * spaciallyInvalidMask.shape[1]
-        percentageOfSpaciallyInvalidPts = 100.0 * float(numberOfSpaciallyInvalidPts) / float(totalNumPts)
+        # get and analyze our lon/lat data
+        longitudeA, latitudeA, spaciallyInvalidMaskA, \
+            numberOfSpaciallyInvalidPtsA, percentageOfSpaciallyInvalidPtsA = \
+            _get_and_analyze_lon_lat (aFile, latitudeVariableName, longitudeVariableName)
+        longitudeB, latitudeB, spaciallyInvalidMaskB, \
+            numberOfSpaciallyInvalidPtsB, percentageOfSpaciallyInvalidPtsB = \
+            _get_and_analyze_lon_lat (bFile, latitudeVariableName, longitudeVariableName)
         
+        # test the "valid" values in our lon/lat
+        longitude = longitudeA
+        latitude = latitudeA
+        if not all(longitudeA.ravel() == longitudeB.ravel()) and all(latitudeA.ravel() == latitudeB.ravel()) :
+            LOG.warn("Possible mismatch in values stored in file a and file b longitude and latitude values."
+                     + " Depending on the degree of mismatch, some data value comparisons may be "
+                     + "distorted or spacially nonsensical.")
+        
+        # compare our spacialy invalid info
+        spaciallyInvalidMask = spaciallyInvalidMaskA | spaciallyInvalidMaskB
+        percentageOfSpaciallyInvalidPts = percentageOfSpaciallyInvalidPtsA
+        if not all(spaciallyInvalidMaskA.ravel() == spaciallyInvalidMaskB.ravel()) : 
+            LOG.info("Mismatch in number of spatially invalid points. " +
+                     "Files may not have corresponding data where expected.")
+            
+            # figure out which points are only valid in one of the two files
+            validOnlyInAMask = (~spaciallyInvalidMaskA) & spaciallyInvalidMaskB
+            numValidOnlyInA = len(validOnlyInAMask[validOnlyInAMask])
+            validOnlyInBMask = (~spaciallyInvalidMaskB) & spaciallyInvalidMaskA
+            numValidOnlyInB = len(validOnlyInBMask[validOnlyInBMask])
+            
+            # so how many do they have together?
+            percentageOfSpaciallyInvalidPts, totalNumSpaciallyInvPts = _get_percentage_from_mask(spaciallyInvalidMask)
+            # make a "clean" version of the lon/lat
+            longitude[validOnlyInAMask] = longitudeA[validOnlyInAMask]
+            longitude[validOnlyInBMask] = longitudeB[validOnlyInBMask]
+            latitude [validOnlyInAMask] = latitudeA [validOnlyInAMask]
+            latitude [validOnlyInBMask] = latitudeB [validOnlyInBMask]
+            
+            # plot the points that are only valid one file and not the other
+            if numValidOnlyInA > 0 :
+                plot.plot_and_save_spacial_trouble(longitude, latitude,
+                                                   validOnlyInAMask,
+                                                   spaciallyInvalidMaskA,
+                                                   "A", outputPath, True)
+            if numValidOnlyInB > 0 :
+                plot.plot_and_save_spacial_trouble(longitude, latitude,
+                                                   validOnlyInBMask,
+                                                   spaciallyInvalidMaskB,
+                                                   "B", outputPath, True)
+            
         # set some things up to hold info for our reports
         variableComparisons = {}
         
@@ -379,8 +467,8 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             # check if this data can be displayed and is
             # not the lon/lat variable itself
             if ((aData.shape == bData.shape) and
-                (aData.shape == longitudeA.shape) and
-                (bData.shape == longitudeB.shape) and
+                (aData.shape == longitude.shape) and
+                (bData.shape == longitude.shape) and
                 (name != longitudeVariableName) and
                 (name != latitudeVariableName)) :
                 
@@ -389,12 +477,12 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                     # create the images comparing that variable
                     plot.plot_and_save_figure_comparison(aData, bData, name,
                                                          aFileName, bFileName,
-                                                         latitudeA, longitudeA,
+                                                         latitude, longitude,
+                                                         spaciallyInvalidMaskA,
+                                                         spaciallyInvalidMaskB,
                                                          spaciallyInvalidMask,
                                                          outputPath, epsilon,
                                                          missing, True)
-                    # TODO, if it seems like people don't always want the little
-                    # images for diffPlot, wire it up so this can be turned off
                 
                 # generate the report for this variable
                 if (shouldGenerateReport) :
@@ -411,22 +499,26 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                                                              lastModifiedTimeA, lastModifiedTimeB, currentTime,
                                                              currentUser, currentMachine)
                     
-            # only log a warning if the user themselves picked the faulty variables
+            # only log a warning if the user themselves picked the faulty variable
             elif hadUserRequest :
                 LOG.warn(name + ' could not be compared. This may be because the data for this variable is not the ' +
                          'right shape or because the variable is currently selected as the longitude or latitude ' +
                          'variable for this file.')
         
-        # generate our overall summary report
+        # generate our general report pages once we've looked at all the variables
         if (shouldGenerateReport) :
             print ('generating summary report')
             # get the current time
             currentTime = datetime.datetime.ctime(datetime.datetime.now())
+            # generate the report summary page
             report.generate_and_save_summary_report(aFileName, bFileName, fileAmd5sum, fileBmd5sum, outputPath, 'index.html',
                                                     longitudeVariableName, latitudeVariableName,
                                                     variableComparisons,
                                                     lastModifiedTimeA, lastModifiedTimeB, currentTime,
                                                     currentUser, currentMachine,
+                                                    numValidOnlyInA, numValidOnlyInB,
+                                                    percentageOfSpaciallyInvalidPtsA,
+                                                    percentageOfSpaciallyInvalidPtsB,
                                                     percentageOfSpaciallyInvalidPts,
                                                     uniqueToANames, uniqueToBNames, commonNames)
             # make the glossary

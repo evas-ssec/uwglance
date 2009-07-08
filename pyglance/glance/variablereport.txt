@@ -1,3 +1,9 @@
+<%!
+    import types as types
+    import glance.report as report
+%>
+
+
 <title>${variableName} Variable Comparison</title>
 </head>
 <body>
@@ -44,15 +50,15 @@
     <h3>Statistical Summary</h3>
     <p>
         <blockquote>
-            % for statName, statValue in statsData.items() :
-                ${statName}<a href="./doc.html">*</a>: ${statValue} <br> 
+            % for statName, statValue in sorted(list(statsData.items())) :
+                ${statName}<a href="./doc.html">*</a>: ${report.make_formatted_display_string(statValue)} <br>
             % endfor
         </blockquote>
     </p>
     
     % if shouldIncludeImages :
     <p>
-        
+        <a href="./${variableName}.AbsDiff.png"><img src="./${variableName}.AbsDiff.small.png"></a>
         <a href="./${variableName}.Diff.png"><img src="./${variableName}.Diff.small.png"></a>
         <a href="./${variableName}.Trouble.png"><img src="./${variableName}.Trouble.small.png"></a>
         <a href="./${variableName}.Hist.png"><img src="./${variableName}.Hist.small.png"></a>

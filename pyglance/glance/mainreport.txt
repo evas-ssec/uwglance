@@ -1,3 +1,7 @@
+<%!
+    import glance.report as report
+%>
+
 <title>Spacial File Comparison</title>
 </head>
 <body>
@@ -23,11 +27,42 @@
         latitude: ${latitudeName} <br>
     </p>
     
-    ## report the percentage of spacially invalid points
-    % if not (percentSpaciallyInvalidPts is None) :
+    ## if we have some unique spacially invalid points, report them
+    <% haveUniqueSpacialInvalidity = False %>
+    %if not (numSpacInvInA is None) :
+        %if numSpacInvInA > 0 :
+            <% haveUniqueSpacialInvalidity = True %>
+            <p>
+                File A has ${numSpacInvInA} spacially valid data points not present in File B.<br>
+                File A has a total of ${report.make_formatted_display_string(perSpacInvPtsInA)}% spacially invalid data. <br>
+                <a href="./SpatialMismatch.A.png"><img src="./SpatialMismatch.A.small.png"></a>
+            </p>
+        % endif
+    %elif not (perSpacInvPtsInA is None) :
         <p>
-            spacially invalid data: ${percentSpaciallyInvalidPts}%
+            File A has a total of ${report.make_formatted_display_string(perSpacInvPtsInA)}% spacially invalid data. <br>
         </p>
+    % endif
+    %if not (numSpacInvInB is None) :
+        %if numSpacInvInB > 0 :
+            <% haveUniqueSpacialInvalidity = True %>
+            <p>
+                File B has ${numSpacInvInB} spacially valid data points not present in File A.<br>
+                File B has a total of ${report.make_formatted_display_string(perSpacInvPtsInB)}% spacially invalid data.<br>
+                <a href="./SpatialMismatch.B.png"><img src="./SpatialMismatch.B.small.png"></a>
+            </p>
+        % endif
+    %elif not (perSpacInvPtsInB is None) :
+        <p>
+            File B has a total of ${report.make_formatted_display_string(perSpacInvPtsInB)}% spacially invalid data. <br>
+        </p>
+    % endif
+    % if not (perSpacInvPtsInBoth is None) :
+        % if perSpacInvPtsInBoth > 0 :
+            <p>
+                data that is spacially invalid in either file: ${report.make_formatted_display_string(perSpacInvPtsInBoth)}%
+            </p>
+        % endif
     % endif
     
     <h3>Compared Variables</h3>
@@ -38,7 +73,7 @@
             % for variableName, info in sorted(list(comparedVariables.items())) :
                 Variable: <a href="${variableName | u}.html">${variableName}</a> <br>
                 Epsilon used: ${info[1]} <br>
-                Finite values within one epsilon of difference: ${info[0]}% <br>
+                Finite values within one epsilon of difference: ${report.make_formatted_display_string(info[0])}% <br>
                 <br>
             % endfor
         </p>
@@ -58,7 +93,7 @@
     % endif
     
     ## check to see if there are any unique variables we need to report
-    % if (len(uniqueToAVars) > 0) | (len(uniqueToBVars) > 0) :
+    % if (len(uniqueToAVars) > 0) or (len(uniqueToBVars) > 0) :
         <h3>Unique Variables</h3>
         
         % if (len(uniqueToAVars) != 0) :
