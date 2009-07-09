@@ -454,6 +454,8 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                                                    "B", outputPath, True)
             
         # set some things up to hold info for our reports
+        # this is going to be in the form
+        # [var_name] = {"passEpsilonPercent": percent ok with epsilon, "epsilon": epsilon)
         variableComparisons = {}
         
         # go through each of the possible variables in our files
@@ -491,11 +493,14 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                     #get info on the variable
                     variableStats = delta.summarize(aData, bData, epsilon, (missing, missing), spaciallyInvalidMask)
                     # hang on to our good % and our epsilon value to describe our comparison
-                    variableComparisons[name] = ((1.0 - variableStats['outside_epsilon_fraction']) * 100.0, epsilon)
+                    variableComparisons[name] = {'passEpsilonPercent': ((1.0 - variableStats['outside_epsilon_fraction']) * 100.0),
+                                                 'epsilon': epsilon
+                                                 }
                     print ('generating report for: ' + name)
                     report.generate_and_save_variable_report(aFileName, bFileName, fileAmd5sum, fileBmd5sum, name,
+                                                             latitudeVariableName, longitudeVariableName, 
                                                              outputPath, name + ".html",
-                                                             epsilon, missing, variableStats, shouldGenerateImages,
+                                                             epsilon, missing, {'general': variableStats}, shouldGenerateImages,
                                                              lastModifiedTimeA, lastModifiedTimeB, currentTime,
                                                              currentUser, currentMachine)
                     

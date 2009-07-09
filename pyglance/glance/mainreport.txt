@@ -1,3 +1,10 @@
+<%doc>
+This Mako template is intended to create a summary report page for glance reportGen.
+
+Created by Eva Schiffer Jun 2009.
+Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
+</%doc>
+
 <%!
     import glance.report as report
 %>
@@ -9,58 +16,57 @@
     <h2>Comparison Summary</h2>
     
     <p>
-        comparison produced ${currentTime} by user ${currentUser} on ${currentMachine}
+        comparison produced ${runInfo['time']} by user ${runInfo['user']} on ${runInfo['machine']}
     </p>
     
+    ## show information on each of the files we're comparing (should only be two)
+    % for fileKey in sorted(list(files)) :
+        <% tempFileInfo = files[fileKey] %>
+        <p>
+            ${fileKey}: ${tempFileInfo['path']} <br>
+            md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
+            last modified: ${tempFileInfo['lastModifiedTime']}
+        </p>
+    % endfor
     <p>
-        file A: ${fileAName} <br>
-        md5sum for file A: ${aMD5SUM} <br>
-        last modified: ${lastModifiedTimeA}
-    </p>
-    <p>
-        file B: ${fileBName} <br>
-        md5sum for file B: ${bMD5SUM} <br>
-        last modified: ${lastModifiedTimeB}
-    </p>
-    <p>
-        longitude: ${longitudeName} <br>
-        latitude: ${latitudeName} <br>
+        latitude: ${runInfo['latitude']} <br>
+        longitude: ${runInfo['longitude']}
     </p>
     
     ## if we have some unique spacially invalid points, report them
     <% haveUniqueSpacialInvalidity = False %>
-    %if not (numSpacInvInA is None) :
-        %if numSpacInvInA > 0 :
-            <% haveUniqueSpacialInvalidity = True %>
-            <p>
-                File A has ${numSpacInvInA} spacially valid data points not present in File B.<br>
-                File A has a total of ${report.make_formatted_display_string(perSpacInvPtsInA)}% spacially invalid data. <br>
-                <a href="./SpatialMismatch.A.png"><img src="./SpatialMismatch.A.small.png"></a>
-            </p>
-        % endif
-    %elif not (perSpacInvPtsInA is None) :
+    ## we will assume the whole substructure will be present if there's a problem with file A
+    ## that we need to report on specifically
+    %if spatial.has_key('file A') and (spatial['file A']['numInvPts'] > 0) :
+        <%
+            fileAInfo = spatial['file A']
+            haveUniqueSpacialInvalidity = True
+        %>
         <p>
-            File A has a total of ${report.make_formatted_display_string(perSpacInvPtsInA)}% spacially invalid data. <br>
+            File A has ${fileAInfo['numInvPts']} spacially valid data points not present in File B.<br>
+            File A has a total of ${report.make_formatted_display_string(fileAInfo['perInvPts'])}% spacially invalid data. <br>
+            <a href="./SpatialMismatch.A.png"><img src="./SpatialMismatch.A.small.png"></a>
         </p>
     % endif
-    %if not (numSpacInvInB is None) :
-        %if numSpacInvInB > 0 :
-            <% haveUniqueSpacialInvalidity = True %>
-            <p>
-                File B has ${numSpacInvInB} spacially valid data points not present in File A.<br>
-                File B has a total of ${report.make_formatted_display_string(perSpacInvPtsInB)}% spacially invalid data.<br>
-                <a href="./SpatialMismatch.B.png"><img src="./SpatialMismatch.B.small.png"></a>
-            </p>
-        % endif
-    %elif not (perSpacInvPtsInB is None) :
+    ## we will assume the whole substructure will be present if there's a problem with file B
+    ## that we need to report on specifically
+    %if spatial.has_key('file B') and (spatial['file B']['numInvPts'] > 0) :
+        <%
+            fileBInfo = spatial['file B']
+            haveUniqueSpacialInvalidity = True
+        %>
         <p>
-            File B has a total of ${report.make_formatted_display_string(perSpacInvPtsInB)}% spacially invalid data. <br>
+            File B has ${fileBInfo['numInvPts']} spacially valid data points not present in File A.<br>
+            File B has a total of ${report.make_formatted_display_string(fileBInfo['perInvPts'])}% spacially invalid data. <br>
+            <a href="./SpatialMismatch.B.png"><img src="./SpatialMismatch.B.small.png"></a>
         </p>
     % endif
-    % if not (perSpacInvPtsInBoth is None) :
-        % if perSpacInvPtsInBoth > 0 :
+    ## report on shared spatial invalidity if there is any
+    % if spatial.has_key('perInvPtsInBoth') :
+        <% perInBoth = spatial['perInvPtsInBoth'] %>
+        % if perInBoth > 0 :
             <p>
-                data that is spacially invalid in either file: ${report.make_formatted_display_string(perSpacInvPtsInBoth)}%
+                data that is spacially invalid in either file: ${report.make_formatted_display_string(perInBoth)}%
             </p>
         % endif
     % endif
@@ -70,16 +76,19 @@
     ## report on all the variables that were compared and give a basic stat idea of how well they did
     <blockquote>
         <p>
-            % for variableName, info in sorted(list(comparedVariables.items())) :
+            % for variableName in sorted(list(variables)) :
+                <% tempVariableInfo = variables[variableName] %>
                 Variable: <a href="${variableName | u}.html">${variableName}</a> <br>
-                Epsilon used: ${info[1]} <br>
-                Finite values within one epsilon of difference: ${report.make_formatted_display_string(info[0])}% <br>
+                Epsilon used: ${tempVariableInfo['epsilon']} <br>
+                Finite values within one epsilon of difference:
+                ${report.make_formatted_display_string(tempVariableInfo['passEpsilonPercent'])}% <br>
                 <br>
             % endfor
         </p>
     </blockquote>
     
     ## report the names of variables shared between the two files
+    <% sharedVars = varNames['sharedVars'] %>
     % if len(sharedVars) > 0 :
         <h3>Shared Variables</h3>
         <p>
@@ -93,6 +102,10 @@
     % endif
     
     ## check to see if there are any unique variables we need to report
+    <%
+        uniqueToAVars = varNames['uniqueToAVars']
+        uniqueToBVars = varNames['uniqueToBVars']
+    %>
     % if (len(uniqueToAVars) > 0) or (len(uniqueToBVars) > 0) :
         <h3>Unique Variables</h3>
         

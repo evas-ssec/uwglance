@@ -59,40 +59,66 @@ def generate_and_save_summary_report(fileAName, fileBName,
                                      lastModifiedTimeA, lastModifiedTimeB,
                                      currentTime, currentUser,
                                      currentMachine,
-                                     numSpaciallyInvalidOnlyInA=None,
-                                     numSpaciallyInvalidOnlyInB=None,
-                                     percentSpaciallyInvalidPtsInA=None,
-                                     percentSpaciallyInvalidPtsInB=None,
-                                     percentSpaciallyInvalidPtsInBoth=None,
+                                     numSpacInvOnlyInA=None,
+                                     numSpacInvOnlyInB=None,
+                                     perSpacInvPtsInA=None,
+                                     perSpacInvPtsInB=None,
+                                     perSpacInvPtsInBoth=None,
                                      uniqueToAVars=[], uniqueToBVars=[], sharedVars=[]) :
     """
     given two files, and information about them, save a summary of their comparison
     The summary report, in html format will be saved to the given outputPath/outputFile
-    Variables should be a dictionary containing the name of each compared variable and the
+    
+    Variables should be a dictionary keyed on the name of each compared variable and containing the
     % of data values that were judged to be "similar enough" between file A and B (according
-    to the epsilon originally inputed for the comparison)
+    to the epsilon originally inputed for the comparison) and the epsilon used for the comparison
+        variables[var_name] = {"passEpsilonPercent": percent "similar enough" according to epsilon, "epsilon": epsilon)
+    more keys can be added in the future if more detailed data reporting is desired on the main report page
     """
-    kwargs = {'fileAName': fileAName,
-              'fileBName': fileBName,
-              'aMD5SUM': aMD5SUM,
-              'bMD5SUM': bMD5SUM,
-              'longitudeName': longitudeName,
-              'latitudeName': latitudeName,
-              'numSpacInvInA': numSpaciallyInvalidOnlyInA,
-              'numSpacInvInB': numSpaciallyInvalidOnlyInB,
-              'perSpacInvPtsInA': percentSpaciallyInvalidPtsInA,
-              'perSpacInvPtsInB': percentSpaciallyInvalidPtsInB,
-              'perSpacInvPtsInBoth': percentSpaciallyInvalidPtsInBoth,
-              'uniqueToAVars': uniqueToAVars,
-              'uniqueToBVars': uniqueToBVars,
-              'sharedVars': sharedVars,
-              'comparedVariables': variables,
-              'lastModifiedTimeA': lastModifiedTimeA,
-              'lastModifiedTimeB': lastModifiedTimeB,
-              'currentTime': currentTime,
-              'currentUser': currentUser,
-              'currentMachine': currentMachine
-              }
+    
+    # pack up all the data needed to build the summary report
+    
+    # information about the run in general
+    runInfo = {'machine': currentMachine,
+               'user': currentUser,
+               'time': currentTime,
+               'latitude': latitudeName,
+               'longitude': longitudeName
+               }
+    # information about the files that were compared
+    files = {'file A': {'path': fileAName,
+                        #'displayName': fileADisplayName, # TODO
+                        'lastModifiedTime': lastModifiedTimeA,
+                        'md5sum': aMD5SUM
+                        },
+             'file B': {'path': fileBName,
+                        #'displayName': fileADisplayName, # TODO
+                        'lastModifiedTime': lastModifiedTimeB,
+                        'md5sum': bMD5SUM
+                        }
+                }
+    # information about the spatial validity of the data
+    spatial = {'file A': {'numInvPts': numSpacInvOnlyInA,
+                          'perInvPts': perSpacInvPtsInA
+                          },
+               'file B': {'numInvPts': numSpacInvOnlyInB,
+                          'perInvPts': perSpacInvPtsInB
+                          },
+               'perInvPtsInBoth': perSpacInvPtsInBoth
+        }
+    # information about the variables present in the files
+    varNames = {'uniqueToAVars': uniqueToAVars,
+                'uniqueToBVars': uniqueToBVars,
+                'sharedVars': sharedVars
+                }
+    # build the full kwargs with all the info
+    kwargs = { 'runInfo': runInfo,
+               'files': files,
+               'spatial': spatial,
+               'varNames': varNames,
+               'variables': variables 
+               }
+              
     _make_and_save_page((outputPath + "/" + reportFileName), './mainreport.txt', **kwargs)
     
     return
@@ -110,9 +136,10 @@ def generate_and_save_doc_page(definitions, outputPath) :
 def generate_and_save_variable_report(fileAName, fileBName,
                                       aMD5SUM, bMD5SUM,
                                       variableName,
+                                      latitudeName, longitudeName,
                                       outputPath, reportFileName,
                                       epsilon, missingDataValue,
-                                      statsData, shouldIncludeImages,
+                                      statGroups, shouldIncludeImages,
                                       lastModifiedTimeA, lastModifiedTimeB,
                                       currentTime, currentUser,
                                       currentMachine) :
@@ -120,7 +147,42 @@ def generate_and_save_variable_report(fileAName, fileBName,
     given two files and information about the comparison of one of their variables,
     generate an html report about that variable and store it the outputPath/reportFileName
     provided
+    statGroups is a dictionary in the form
+         statGroups['stat group display name'] = {a dictionary of stats/values to show}
+    ie. there may be many different groups of stats that should each be displayed
     """
+    
+    # pack up all the data for a report on a particular variable
+    
+    # information about the run in general
+    runInfo = {'machine': currentMachine,
+               'user': currentUser,
+               'time': currentTime,
+               'latitude': latitudeName,
+               'longitude': longitudeName,
+               'variableName': variableName,
+               'epsilon': epsilon,
+               'missingDataValue': missingDataValue,
+               'shouldIncludeImages': shouldIncludeImages
+               }
+    # information about the files that were compared
+    files = {'file A': {'path': fileAName,
+                        #'displayName': fileADisplayName, # TODO
+                        'lastModifiedTime': lastModifiedTimeA,
+                        'md5sum': aMD5SUM
+                        },
+             'file B': {'path': fileBName,
+                        #'displayName': fileADisplayName, # TODO
+                        'lastModifiedTime': lastModifiedTimeB,
+                        'md5sum': bMD5SUM
+                        }
+                }
+    # put all the info together in the kwargs
+    kwargs = { 'runInfo': runInfo,
+               'files' : files,
+               'statGroups': statGroups 
+               }
+    '''
     kwargs = {'fileAName': fileAName,
               'fileBName': fileBName,
               'aMD5SUM' : aMD5SUM,
@@ -136,6 +198,8 @@ def generate_and_save_variable_report(fileAName, fileBName,
               'currentUser': currentUser,
               'currentMachine': currentMachine
               }
+              '''
+              
     _make_and_save_page((outputPath + "/" + reportFileName), './variablereport.txt', **kwargs)
     
     return

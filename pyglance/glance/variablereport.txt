@@ -1,8 +1,17 @@
+<%doc>
+This Mako template is intended to create a variable specific report page for glance reportGen.
+
+Created by Eva Schiffer Jun 2009.
+Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
+</%doc>
+
 <%!
     import types as types
     import glance.report as report
 %>
 
+## we will use this a lot, so hang on to it
+<% variableName = runInfo['variableName'] %>
 
 <title>${variableName} Variable Comparison</title>
 </head>
@@ -11,20 +20,24 @@
     <h1>${variableName} Variable Comparison</h1>
     
     <p>
-        comparison produced ${currentTime} by user ${currentUser} on ${currentMachine}
+        comparison produced ${runInfo['time']} by user ${runInfo['user']} on ${runInfo['machine']}
     </p>
     
+    ## show information on each of the files we're comparing (should only be two)
+    % for fileKey in sorted(list(files)) :
+        <% tempFileInfo = files[fileKey] %>
+        <p>
+            ${fileKey}: ${tempFileInfo['path']} <br>
+            md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
+            last modified: ${tempFileInfo['lastModifiedTime']}
+        </p>
+    % endfor
     <p>
-        file A: ${fileAName} <br>
-        md5sum for file A: ${aMD5SUM} <br>
-        last modified: ${lastModifiedTimeA}
-    </p>
-    <p>
-        file B: ${fileBName} <br>
-        md5sum for file B: ${bMD5SUM} <br>
-        last modified: ${lastModifiedTimeB}
+        latitude: ${runInfo['latitude']} <br>
+        longitude: ${runInfo['longitude']}
     </p>
     
+    <% shouldIncludeImages = runInfo['shouldIncludeImages'] %>
     % if shouldIncludeImages :
         <h3>Original Data</h3>
         <p>
@@ -38,8 +51,9 @@
     ## comparison parameters
     <p>
         variable name: ${variableName} <br>
-        epsilon value: ${epsilon} <br>
+        epsilon value: ${runInfo['epsilon']} <br>
         "missing" data value:
+        <% missingDataValue = runInfo['missingDataValue'] %>
         % if missingDataValue is None :
             None
         % else :
@@ -48,13 +62,22 @@
     </p>
     
     <h3>Statistical Summary</h3>
-    <p>
-        <blockquote>
-            % for statName, statValue in sorted(list(statsData.items())) :
-                ${statName}<a href="./doc.html">*</a>: ${report.make_formatted_display_string(statValue)} <br>
-            % endfor
-        </blockquote>
-    </p>
+    
+    ## list out all of the statistics groups we have
+    <dl>
+    % for setName in sorted(list(statGroups)) :
+        <% dataSet = statGroups[setName] %>
+            <dt>
+                ${setName}
+            </dt>
+            <dd>
+                % for statName, statValue in sorted(list(dataSet.items())) :
+                    ${statName}<a href="./doc.html">*</a>: ${report.make_formatted_display_string(statValue)} <br>
+                % endfor
+                <br>
+            <dd>
+    % endfor
+    </dl>
     
     % if shouldIncludeImages :
     <p>
