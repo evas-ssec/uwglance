@@ -14,6 +14,7 @@ try:
     import h5py
 except ImportError:
     pass
+from pycdf import CDF
 
 LOG = logging.getLogger(__name__)
 
@@ -37,8 +38,29 @@ class hdf(SD):
         return getattr(self.select(name),'_FillValue',None)
         
 
-FIXME_IDPS = [ '/All_Data/CrIS-SDR_All/ES' + ri + band for ri in ['Real','Imaginary'] for band in ['LW','MW','SW'] ] 
+class nc(CDF):
+    """wrapper for NetCDF3/4/opendap dataset for comparison
+    __call__ yields sequence of variable names
+    __getitem__ returns individual variables ready for slicing to numpy arrays
+    """
+    
+    def __init__(self,filename):
+        super(self.__class__,self).__init__(filename, NC.NOWRITE)
 
+    def __call__(self):
+        "yield names of variables to be compared"
+        return self.variables().keys()
+    
+    def __getitem__(self, name):
+        return self.var(name)
+        
+    def missing_value(self, name):
+        return getattr(self.var(name),'_FillValue',getattr(self.var(name),'missing_value',None))
+nc4 = nc
+cdf = nc
+
+
+FIXME_IDPS = [ '/All_Data/CrIS-SDR_All/ES' + ri + band for ri in ['Real','Imaginary'] for band in ['LW','MW','SW'] ] 
 
 class h5(object):
     """wrapper for HDF5 datasets
