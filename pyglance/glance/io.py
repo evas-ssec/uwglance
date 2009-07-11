@@ -14,7 +14,7 @@ try:
     import h5py
 except ImportError:
     pass
-from pycdf import CDF
+from pycdf import CDF, NC
 
 LOG = logging.getLogger(__name__)
 
