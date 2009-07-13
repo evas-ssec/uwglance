@@ -10,6 +10,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
 import os, sys, logging, re, subprocess, datetime
+import imp as imp
 from pprint import pprint, pformat
 import numpy as np
 
@@ -19,6 +20,16 @@ import glance.plot as plot
 import glance.report as report
 
 LOG = logging.getLogger(__name__)
+
+glance_default_longitude_name = 'pixel_longitude' 
+glance_default_latitude_name = 'pixel_latitude'
+
+# these are the built in default settings
+glance_analysis_defaults = {'epsilon': 0.0,
+                            'missing_value': None,
+                            'epsilon_failure_tolerance': None, # this means don't do the check
+                            'nonfinite_data_tolerance': None # this means don't do the check
+                            }
 
 def _cvt_names(namelist, epsilon, missing):
     """"if variable names are of the format name:epsilon, yield name,epsilon, missing
@@ -55,30 +66,28 @@ def _setup_file(fileNameAndPath, prefexText='') :
     open the provided file name/path and extract information on the md5sum and last modification time
     optional prefext text may be passed in for informational output formatting
     '''
+    # some info to return
+    fileInfo = {'path': fileNameAndPath}
+    
     # open the file
     LOG.info(prefexText + "opening " + fileNameAndPath)
     fileObject = io.open(fileNameAndPath)
     
     # get the file md5sum
     tempSubProcess = subprocess.Popen("md5sum " + fileNameAndPath, shell=True, stdout=subprocess.PIPE)
-    fileMD5SUM = tempSubProcess.communicate()[0].split()[0]
-    LOG.info(prefexText + "file md5sum: " + str(fileMD5SUM))
+    fileInfo['md5sum'] = tempSubProcess.communicate()[0].split()[0]
+    LOG.info(prefexText + "file md5sum: " + str(fileInfo['md5sum']))
     
     # get the last modified stamp
     statsForFile = os.stat(fileNameAndPath)
-    lastModifiedTime = datetime.datetime.fromtimestamp(statsForFile.st_mtime).ctime() # should time zone be forced?
-    LOG.info (prefexText + "file was last modified: " + lastModifiedTime)
+    fileInfo['lastModifiedTime'] = datetime.datetime.fromtimestamp(statsForFile.st_mtime).ctime() # should time zone be forced?
+    LOG.info (prefexText + "file was last modified: " + fileInfo['lastModifiedTime'])
     
-    return fileObject, fileMD5SUM, lastModifiedTime
+    return fileObject, fileInfo
 
-# TODO in the future this should take information from a config file as well
-def _resolve_names(fileAObject, fileBObject, epsilon, missing, requestedNamesFromCommandLine) :
+def _check_file_names(fileAObject, fileBObject) :
     """
-    figure out which names the two files share and which are unique to each file, as well as which names
-    were requested and are in both sets
-    
-    Note: if we ever need a variable with different names in file A and B to be comparable, this logic
-    will need to be changed.
+    get information about the names in the two files and how they compare to each other
     """
     # get information about the variables stored in the files
     aNames = set(fileAObject())
@@ -90,12 +99,145 @@ def _resolve_names(fileAObject, fileBObject, epsilon, missing, requestedNamesFro
     uniqueToANames = aNames - commonNames
     uniqueToBNames = bNames - commonNames
     
+    return {'sharedVars': commonNames,  'uniqueToAVars': uniqueToANames, 'uniqueToBVars': uniqueToBNames}
+
+def _resolve_names(fileAObject, fileBObject, defaultValues,
+                   requestedNames, usingConfigFileFormat=False) :
+    """
+    figure out which names the two files share and which are unique to each file, as well as which names
+    were requested and are in both sets
+    
+    usingConfigFileFormat signals whether the requestedNames parameter will be in the form of the inputed
+    names from the command line or a more complex dictionary holding information about the names read in
+    from a configuration file
+    
+    Note: if we ever need a variable with different names in file A and B to be comparable, this logic
+    will need to be changed.
+    """
+    # look at the names present in the two files and compare them
+    nameComparison = _check_file_names(fileAObject, fileBObject)
+    
     # figure out which set should be selected based on the user requested names
-    finalNames = _parse_varnames(commonNames, requestedNamesFromCommandLine, epsilon, missing)
+    fileCommonNames = nameComparison['sharedVars']
+    finalNames = {}
+    if (usingConfigFileFormat) :
+        
+        # if the user didn't ask for any, try everything
+        if (requestedNames == {}) :
+            finalFromCommandLine = _parse_varnames(fileCommonNames, ['.*'],
+                                                   defaultValues['epsilon'], defaultValues['missing_value'])
+            for name, epsilon, missing in finalFromCommandLine :
+                # note that we'll use the variable's name as the display name for the time being
+                finalNames[name] = {'variable_name': name,
+                                    'epsilon': defaultValues['epsilon'],
+                                    'missing_value': defaultValues['missing_value']
+                                    }
+        # otherwise just do the ones the user asked for
+        else : 
+            # TODO, how could I do this without a loop?
+            for name in fileCommonNames :
+                if requestedNames.has_key(name) :
+                    finalNames[name] = defaultValues.copy()
+                    finalNames[name]['variable_name'] = name
+                    finalNames[name].update(requestedNames[name])
+    else:
+        # format this similarly to the stuff from the config file
+        finalFromCommandLine = _parse_varnames(fileCommonNames, requestedNames,
+                                               defaultValues['epsilon'], defaultValues['missing_value'])
+        for name, epsilon, missing in finalFromCommandLine :
+            # note that we'll use the variable's name as the display name for the time being
+            finalNames[name] = {'variable_name': name,
+                                'epsilon': defaultValues['epsilon'],
+                                'missing_value': defaultValues['missing_value']
+                                }
+    
     LOG.debug("Final selected set of variables to analyze:")
     LOG.debug(str(finalNames))
     
-    return finalNames, commonNames, uniqueToANames, uniqueToBNames
+    return finalNames, nameComparison
+
+def _load_config_or_options(optionsSet, originalArgs) :
+    """
+    load information on how the user wants to run the command either from the command line options or
+    from a configuration file
+    """
+    
+    # basic defaults for stuff we will need to return
+    runInfo = {}
+    runInfo['shouldIncludeReport'] = True
+    runInfo['shouldIncludeImages'] = False
+    runInfo['latitude'] = glance_default_latitude_name
+    runInfo['longitude'] = glance_default_longitude_name
+    # by default, we don't have any particular variables to analyze
+    desiredVariables = {}
+    # use the built in default values, to start with
+    defaultsToUse = glance_analysis_defaults.copy()
+    
+    requestedNames = None
+    
+    # set up the paths, they can only come from the command line
+    paths = {}
+    paths['a'], paths['b'] = originalArgs[:2] # todo, let caller control # of paths expected?
+    paths['out'] = optionsSet.outputpath
+    
+    # check to see if the user wants to use a config file and if the path exists
+    requestedConfigFile = optionsSet.configFile
+    usedConfigFile = False
+    if (not (requestedConfigFile is None)) and os.path.exists(requestedConfigFile):
+        
+        LOG.info ("Using Config File Settings")
+        
+        # this will handle relative paths, but not '~'?
+        requestedConfigFile = os.path.abspath(os.path.expanduser(requestedConfigFile))
+        
+        # split out the file base name and the file path
+        (filePath, fileName) = os.path.split(requestedConfigFile)
+        splitFileName = fileName.split('.')
+        fileBaseName = fileName[:-3] # remove the '.py' from the end
+        
+        # load the file
+        print('loading config file: ' + str(requestedConfigFile))
+        glanceRunConfig = imp.load_module(fileBaseName, file(requestedConfigFile, 'U'),
+                                          filePath, ('.py' , 'U', 1))
+        
+        # get everything from the config file
+        runInfo['shouldIncludeImages'] = glanceRunConfig.shouldIncludeImages
+        runInfo['latitude'] = glanceRunConfig.latitudeVar or runInfo['latitude']
+        runInfo['longitude'] = glanceRunConfig.longitudeVar or runInfo['longitude']
+        
+        # get any requested names
+        requestedNames = glanceRunConfig.setOfVariables.copy()
+        
+        # user selected defaults, if they omit any we'll still be using the program defaults
+        defaultsToUse.update(glanceRunConfig.defaultValues)
+        
+        # this is an exception, since it is not advertised to the user we don't expect it to be in the file
+        # (at least not at the moment, it could be added later)
+        runInfo['shouldIncludeReport'] = not optionsSet.imagesOnly 
+        
+        usedConfigFile = True
+    
+    # if we didn't get the info from the config file for some reason
+    # (the user didn't want to, we couldn't, etc...) get it from the command line options
+    if not usedConfigFile:
+        
+        LOG.info ('Using Command Line Settings')
+        
+        # so get everything from the options directly
+        runInfo['shouldIncludeReport'] = not optionsSet.imagesOnly
+        runInfo['shouldIncludeImages'] = not optionsSet.htmlOnly
+        runInfo['latitude'] = optionsSet.latitudeVar or runInfo['latitude']
+        runInfo['longitude'] = optionsSet.longitudeVar or runInfo['longitude']
+        
+        # get any requested names from the command line
+        requestedNames = originalArgs[2:] or ['.*']
+        
+        # user selected defaults
+        defaultsToUse['epsilon'] = optionsSet.epsilon
+        defaultsToUse['missing_value'] = optionsSet.missing
+        # there is no way to set the tolerances from the command line at the moment
+    
+    return paths, runInfo, defaultsToUse, requestedNames, usedConfigFile
 
 def _get_and_analyze_lon_lat (fileObject, latitudeVariableName, longitudeVariableName) :
     """
@@ -166,9 +308,8 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
     parser.add_option('-r', '--reportonly', dest="htmlOnly", 
                       action="store_true", default=False,
                       help="generate only html report files (no images)")
-# this option will be added in the future
-#    parser.add_option('-c', '--configfile', dest="configFile", type='string',
-#                      help="set optional configuration file")
+    parser.add_option('-c', '--configfile', dest="configFile", type='string', default=None,
+                      help="set optional configuration file")
     
                     
     options, args = parser.parse_args()
@@ -363,54 +504,50 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
          python -m glance.compare reportGen --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
          python -m glance.compare reportGen --imagesonly A.hdf B.hdf
         """
-        # should we generate the report html?
-        shouldGenerateReport = not options.imagesOnly
-        # should we generate the images?
-        shouldGenerateImages = not options.htmlOnly
-        if (not shouldGenerateImages) and (not shouldGenerateReport) :
+        
+        # load the user settings from either the command line or a user defined config file
+        pathsTemp, runInfo, defaultValues, requestedNames, usedConfigFile = _load_config_or_options(options, args)
+        
+        # note some of this information for debugging purposes
+        LOG.debug('paths: ' + str(pathsTemp))
+        LOG.debug('defaults: ' + str(defaultValues))
+        LOG.debug(str("longitude variable: " + runInfo['longitude']))
+        LOG.debug(str("latitude variable: " + runInfo['latitude']))
+        
+        # if we wouldn't generate anything, just stop now
+        if (not runInfo['shouldIncludeImages']) and (not runInfo['shouldIncludeReport']) :
             LOG.warn("User selection of no image generation and no report generation will result in no " +
                      "content being generated. Aborting report generation function.")
             return
         
-        # get the file names the user wants to use
-        aFileName, bFileName = args[:2]
-        # now open the files and get some basic info on them
-        LOG.info("Processing File A:")
-        aFile, fileAmd5sum, lastModifiedTimeA = _setup_file(aFileName, "\t")
-        LOG.info("Processing File B:")
-        bFile, fileBmd5sum, lastModifiedTimeB = _setup_file(bFileName, "\t")
+        # get info on who's doing the run and where
+        runInfo['machine'] = os.uname()[1] # the name of the machine running the report
+        runInfo['user'] = os.getlogin() # the name of the user running the report
         
-        # get machine name
-        currentMachine = os.uname()[1]
-        LOG.info("current machine: " + currentMachine)
-        # get the current user
-        currentUser = os.getlogin()
-        LOG.info ("current user: " + currentUser)
+        # get information about the input and output files
+        outputPath = pathsTemp['out']
+        LOG.debug("output path: " + str(outputPath))
+        # open the files
+        files = {}
+        LOG.info("Processing File A:")
+        aFile, files['file A'] = _setup_file(pathsTemp['a'], "\t")
+        LOG.info("Processing File B:")
+        bFile, files['file B'] = _setup_file(pathsTemp['b'], "\t")
         
         # get information about the names the user requested
-        hadUserRequest = (len(args) > 2)
-        requestedNames = args[2:] or ['.*']
-        finalNames, commonNames, uniqueToANames, uniqueToBNames = \
-                _resolve_names(aFile, bFile, options.epsilon, options.missing, requestedNames)
+        hadUserRequest = (not (requestedNames is None)) and (len(requestedNames) > 0)
+        finalNames, nameStats = _resolve_names(aFile, bFile,
+                                               defaultValues,
+                                               requestedNames, usedConfigFile)
         
-        # get the output path
-        outputPath = options.outputpath
-        LOG.debug("output path: " + str(outputPath))
-        
-        # get information about the longitude/latitude data we will be using
-        # to build our report
-        longitudeVariableName = options.longitudeVar or 'pixel_longitude'
-        latitudeVariableName = options.latitudeVar or'pixel_latitude'
-        LOG.debug(str("longitude variable: " + longitudeVariableName))
-        LOG.debug(str("latitude variable: " + latitudeVariableName))
-        
-        # get and analyze our lon/lat data
+        # get and analyze our longitude and latitude data
+        spatialInfo = {'file A': {}, 'file B':{}}
         longitudeA, latitudeA, spaciallyInvalidMaskA, \
-            numberOfSpaciallyInvalidPtsA, percentageOfSpaciallyInvalidPtsA = \
-            _get_and_analyze_lon_lat (aFile, latitudeVariableName, longitudeVariableName)
+            spatialInfo['file A']['totNumInvPts'], spatialInfo['file A']['perInvPts'] = \
+            _get_and_analyze_lon_lat (aFile, runInfo['latitude'], runInfo['longitude'])
         longitudeB, latitudeB, spaciallyInvalidMaskB, \
-            numberOfSpaciallyInvalidPtsB, percentageOfSpaciallyInvalidPtsB = \
-            _get_and_analyze_lon_lat (bFile, latitudeVariableName, longitudeVariableName)
+            spatialInfo['file B']['totNumInvPts'], spatialInfo['file B']['perInvPts'] = \
+            _get_and_analyze_lon_lat (bFile, runInfo['latitude'], runInfo['longitude'])
         
         # test the "valid" values in our lon/lat
         longitude = longitudeA
@@ -419,22 +556,25 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             LOG.warn("Possible mismatch in values stored in file a and file b longitude and latitude values."
                      + " Depending on the degree of mismatch, some data value comparisons may be "
                      + "distorted or spacially nonsensical.")
+            # TODO, this should cause a warning to be put in the report
         
         # compare our spacialy invalid info
         spaciallyInvalidMask = spaciallyInvalidMaskA | spaciallyInvalidMaskB
-        percentageOfSpaciallyInvalidPts = percentageOfSpaciallyInvalidPtsA
+        spatialInfo['perInvPtsInBoth'] = spatialInfo['file A']['perInvPts']
+                # a default that will hold if the two files have the same spatially invalid pts
+        
         if not all(spaciallyInvalidMaskA.ravel() == spaciallyInvalidMaskB.ravel()) : 
             LOG.info("Mismatch in number of spatially invalid points. " +
                      "Files may not have corresponding data where expected.")
             
             # figure out which points are only valid in one of the two files
             validOnlyInAMask = (~spaciallyInvalidMaskA) & spaciallyInvalidMaskB
-            numValidOnlyInA = len(validOnlyInAMask[validOnlyInAMask])
+            spatialInfo['file A']['numInvPts'] = len(validOnlyInAMask[validOnlyInAMask])
             validOnlyInBMask = (~spaciallyInvalidMaskB) & spaciallyInvalidMaskA
-            numValidOnlyInB = len(validOnlyInBMask[validOnlyInBMask])
+            spatialInfo['file B']['numInvPts'] = len(validOnlyInBMask[validOnlyInBMask])
             
             # so how many do they have together?
-            percentageOfSpaciallyInvalidPts, totalNumSpaciallyInvPts = _get_percentage_from_mask(spaciallyInvalidMask)
+            spatialInfo['perInvPtsInBoth'], totalNumSpaciallyInvPts = _get_percentage_from_mask(spaciallyInvalidMask)
             # make a "clean" version of the lon/lat
             longitude[validOnlyInAMask] = longitudeA[validOnlyInAMask]
             longitude[validOnlyInBMask] = longitudeB[validOnlyInBMask]
@@ -442,12 +582,12 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             latitude [validOnlyInBMask] = latitudeB [validOnlyInBMask]
             
             # plot the points that are only valid one file and not the other
-            if numValidOnlyInA > 0 :
+            if (spatialInfo['file A']['numInvPts'] > 0) and (runInfo['shouldIncludeImages']) :
                 plot.plot_and_save_spacial_trouble(longitude, latitude,
                                                    validOnlyInAMask,
                                                    spaciallyInvalidMaskA,
                                                    "A", outputPath, True)
-            if numValidOnlyInB > 0 :
+            if (spatialInfo['file B']['numInvPts'] > 0) and (runInfo['shouldIncludeImages']) :
                 plot.plot_and_save_spacial_trouble(longitude, latitude,
                                                    validOnlyInBMask,
                                                    spaciallyInvalidMaskB,
@@ -460,72 +600,76 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         
         # go through each of the possible variables in our files
         # and make a report section with images for whichever ones we can
-        for name, epsilon, missing in finalNames:
+        for name in finalNames:
+            
+            # pull out the information for this variable analysis run
+            varRunInfo = finalNames[name].copy()
+            displayName = name
+            if (varRunInfo.has_key('display_name')) :
+                displayName = varRunInfo['display_name']
             
             # get the data for the variable
-            aData = aFile[name][:]
-            bData = bFile[name][:]
+            aData = aFile[varRunInfo['variable_name']][:]
+            bData = bFile[varRunInfo['variable_name']][:]
             
-            # check if this data can be displayed and is
-            # not the lon/lat variable itself
+            # check if this data can be displayed
             if ((aData.shape == bData.shape) and
                 (aData.shape == longitude.shape) and
-                (bData.shape == longitude.shape) and
-                (name != longitudeVariableName) and
-                (name != latitudeVariableName)) :
+                (bData.shape == longitude.shape)) :
                 
                 # if we should be making images, then make them for this variable
-                if (shouldGenerateImages) :
+                if (runInfo['shouldIncludeImages']) :
                     # create the images comparing that variable
-                    plot.plot_and_save_figure_comparison(aData, bData, name,
-                                                         aFileName, bFileName,
+                    plot.plot_and_save_figure_comparison(aData, bData, varRunInfo['variable_name'],
+                                                         files['file A']['path'], files['file B']['path'],
                                                          latitude, longitude,
                                                          spaciallyInvalidMaskA,
                                                          spaciallyInvalidMaskB,
                                                          spaciallyInvalidMask,
-                                                         outputPath, epsilon,
-                                                         missing, True)
+                                                         outputPath, varRunInfo['epsilon'],
+                                                         varRunInfo['missing_value'], True,
+                                                         displayName)
                 
                 # generate the report for this variable
-                if (shouldGenerateReport) :
+                if (runInfo['shouldIncludeReport']) :
                     # get the current time
-                    currentTime = datetime.datetime.ctime(datetime.datetime.now())
+                    runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
                     #get info on the variable
-                    variableStats = delta.summarize(aData, bData, epsilon, (missing, missing), spaciallyInvalidMask)
+                    variableStats = delta.summarize(aData, bData, varRunInfo['epsilon'],
+                                                    (varRunInfo['missing_value'], varRunInfo['missing_value']),
+                                                    spaciallyInvalidMask)
                     # hang on to our good % and our epsilon value to describe our comparison
-                    variableComparisons[name] = {'passEpsilonPercent': ((1.0 - variableStats['outside_epsilon_fraction']) * 100.0),
-                                                 'epsilon': epsilon
-                                                 }
-                    print ('generating report for: ' + name)
-                    report.generate_and_save_variable_report(aFileName, bFileName, fileAmd5sum, fileBmd5sum, name,
-                                                             latitudeVariableName, longitudeVariableName, 
-                                                             outputPath, name + ".html",
-                                                             epsilon, missing, {'general': variableStats}, shouldGenerateImages,
-                                                             lastModifiedTimeA, lastModifiedTimeB, currentTime,
-                                                             currentUser, currentMachine)
+                    variableComparisons[varRunInfo['variable_name']] = \
+                            {'pass_epsilon_percent': ((1.0 - variableStats['outside_epsilon_fraction']) * 100.0),
+                             'variable_run_info': varRunInfo
+                             }
+                    print ('generating report for: ' + varRunInfo['variable_name'])
+                    report.generate_and_save_variable_report(files,
+                                                             varRunInfo, runInfo,
+                                                             {'general': variableStats}, # todo, this should be generated by delta
+                                                             outputPath, varRunInfo['variable_name'] + ".html")
+                                                             
+                                                             
                     
             # only log a warning if the user themselves picked the faulty variable
             elif hadUserRequest :
-                LOG.warn(name + ' could not be compared. This may be because the data for this variable is not the ' +
-                         'right shape or because the variable is currently selected as the longitude or latitude ' +
-                         'variable for this file.')
+                LOG.warn(varRunInfo['variable_name'] + ' ' +
+                         'could not be compared. This may be because the data for this variable does not match in shape ' +
+                         'between the two files or the data may not match the shape of the selected longitude and ' +
+                         'latitude variables.')
         
         # generate our general report pages once we've looked at all the variables
-        if (shouldGenerateReport) :
+        if (runInfo['shouldIncludeReport']) :
             print ('generating summary report')
             # get the current time
-            currentTime = datetime.datetime.ctime(datetime.datetime.now())
+            runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
             # generate the report summary page
-            report.generate_and_save_summary_report(aFileName, bFileName, fileAmd5sum, fileBmd5sum, outputPath, 'index.html',
-                                                    longitudeVariableName, latitudeVariableName,
-                                                    variableComparisons,
-                                                    lastModifiedTimeA, lastModifiedTimeB, currentTime,
-                                                    currentUser, currentMachine,
-                                                    numValidOnlyInA, numValidOnlyInB,
-                                                    percentageOfSpaciallyInvalidPtsA,
-                                                    percentageOfSpaciallyInvalidPtsB,
-                                                    percentageOfSpaciallyInvalidPts,
-                                                    uniqueToANames, uniqueToBNames, commonNames)
+            report.generate_and_save_summary_report(files,
+                                                    outputPath, 'index.html',
+                                                    runInfo,
+                                                    variableComparisons, 
+                                                    spatialInfo,
+                                                    nameStats)
             # make the glossary
             print ('generating glossary')
             report.generate_and_save_doc_page(delta.STATISTICS_DOC, outputPath)

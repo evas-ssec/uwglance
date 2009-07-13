@@ -23,11 +23,18 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     % for fileKey in sorted(list(files)) :
         <% tempFileInfo = files[fileKey] %>
         <p>
-            ${fileKey}: ${tempFileInfo['path']} <br>
-            md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
-            last modified: ${tempFileInfo['lastModifiedTime']}
+            ${fileKey}:
+            % if tempFileInfo.has_key('displayName') :
+                ${tempFileInfo['displayName']}
+            % endif
+            <blockquote>
+                file path: ${tempFileInfo['path']} <br>
+                md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
+                last modified: ${tempFileInfo['lastModifiedTime']}
+            </blockquote>
         </p>
     % endfor
+    
     <p>
         latitude: ${runInfo['latitude']} <br>
         longitude: ${runInfo['longitude']}
@@ -37,28 +44,40 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     <% haveUniqueSpacialInvalidity = False %>
     ## we will assume the whole substructure will be present if there's a problem with file A
     ## that we need to report on specifically
-    %if spatial.has_key('file A') and (spatial['file A']['numInvPts'] > 0) :
+    %if spatial.has_key('file A') and spatial['file A'].has_key('numInvPts') and (spatial['file A']['numInvPts'] > 0) :
         <%
             fileAInfo = spatial['file A']
             haveUniqueSpacialInvalidity = True
         %>
         <p>
-            File A has ${fileAInfo['numInvPts']} spacially valid data points not present in File B.<br>
+            File A has
+            % if runInfo['shouldIncludeImages'] :
+                <a href="./SpatialMismatch.A.png">
+            % endif
+            ${fileAInfo['numInvPts']} spacially valid data points not present in File B.<br>
+            % if runInfo['shouldIncludeImages'] :
+                </a>
+            % endif
             File A has a total of ${report.make_formatted_display_string(fileAInfo['perInvPts'])}% spacially invalid data. <br>
-            <a href="./SpatialMismatch.A.png"><img src="./SpatialMismatch.A.small.png"></a>
         </p>
     % endif
     ## we will assume the whole substructure will be present if there's a problem with file B
     ## that we need to report on specifically
-    %if spatial.has_key('file B') and (spatial['file B']['numInvPts'] > 0) :
+    %if spatial.has_key('file B') and spatial['file B'].has_key('numInvPts') and (spatial['file B']['numInvPts'] > 0) :
         <%
             fileBInfo = spatial['file B']
             haveUniqueSpacialInvalidity = True
         %>
         <p>
-            File B has ${fileBInfo['numInvPts']} spacially valid data points not present in File A.<br>
+            File B has
+            % if runInfo['shouldIncludeImages'] :
+                <a href="./SpatialMismatch.B.png">
+            % endif
+            ${fileBInfo['numInvPts']} spacially valid data points not present in File A.<br>
+            % if runInfo['shouldIncludeImages'] :
+                </a>
+            % endif
             File B has a total of ${report.make_formatted_display_string(fileBInfo['perInvPts'])}% spacially invalid data. <br>
-            <a href="./SpatialMismatch.B.png"><img src="./SpatialMismatch.B.small.png"></a>
         </p>
     % endif
     ## report on shared spatial invalidity if there is any
@@ -77,11 +96,16 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     <blockquote>
         <p>
             % for variableName in sorted(list(variables)) :
-                <% tempVariableInfo = variables[variableName] %>
-                Variable: <a href="${variableName | u}.html">${variableName}</a> <br>
-                Epsilon used: ${tempVariableInfo['epsilon']} <br>
+                <%
+                    tempVariableInfo = variables[variableName]
+                    varDisplayName = variableName
+                    if (tempVariableInfo['variable_run_info'].has_key('display_name')) :
+                        varDisplayName = tempVariableInfo['variable_run_info']['display_name']
+                %>
+                Variable: <a href="${variableName | u}.html">${varDisplayName}</a> <br>
+                Epsilon used: ${tempVariableInfo['variable_run_info']['epsilon']} <br>
                 Finite values within one epsilon of difference:
-                ${report.make_formatted_display_string(tempVariableInfo['passEpsilonPercent'])}% <br>
+                ${report.make_formatted_display_string(tempVariableInfo['pass_epsilon_percent'])}% <br>
                 <br>
             % endfor
         </p>

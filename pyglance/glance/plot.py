@@ -67,7 +67,8 @@ def _create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsi
     if (badMask != None) :
         numTroublePts = badX.shape[0]
         LOG.debug('\t\tnumber of trouble points in scatter plot: ' + str(badX.shape[0]))
-        axes.plot(badX, badY, 'r,', label='outside\nepsilon')
+        if numTroublePts > 0 :
+            axes.plot(badX, badY, 'r,', label='outside\nepsilon')
     
     # draw the line for the "perfect fit" 
     xbounds = axes.get_xbound()
@@ -77,8 +78,8 @@ def _create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsi
     perfect = [max(xbounds[0], ybounds[0]), min(xbounds[1], ybounds[1])]
     axes.plot(perfect, perfect, 'k--', label='A = B')
     
-    # now draw the epsilon bound lines if they are visible
-    if (not (epsilon is None)) and (epsilon < xrange) and (epsilon < yrange):
+    # now draw the epsilon bound lines if they are visible and the lines won't be the same as A = B
+    if (not (epsilon is None)) and (epsilon > 0.0) and (epsilon < xrange) and (epsilon < yrange):
         # plot the top line
         axes.plot([perfect[0], perfect[1] - epsilon], [perfect[0] + epsilon, perfect[1]], '--', color='#00FF00', label='+/-epsilon')
         # plot the bottom line
@@ -344,7 +345,7 @@ def plot_and_save_figure_comparison(aData, bData, variableName,
                                     spaciallyInvalidMaskB,
                                     spaciallyInvalidMaskBoth,
                                     outputPath, epsilon, missing,
-                                    makeSmall=False) :
+                                    makeSmall=False, variableDisplayName=None) :
     """
     given two files, and information on what to compare, make comparison
     figures and save them to the given output graph.
@@ -354,7 +355,12 @@ def plot_and_save_figure_comparison(aData, bData, variableName,
     difference exceeds epsilon or there are missing or nan values in one
     or both of the files
     """
-    print("Creating figures for: " + variableName)
+    # if we weren't given a variable display name,
+    # just use the standard variable name instead
+    if variableDisplayName is None :
+        variableDisplayName = variableName
+    
+    print("Creating figures for: " + variableDisplayName)
     
     # compare the two data sets to get our difference data and trouble info
     rawDiffData, goodMask, troubleMask, (aNotFiniteMask, bNotFiniteMask), \
@@ -378,31 +384,31 @@ def plot_and_save_figure_comparison(aData, bData, variableName,
     # make the three figures
     print("\tcreating image of file a")
     figureA = _create_mapped_figure(aData, latitudeData, longitudeData, visibleAxesA,
-                                    (variableName + "\nin File A"),
+                                    (variableDisplayName + "\nin File A"),
                                     invalidMask=(spaciallyInvalidMaskA | invalidDataMaskA))
     print("\tcreating image of file b")
     figureB = _create_mapped_figure(bData, latitudeData, longitudeData, visibleAxesB,
-                                    (variableName + "\nin File B"),
+                                    (variableDisplayName + "\nin File B"),
                                     invalidMask=(spaciallyInvalidMaskB | invalidDataMaskB))
     print("\tcreating image of the absolue value of difference")
     figureAbsDiff = _create_mapped_figure(diffData, latitudeData, longitudeData, visibleAxesBoth, 
-                                          ("Absolute value of difference in\n" + variableName),
+                                          ("Absolute value of difference in\n" + variableDisplayName),
                                           invalidMask=(everyThingWrongButEpsilon))
     print("\tcreating image of the difference")
     figureDiff = _create_mapped_figure(rawDiffData, latitudeData, longitudeData, visibleAxesBoth, 
-                                          ("Value of (Data File B - Data File A) for\n" + variableName),
+                                          ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
                                           invalidMask=(everyThingWrongButEpsilon))
     # this figure is more complex because we want to mark the trouble points on it
     print("\tcreating image marking trouble data")
     figureBadDataInDiff = _create_mapped_figure(bData, latitudeData, longitudeData, visibleAxesBoth,
-                                                ("Areas of trouble data in\n" + variableName),
+                                                ("Areas of trouble data in\n" + variableDisplayName),
                                                 spaciallyInvalidMaskBoth | invalidDataMaskB,
                                                 mediumGrayColorMap, troubleMask)
     # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
     print("\tcreating histogram of the amount of difference")
     numBinsToUse = 50
     diffHistogramFigure = _create_histogram(rawDiffData[~everyThingWrongButEpsilon].ravel(), numBinsToUse,
-                                            ("Difference in\n" + variableName),
+                                            ("Difference in\n" + variableDisplayName),
                                             ('Value of (Data File B - Data File A) at a Data Point'),
                                             ('Number of Data Points with a Given Difference'),
                                             True)
@@ -414,7 +420,7 @@ def plot_and_save_figure_comparison(aData, bData, variableName,
                                            tooDifferentMask[~everyThingWrongButEpsilon].ravel(), epsilon)
     
     # save the figures to disk
-    print("Saving figures for: " + variableName)
+    print("Saving figures for: " + variableDisplayName)
     print("\tsaving image of file a")
     figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200) 
     print("\tsaving image of file b")

@@ -68,6 +68,11 @@ def corr(x,y,mask):
     yf = y.flatten()[gf]
     assert(sum(~isfinite(yf))==0)
     assert(sum(~isfinite(xf))==0)
+    # don't try to build a correlation if
+    # masking left us with insufficient data
+    # to do so
+    if (xf.size < 2) or (yf.size < 2) :
+        return nan
     return compute_r(xf,yf)[0]
 
 def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(None,None), plot=None):
@@ -111,6 +116,14 @@ def stats(dif, mask, bad, *etc):
                 'median_diff': median(dif[mask]) 
                 }
 
+def _get_num_perfect(a, b, ignoreMask=None):
+    numPerfect = 0
+    if not (ignoreMask is None) :
+        numPerfect = sum(a[~ignoreMask] == b[~ignoreMask])
+    else :
+        numPerfect = sum(a == b)
+    return numPerfect
+
 def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None), ignoreMask=None):
     """return dictionary of similarity statistics
     stats not including 'nan' in name exclude nans in either arrays
@@ -123,7 +136,7 @@ def summarize(a, b, epsilon=0., (amiss,bmiss)=(None,None), ignoreMask=None):
     b_nans = isnan(b)
     n = a.size
     r = corr(a,b,mask)
-    n_perfect = sum(a[~ignoreMask] == b[~ignoreMask])
+    n_perfect = _get_num_perfect(a, b, ignoreMask)
     f_perfect = n_perfect / float(n)
         
     out = { 'a_xor_b_finite_count': a_xor_b_finite,

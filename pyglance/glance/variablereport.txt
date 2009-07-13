@@ -11,13 +11,18 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 %>
 
 ## we will use this a lot, so hang on to it
-<% variableName = runInfo['variableName'] %>
+<%
+    variableName = runInfo['variable_name']
+    variableDisplayName = variableName
+    if (runInfo.has_key('display_name')):
+        variableDisplayName = runInfo['display_name']
+%>
 
-<title>${variableName} Variable Comparison</title>
+<title>${variableDisplayName} Variable Comparison</title>
 </head>
 <body>
     
-    <h1>${variableName} Variable Comparison</h1>
+    <h1>${variableDisplayName} Variable Comparison</h1>
     
     <p>
         comparison produced ${runInfo['time']} by user ${runInfo['user']} on ${runInfo['machine']}
@@ -27,11 +32,18 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     % for fileKey in sorted(list(files)) :
         <% tempFileInfo = files[fileKey] %>
         <p>
-            ${fileKey}: ${tempFileInfo['path']} <br>
-            md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
-            last modified: ${tempFileInfo['lastModifiedTime']}
+            ${fileKey}:
+            % if tempFileInfo.has_key('displayName') :
+                ${tempFileInfo['displayName']}
+            % endif
+            <blockquote>
+                file path: ${tempFileInfo['path']} <br>
+                md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
+                last modified: ${tempFileInfo['lastModifiedTime']}
+            </blockquote>
         </p>
     % endfor
+    
     <p>
         latitude: ${runInfo['latitude']} <br>
         longitude: ${runInfo['longitude']}
@@ -53,7 +65,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         variable name: ${variableName} <br>
         epsilon value: ${runInfo['epsilon']} <br>
         "missing" data value:
-        <% missingDataValue = runInfo['missingDataValue'] %>
+        <% missingDataValue = runInfo['missing_value'] %>
         % if missingDataValue is None :
             None
         % else :
