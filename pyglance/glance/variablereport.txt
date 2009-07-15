@@ -44,9 +44,20 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         </p>
     % endfor
     
+    ## display the latitude and longitude variable names
     <p>
-        latitude: ${runInfo['latitude']} <br>
-        longitude: ${runInfo['longitude']}
+        % if ('latitude_alt_name_in_b' in runInfo) :
+            latitude in A: ${runInfo['latitude']}<br>
+            latitude in B: ${runInfo['latitude_alt_name_in_b']}<br>
+        % else :
+            latitude: ${runInfo['latitude']} <br>
+        % endif
+        % if ('longitude_alt_name_in_b' in runInfo) :
+            longitude in A: ${runInfo['longitude']}<br>
+            longitude in B: ${runInfo['longitude_alt_name_in_b']}<br>
+        % else :
+            longitude: ${runInfo['longitude']}<br>
+        % endif
     </p>
     
     <% shouldIncludeImages = runInfo['shouldIncludeImages'] %>
@@ -62,7 +73,12 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     
     ## comparison parameters
     <p>
-        variable name: ${variableName} <br>
+        % if 'alternate_name_in_B' in runInfo :
+            variable name in A: ${variableName} <br>
+            variable name in B: ${runInfo['alternate_name_in_B']} <br>
+        % else :
+            variable name: ${variableName} <br>
+        % endif
         epsilon value: ${runInfo['epsilon']} <br>
         "missing" data value:
         <% missingDataValue = runInfo['missing_value'] %>

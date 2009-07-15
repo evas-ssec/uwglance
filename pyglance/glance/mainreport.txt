@@ -35,10 +35,42 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         </p>
     % endfor
     
+    ## display the latitude and longitude variable names
     <p>
-        latitude: ${runInfo['latitude']} <br>
-        longitude: ${runInfo['longitude']}
+        % if ('latitude_alt_name_in_b' in runInfo) :
+            latitude in A: ${runInfo['latitude']}<br>
+            latitude in B: ${runInfo['latitude_alt_name_in_b']}<br>
+        % else :
+            latitude: ${runInfo['latitude']} <br>
+        % endif
+        % if ('longitude_alt_name_in_b' in runInfo) :
+            longitude in A: ${runInfo['longitude']}<br>
+            longitude in B: ${runInfo['longitude_alt_name_in_b']}<br>
+        % else :
+            longitude: ${runInfo['longitude']}<br>
+        % endif
     </p>
+    
+    ## if there is a problem with the longitude/latitude correlation between the two files,
+    ## make a nice big warning for the user
+    % if spatial.has_key('num_lon_lat_not_equal_points') and (spatial['num_lon_lat_not_equal_points'] > 0) :
+        <p>
+            WARNING: ${spatial['num_lon_lat_not_equal_points']} data points show possible mismatch in values stored in file a
+            and file b longitude and latitude values. Depending on the degree of mismatch, some data value comparisons
+            in this report may be distorted or spacially nonsensical. Please consider re-running this report and including an
+            examination of your longitude and latitude variables with appropriate epsilons in order to analyze the significance
+            of the difference.<br>
+            ## if we're showing images, link to graphs showing the problem
+            % if runInfo['shouldIncludeImages'] :
+                <a href="./LonLatMismatch.A.png">
+                    View mismatching points in A's lon/lat system
+                </a><br>
+                <a href="./LonLatMismatch.B.png">
+                    View mismatching points in B's lon/lat system
+                </a>
+            % endif
+        </p>
+    % endif
     
     ## if we have some unique spacially invalid points, report them
     <% haveUniqueSpacialInvalidity = False %>

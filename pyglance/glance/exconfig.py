@@ -15,8 +15,15 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 shouldIncludeImages = True
 
 # the names of the latitude and longitude variables that will be used
-longitudeVar = 'imager_prof_retr_abi_r4_generic1'
-latitudeVar = 'imager_prof_retr_abi_r4_generic2'
+lat_lon_info = {}
+lat_lon_info['longitude'] = 'imager_prof_retr_abi_r4_generic1' # the name of the longitude variable
+lat_lon_info ['latitude'] = 'imager_prof_retr_abi_r4_generic2' # the name of the latitude variable
+# the following two values are optional and only need to be set if the the latitude and longitude have
+# different names in file A and file B
+"""
+lat_lon_info['longitude_alt_name_in_b'] = 'resampled_longitude' # the alternate name of the longitude in file B
+lat_lon_info ['latitude_alt_name_in_b'] = 'resampled_latitude'  # the alternate name of the latitude in file A
+"""
 
 # per variable defaults
 # these default variables will only apply if you don't define them in a given variable
@@ -53,8 +60,9 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
 # variables in size, do not place any entries in the setOfVariables (ie. just
 # leave it as an empty dictionary)
 setOfVariables = {}
+
 setOfVariables['imager_prof_retr_abi_total_totals_index'] = {           # this should match the variable name in your files
-    
+                                  
                                   'display_name': 'Total Totals',       # this entry is totally optional, it's used to label
                                                                         # the report and some of the plots, if ommitted
                                                                         # the variable name will be used in those places instead
@@ -67,21 +75,21 @@ setOfVariables['imager_prof_retr_abi_total_totals_index'] = {           # this s
                                                                         # None indicates that this variable should not pass/fail
                                                                         # based on nearness of epsilon comparison
                                                                         
-                                  'nonfinite_data_tolerance': None      # the allowed fraction of non-finite data
+                                  'nonfinite_data_tolerance': None,     # the allowed fraction of non-finite data
                                                                         # None indicates that this variable should not pass/fail
                                                                         # based on amount of non-finite data
                                   }
-setOfVariables['imager_prof_retr_abi_land_surface_temperature'] = {
-                                  'display_name': 'Land Surface Temperature',
-                                  'epsilon': 5.0
-                                  # example:
-                                  # because missing, and the two tolerances are not defined here,
-                                  # this variable would use the defaultValues for those 
-                                  }
 setOfVariables['imager_prof_retr_abi_total_precipitable_water_high'] = {
                                   'display_name': 'Total Precipitable Water, High',
-                                  'epsilon': 3.0
+                                  'epsilon': 3.0,
+                                  
+                                  'alternate_name_in_B': 'imager_prof_retr_abi_total_precipitable_water_low',
+                                                                        # this represents an alternate name that would be
+                                                                        # the equivalent variable in file B (if this is
+                                                                        # defined, our primary variable name will be expected
+                                                                        # to appear only in file A)
                                   }
+
 setOfVariables['imager_prof_retr_abi_total_precipitable_water'] = {
                                   'display_name': 'Total Precipitable Water',
                                   'epsilon': 3.0
@@ -93,6 +101,13 @@ setOfVariables['imager_prof_retr_abi_total_precipitable_water_low'] = {
 setOfVariables['imager_prof_retr_abi_total_precipitable_water_mid'] = {
                                   'display_name': 'Total Precipitable Water, Mid',
                                   'epsilon': 3.0
+                                  }
+setOfVariables['imager_prof_retr_abi_land_surface_temperature'] = {
+                                  'display_name': 'Land Surface Temperature',
+                                  'epsilon': 5.0
+                                  # example:
+                                  # because missing, and the two tolerances are not defined here,
+                                  # this variable would use the defaultValues for those 
                                   }
 setOfVariables['imager_prof_retr_abi_k_index'] = {
                                   'display_name': 'K-Index',

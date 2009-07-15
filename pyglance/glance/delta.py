@@ -202,7 +202,7 @@ def _get_finite_data_stats(a_is_finite_mask, b_is_finite_mask) :
     
     return finite_value_stats
 
-def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_mask) :
+def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_mask, ignore_in_a_mask, ignore_in_b_mask) :
     """
     Get a list of general statistics about a and b, given a and b and some other information
     about them.
@@ -210,6 +210,8 @@ def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_m
     """
     # figure out how much trouble we had
     num_trouble = sum(trouble_mask)
+    num_ignored_in_a = sum(ignore_in_a_mask)
+    num_ignored_in_b = sum(ignore_in_b_mask)
     
     # make the assumption that a and b are the same size/shape as their trouble mask
     total_num_values = trouble_mask.size
@@ -219,6 +221,8 @@ def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_m
                      'epsilon': epsilon,
                      'num_data_points': total_num_values,
                      'shape': trouble_mask.shape,
+                     'spatially_invalid_pts_ignored_in_a': num_ignored_in_a,
+                     'spatially_invalid_pts_ignored_in_b': num_ignored_in_b,
                      'trouble_points_count': num_trouble,
                      'trouble_points_fraction': num_trouble/ float(total_num_values)
                      }
@@ -249,27 +253,37 @@ def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, epsilon, add
     
     return comparison
 
-def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), ignoreMask=None):
+def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), ignoreInAMask=None, ignoreInBMask=None):
     """return dictionary of statistics dictionaries
     stats not including 'nan' in name exclude nans in either arrays
     """
+    # select/build our ignore masks
+    # if the user didn't send us any, don't ignore anything
+    if (ignoreInAMask is None) :
+        ignoreInAMask = zeros(a.shape, dtype=bool)
+    if (ignoreInBMask is None) :
+        ignoreInBMask = zeros(b.shape, dtype=bool)
+    ignoreMask = ignoreInAMask | ignoreInBMask
+    
     d, mask, trouble, (anfin, bnfin), (amis, bmis) = nfo = diff(a,b,epsilon,(a_missing_value, b_missing_value),ignoreMask)
-    additional_statistics = stats(*nfo)
     
     # build some other finite data masks that we'll need
     finite_a_mask = ~(anfin | amis)
     finite_b_mask = ~(bnfin | bmis)
     finite_mask = finite_a_mask & finite_b_mask
+    if not (ignoreInAMask is None) :
+        finite_a_mask = finite_a_mask & (~ ignoreInAMask)
+    if not (ignoreInBMask is None) :
+        finite_b_mask = finite_b_mask & (~ ignoreInBMask)
     if not (ignoreMask is None) :
-        finite_a_mask = finite_a_mask & (~ ignoreMask)
-        finite_b_mask = finite_b_mask & (~ ignoreMask)
         finite_mask = finite_mask & (~ ignoreMask)
     
-    general_stats = _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble)
-    comparison_stats = _get_numerical_data_stats(a, b, d, finite_mask, epsilon, additional_statistics)
+    general_stats = _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble, ignoreInAMask, ignoreInBMask) 
+    additional_statistics = stats(*nfo) # grab some additional comparison statistics
+    comparison_stats = _get_numerical_data_stats(a, b, d, finite_mask, epsilon, additional_statistics) 
     nan_stats = _get_nan_stats(a, b)
     missing_stats = _get_missing_value_stats(amis, bmis)
-    finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask)
+    finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask) 
     
     out = {}
     out['NaN Statistics'] = nan_stats
@@ -289,6 +303,10 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'epsilon': 'amount of difference between matching data points in A and B that is considered acceptable',
                     'num_data_points': "number of data values in A",
                     'shape': "shape of A",
+                    'spatially_invalid_pts_ignored_in_a': 'number of points with invalid latitude/longitude information in A that were' +
+                                                            ' ignored for the purposes for data analysis and presentation',
+                    'spatially_invalid_pts_ignored_in_b': 'number of points with invalid latitude/longitude information in B that were' +
+                                                            ' ignored for the purposes for data analysis and presentation',
                     'trouble_points_count': 'number of points that are nonfinite or missing in either input data set (A or B),' +
                                             ' or are unacceptable when compared (according to the current epsilon value)',
                     'trouble_points_fraction': 'fraction of points that are nonfinite or missing in either input data set (A or B),' +

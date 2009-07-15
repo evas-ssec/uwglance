@@ -315,9 +315,9 @@ def compare_spectra(actual, desired=None, acceptable=None, x=None):
     
 def plot_and_save_spacial_trouble(longitude, latitude,
                                   spacialTroubleMask, spaciallyInvalidMask,
-                                  fileNameDiscriminator, outputPath, makeSmall=False) :
+                                  fileNameDiscriminator, title, fileBaseName, outputPath, makeSmall=False) :
     """
-    given information on spacial trouble points in A and B, plot only those points in a very obvious way
+    given information on spatially placed trouble points in A and B, plot only those points in a very obvious way
     on top of a background plot of a's data shown in grayscale, save this plot to the output path given
     if makeSmall is passed as true a smaller version of the image will also be saved
     """
@@ -325,16 +325,15 @@ def plot_and_save_spacial_trouble(longitude, latitude,
     visibleAxes = _get_visible_axes(longitude, latitude, spaciallyInvalidMask)
     
     # make the figure
-    spatialTroubleFig = _create_mapped_figure(None, latitude, longitude, visibleAxes,
-                                              "Points only spacially valid\nin File " + fileNameDiscriminator,
+    spatialTroubleFig = _create_mapped_figure(None, latitude, longitude, visibleAxes, title,
                                               spaciallyInvalidMask, None, spacialTroubleMask)
     # save the figure
-    spatialTroubleFig.savefig(outputPath + "/SpatialMismatch." + fileNameDiscriminator + ".png", dpi=200) 
+    spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=200) 
     
     # we may also save a smaller versions of the figure
     if (makeSmall) :
         
-        spatialTroubleFig.savefig(outputPath + "/SpatialMismatch." + fileNameDiscriminator + ".small.png", dpi=50)
+        spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=50)
     
     return
     

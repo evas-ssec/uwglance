@@ -75,6 +75,8 @@ def generate_and_save_summary_report(files,
                    'time': currentTime,
                    'latitude': latitudeName,
                    'longitude': longitudeName,
+                   'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
+                   'longitude_alt_name_in_b': longitudeNameInB,     # optional, if not defined, B's using the normal longitude
                    'shouldIncludeImages': shouldIncludeImages # this key/value is optional, defaults to True
                    }
                    
@@ -99,7 +101,10 @@ def generate_and_save_summary_report(files,
                      'file B': {'numInvPts': number of spatially invalid points only in B (and not corrspondingly in A),
                                 'perInvPts': percent of spatially invalid points in B (out of all pts in B)
                                 },
-                     'perInvPtsInBoth': the percent of points that are spatially invalid in at least one of the two files
+                     'perInvPtsInBoth': the percent of points that are spatially invalid in at least one of the two files,
+                     'num_lon_lat_not_equal_points': number of points that do not match in the sets of lon/lat
+                                # if the 'num_lon_lat_not_equal_points' key is defined it means there are mismatching
+                                # longitude/latitude pairs in the data that was compared!
         }
     any of the first level of keys in spatial are optional,
     although it is assumed that if you include an entry for 'file A' or 'file B' it
@@ -166,6 +171,8 @@ def generate_and_save_variable_report(files,
                             'time': currentTime,
                             'latitude': latitudeName,
                             'longitude': longitudeName,
+                            'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
+                            'longitude_alt_name_in_b': longitudeNameInB,     # optional, if not defined, B's using the normal longitude
                             'shouldIncludeImages': shouldIncludeImages
                             }
     

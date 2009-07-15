@@ -134,9 +134,14 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                                     }
         # otherwise just do the ones the user asked for
         else : 
-            # TODO, how could I do this without a loop?
-            for name in fileCommonNames :
-                if requestedNames.has_key(name) :
+            # check each of the names the user asked for to see if it is either in the list of common names
+            # or, if the user asked for an alternate name mapping in file B, if the two mapped names are in
+            # files A and B respectively
+            for name in requestedNames :
+                if (name in fileCommonNames) | \
+                        (requestedNames[name].has_key('alternate_name_in_B') and
+                         (name in nameComparison['uniqueToAVars']) and
+                         (requestedNames[name]['alternate_name_in_B'] in nameComparison['uniqueToBVars'])) :
                     finalNames[name] = defaultValues.copy()
                     finalNames[name]['variable_name'] = name
                     finalNames[name].update(requestedNames[name])
@@ -202,8 +207,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
         
         # get everything from the config file
         runInfo['shouldIncludeImages'] = glanceRunConfig.shouldIncludeImages
-        runInfo['latitude'] = glanceRunConfig.latitudeVar or runInfo['latitude']
-        runInfo['longitude'] = glanceRunConfig.longitudeVar or runInfo['longitude']
+        runInfo.update(glanceRunConfig.lat_lon_info) # get info on the lat/lon variables
         
         # get any requested names
         requestedNames = glanceRunConfig.setOfVariables.copy()
@@ -256,7 +260,8 @@ def _get_and_analyze_lon_lat (fileObject, latitudeVariableName, longitudeVariabl
     # analyze our spacially invalid data
     percentageOfSpaciallyInvalidPts, numberOfSpaciallyInvalidPts = _get_percentage_from_mask(spaciallyInvalidMask)
     
-    return longitudeData, latitudeData, spaciallyInvalidMask, numberOfSpaciallyInvalidPts, percentageOfSpaciallyInvalidPts
+    return longitudeData, latitudeData, spaciallyInvalidMask, {'totNumInvPts': numberOfSpaciallyInvalidPts,
+                                                               'perInvPts': percentageOfSpaciallyInvalidPts}
 
 def _get_percentage_from_mask(dataMask) :
     """
@@ -269,6 +274,45 @@ def _get_percentage_from_mask(dataMask) :
     percentage = 100.0 * float(numMarkedDataPts) / float(totalDataPts)
     
     return percentage, numMarkedDataPts
+
+def _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB, ignoreMaskA, ignoreMaskB, doMakeImages, outputPath) :
+    """
+    check to make sure the longitude and latitude are equal everywhere that's not in the ignore masks
+    if they are not and doMakeImages was passed as True, generate appropriate figures to show where
+    return the number of points where they are not equal (0 would mean they're the same)
+    """
+    num_lon_lat_not_equal_points = 0
+    
+    # first of all, if the latitude and longitude are not the same shape, then things can't ever be "equal"
+    if (longitudeA.shape != longitudeB.shape) | (latitudeA.shape != latitudeB.shape) :
+        return -1
+    
+    lon_lat_not_equal_mask = ((longitudeA != longitudeB) | (latitudeA != latitudeB)) & (~ (ignoreMaskA | ignoreMaskB))
+    # if we ever want to limit the difference by an epsilon, here's the basic form
+    #lon_lat_not_equal_mask = ((abs(longitudeA - longitudeB) > 0.001) | (abs(latitudeA - latitudeB) > 0.001)) & (~ (ignoreMaskA | ignoreMaskB))
+    num_lon_lat_not_equal_points = sum(lon_lat_not_equal_mask.ravel())
+    if (num_lon_lat_not_equal_points > 0) :
+        LOG.warn("Possible mismatch in values stored in file a and file b longitude and latitude values."
+                 + " Depending on the degree of mismatch, some data value comparisons may be "
+                 + "distorted or spacially nonsensical.")
+        # if we are making images, make two showing the invalid lons/lats
+        if (doMakeImages) :
+            plot.plot_and_save_spacial_trouble(longitudeA, latitudeA,
+                                               lon_lat_not_equal_mask,
+                                               ignoreMaskA,
+                                               "A", "Lon./Lat. Points Mismatched between A and B\n" +
+                                               "(Shown in A)",
+                                               "LonLatMismatch",
+                                               outputPath, True)
+            plot.plot_and_save_spacial_trouble(longitudeB, latitudeB,
+                                               lon_lat_not_equal_mask,
+                                               ignoreMaskB,
+                                               "B", "Lon./Lat. Points Mismatched between A and B\n" +
+                                               "(Shown in B)",
+                                               "LonLatMismatch",
+                                               outputPath, True)
+        
+    return num_lon_lat_not_equal_points
 
 def main():
     import optparse
@@ -482,7 +526,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         reportGen(*args)
         
         return
-
+    
     def reportGen(*args) :
         """generate a report comparing two files
         This option creates a report comparing variables in the two given hdf files.
@@ -514,10 +558,9 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         pathsTemp, runInfo, defaultValues, requestedNames, usedConfigFile = _load_config_or_options(options, args)
         
         # note some of this information for debugging purposes
-        LOG.debug('paths: ' + str(pathsTemp))
-        LOG.debug('defaults: ' + str(defaultValues))
-        LOG.debug(str("longitude variable: " + runInfo['longitude']))
-        LOG.debug(str("latitude variable: " + runInfo['latitude']))
+        LOG.debug('paths: ' +           str(pathsTemp))
+        LOG.debug('defaults: ' +        str(defaultValues))
+        LOG.debug('run information: ' + str(runInfo))
         
         # if we wouldn't generate anything, just stop now
         if (not runInfo['shouldIncludeImages']) and (not runInfo['shouldIncludeReport']) :
@@ -529,9 +572,8 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         runInfo['machine'] = os.uname()[1] # the name of the machine running the report
         runInfo['user'] = os.getlogin() # the name of the user running the report
         
-        # get information about the input and output files
+        # deal with the input and output files
         outputPath = pathsTemp['out']
-        LOG.debug("output path: " + str(outputPath))
         # open the files
         files = {}
         LOG.info("Processing File A:")
@@ -546,28 +588,40 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                                                requestedNames, usedConfigFile)
         
         # get and analyze our longitude and latitude data
-        spatialInfo = {'file A': {}, 'file B':{}}
-        longitudeA, latitudeA, spaciallyInvalidMaskA, \
-            spatialInfo['file A']['totNumInvPts'], spatialInfo['file A']['perInvPts'] = \
+        spatialInfo = {}
+        b_longitude = runInfo['longitude']
+        b_latitude  = runInfo['latitude']
+        if ('longitude_alt_name_in_b' in runInfo) :
+            b_longitude = runInfo['longitude_alt_name_in_b']
+        if ( 'latitude_alt_name_in_b' in runInfo):
+            b_latitude  = runInfo['latitude_alt_name_in_b']
+        longitudeA, latitudeA, spaciallyInvalidMaskA, spatialInfo['file A'] = \
             _get_and_analyze_lon_lat (aFile, runInfo['latitude'], runInfo['longitude'])
-        longitudeB, latitudeB, spaciallyInvalidMaskB, \
-            spatialInfo['file B']['totNumInvPts'], spatialInfo['file B']['perInvPts'] = \
-            _get_and_analyze_lon_lat (bFile, runInfo['latitude'], runInfo['longitude'])
+        longitudeB, latitudeB, spaciallyInvalidMaskB, spatialInfo['file B'] = \
+            _get_and_analyze_lon_lat (bFile, b_latitude, b_longitude)
         
         # test the "valid" values in our lon/lat
         longitude = longitudeA
         latitude = latitudeA
-        if not all(longitudeA.ravel() == longitudeB.ravel()) and all(latitudeA.ravel() == latitudeB.ravel()) :
-            LOG.warn("Possible mismatch in values stored in file a and file b longitude and latitude values."
-                     + " Depending on the degree of mismatch, some data value comparisons may be "
-                     + "distorted or spacially nonsensical.")
-            # TODO, this should cause a warning to be put in the report
+        spatialInfo['num_lon_lat_not_equal_points'] = _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB,
+                                                                              spaciallyInvalidMaskA, spaciallyInvalidMaskB,
+                                                                              runInfo['shouldIncludeImages'], outputPath)
+        # if we got the worst type of error result from the comparison we need to stop now, because the data is too
+        # dissimilar to be used
+        if spatialInfo['num_lon_lat_not_equal_points'] < 0 :
+            LOG.warn("Unable to reconcile sizes of longitude and latitude for variables "
+                     + str(runInfo['longitude']) + str(longitudeA.shape) + "/"
+                     + str(runInfo['latitude'])  + str(latitudeA.shape) + " in file A and variables "
+                     + str(b_longitude) + str(longitudeB.shape) + "/"
+                     + str(b_latitude)  + str(latitudeB.shape) + " in file B. Aborting attempt to compare files.")
+            return
+        
+        # for convenience, make a combined mask
+        spaciallyInvalidMask = spaciallyInvalidMaskA | spaciallyInvalidMaskB
         
         # compare our spacialy invalid info
-        spaciallyInvalidMask = spaciallyInvalidMaskA | spaciallyInvalidMaskB
         spatialInfo['perInvPtsInBoth'] = spatialInfo['file A']['perInvPts']
                 # a default that will hold if the two files have the same spatially invalid pts
-        
         if not all(spaciallyInvalidMaskA.ravel() == spaciallyInvalidMaskB.ravel()) : 
             LOG.info("Mismatch in number of spatially invalid points. " +
                      "Files may not have corresponding data where expected.")
@@ -591,12 +645,16 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                 plot.plot_and_save_spacial_trouble(longitude, latitude,
                                                    validOnlyInAMask,
                                                    spaciallyInvalidMaskA,
-                                                   "A", outputPath, True)
+                                                   "A", "Points only spatially valid\nin File A",
+                                                   "SpatialMismatch",
+                                                   outputPath, True)
             if (spatialInfo['file B']['numInvPts'] > 0) and (runInfo['shouldIncludeImages']) :
                 plot.plot_and_save_spacial_trouble(longitude, latitude,
                                                    validOnlyInBMask,
                                                    spaciallyInvalidMaskB,
-                                                   "B", outputPath, True)
+                                                   "B", "Points only spatially valid\nin File B",
+                                                   "SpatialMismatch",
+                                                   outputPath, True)
             
         # set some things up to hold info for our reports
         # this is going to be in the form
@@ -612,10 +670,20 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             displayName = name
             if (varRunInfo.has_key('display_name')) :
                 displayName = varRunInfo['display_name']
+            explanationName = name
+            if (varRunInfo.has_key('alternate_name_in_B')) :
+                explanationName = explanationName + " / " + varRunInfo['alternate_name_in_B']
+            
+            # if B has an alternate variable name, figure that out
+            has_alt_B_variable = False
+            b_variable = varRunInfo['variable_name']
+            if (varRunInfo.has_key('alternate_name_in_B')) :
+                has_alt_B_variable = True
+                b_variable = varRunInfo['alternate_name_in_B']
             
             # get the data for the variable
             aData = aFile[varRunInfo['variable_name']][:]
-            bData = bFile[varRunInfo['variable_name']][:]
+            bData = bFile[b_variable][:]
             
             # check if this data can be displayed
             if ((aData.shape == bData.shape) and
@@ -625,7 +693,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                 # if we should be making images, then make them for this variable
                 if (runInfo['shouldIncludeImages']) :
                     # create the images comparing that variable
-                    plot.plot_and_save_figure_comparison(aData, bData, varRunInfo['variable_name'],
+                    plot.plot_and_save_figure_comparison(aData, bData, varRunInfo['variable_name'], 
                                                          files['file A']['path'], files['file B']['path'],
                                                          latitude, longitude,
                                                          spaciallyInvalidMaskA,
@@ -642,24 +710,24 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                     #get info on the variable
                     variableStats = delta.summarize(aData, bData, varRunInfo['epsilon'],
                                                     (varRunInfo['missing_value'], varRunInfo['missing_value']),
-                                                    spaciallyInvalidMask)
+                                                    spaciallyInvalidMaskA, spaciallyInvalidMaskB)
                     # hang on to our good % and our epsilon value to describe our comparison
                     variableComparisons[varRunInfo['variable_name']] = \
                             {'pass_epsilon_percent': ((1.0 -
                                                        variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']) * 100.0),
                              'variable_run_info': varRunInfo
                              }
-                    print ('generating report for: ' + varRunInfo['variable_name'])
+                    print ('generating report for: ' + displayName) 
                     report.generate_and_save_variable_report(files,
                                                              varRunInfo, runInfo,
                                                              variableStats, 
-                                                             outputPath, varRunInfo['variable_name'] + ".html")
+                                                             outputPath, varRunInfo['variable_name'] + ".html") 
                                                              
                                                              
                     
             # only log a warning if the user themselves picked the faulty variable
             elif hadUserRequest :
-                LOG.warn(varRunInfo['variable_name'] + ' ' +
+                LOG.warn(explanationName + ' ' + 
                          'could not be compared. This may be because the data for this variable does not match in shape ' +
                          'between the two files or the data may not match the shape of the selected longitude and ' +
                          'latitude variables.')
@@ -681,6 +749,48 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             report.generate_and_save_doc_page(delta.STATISTICS_DOC, outputPath)
         
         return
+    
+    """
+    # This was used to modify files for testing and should not be uncommented
+    # unless you intend to use it only temporarily for testing purposes
+    # at the moment it is not written very generally (only works with hdf4),
+    # requires you to use 'from pyhdf.SD import SD, SDS' and change io to load
+    # files in write mode rather than read only
+    def make_renamed_variable_copy(*args) :
+        '''
+        make a copy of a variable in a file using the new name given by the user
+        '''
+        file_path = args[0]
+        old_var_name = args[1]
+        new_var_name = args[2]
+        
+        print ("Copying variable \'" + old_var_name + "\' to \'" + new_var_name
+               + "\' in file " + file_path)
+        
+        # open the file and get the old variable
+        LOG.info("\topening " + file_path)
+        file_object = io.open(file_path)
+        LOG.info("\tgetting " + old_var_name)
+        variable_object_old = file_object[old_var_name]
+        temp, old_rank, old_shape, old_type, old_num_attributes = SDS.info(variable_object_old)
+        old_attributes = SDS.attributes(variable_object_old)
+        
+        # make a copy of the variable with the new name
+        LOG.info("\tsaving " + new_var_name)
+        variable_object_new = SD.create(file_object, new_var_name, old_type, old_shape)
+        SDS.set(variable_object_new, variable_object_old[:])
+        '''  TODO, attribute copying is not working yet
+        for attribute_name in old_attributes :
+            variable_object_new[attribute_name] = variable_object_old[attribute_name]
+        '''
+        
+        # close up all our access objects
+        SDS.endaccess(variable_object_old)
+        SDS.endaccess(variable_object_new)
+        SD.end(file_object)
+        
+        return
+    """
 
     # def build(*args):
     #     """build summary
