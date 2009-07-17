@@ -314,6 +314,63 @@ def _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB, ignore
         
     return num_lon_lat_not_equal_points
 
+def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_info,
+                                longitude_a, longitude_b, latitude_a, latitude_b,
+                                do_include_images, output_path) :
+    """
+    Given information about where the two files are spatially invalid, figure
+    out what invalidity they share and save information or plots for later use
+    also build a shared longitude/latitude based on A but also including valid
+    points in B
+    """
+    
+    # for convenience,
+    # make a combined mask
+    invalid_in_common_mask = invalid_in_a_mask | invalid_in_b_mask
+    # make a "common" latitude based on A
+    longitude_common = longitude_a
+    latitude_common = latitude_a
+    
+    # compare our spacialy invalid info
+    spatial_info['perInvPtsInBoth'] = spatial_info['file A']['perInvPts']
+            # a default that will hold if the two files have the same spatially invalid pts
+    if not all(invalid_in_a_mask.ravel() == invalid_in_b_mask.ravel()) : 
+        LOG.info("Mismatch in number of spatially invalid points. " +
+                 "Files may not have corresponding data where expected.")
+        
+        # figure out which points are only valid in one of the two files
+        valid_only_in_mask_a = (~invalid_in_a_mask) & invalid_in_b_mask
+        spatial_info['file A']['numInvPts'] = sum(valid_only_in_mask_a.ravel())
+        valid_only_in_mask_b = (~invalid_in_b_mask) & invalid_in_a_mask
+        spatial_info['file B']['numInvPts'] = sum(valid_only_in_mask_b.ravel())
+        
+        # so how many do they have together?
+        spatial_info['perInvPtsInBoth'] = _get_percentage_from_mask(invalid_in_common_mask)[0]
+        #spatial_info['perInvPtsInBoth'], totalNumSpaciallyInvPts = _get_percentage_from_mask(invalid_in_common_mask) todo, remove?
+        # make a "clean" version of the lon/lat
+        longitude_common[valid_only_in_mask_a] = longitude_a[valid_only_in_mask_a]
+        longitude_common[valid_only_in_mask_b] = longitude_b[valid_only_in_mask_b]
+        latitude_common [valid_only_in_mask_a] = latitude_a [valid_only_in_mask_a]
+        latitude_common [valid_only_in_mask_b] = latitude_b [valid_only_in_mask_b]
+        
+        # plot the points that are only valid one file and not the other
+        if (spatial_info['file A']['numInvPts'] > 0) and (do_include_images) :
+            plot.plot_and_save_spacial_trouble(longitude_a, latitude_a,
+                                               valid_only_in_mask_a,
+                                               invalid_in_a_mask,
+                                               "A", "Points only spatially valid\nin File A",
+                                               "SpatialMismatch",
+                                               output_path, True)
+        if (spatial_info['file B']['numInvPts'] > 0) and (do_include_images) :
+            plot.plot_and_save_spacial_trouble(longitude_b, latitude_b,
+                                               valid_only_in_mask_b,
+                                               invalid_in_b_mask,
+                                               "B", "Points only spatially valid\nin File B",
+                                               "SpatialMismatch",
+                                               output_path, True)
+    
+    return invalid_in_common_mask, spatial_info, longitude_common, latitude_common
+
 def main():
     import optparse
     usage = """
@@ -601,8 +658,6 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             _get_and_analyze_lon_lat (bFile, b_latitude, b_longitude)
         
         # test the "valid" values in our lon/lat
-        longitude = longitudeA
-        latitude = latitudeA
         spatialInfo['num_lon_lat_not_equal_points'] = _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB,
                                                                               spaciallyInvalidMaskA, spaciallyInvalidMaskB,
                                                                               runInfo['shouldIncludeImages'], outputPath)
@@ -614,47 +669,14 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                      + str(runInfo['latitude'])  + str(latitudeA.shape) + " in file A and variables "
                      + str(b_longitude) + str(longitudeB.shape) + "/"
                      + str(b_latitude)  + str(latitudeB.shape) + " in file B. Aborting attempt to compare files.")
-            return
+            # TODO, should we make some sort of error report instead?
+            sys.exit(1) # things have gone wrong
         
-        # for convenience, make a combined mask
-        spaciallyInvalidMask = spaciallyInvalidMaskA | spaciallyInvalidMaskB
-        
-        # compare our spacialy invalid info
-        spatialInfo['perInvPtsInBoth'] = spatialInfo['file A']['perInvPts']
-                # a default that will hold if the two files have the same spatially invalid pts
-        if not all(spaciallyInvalidMaskA.ravel() == spaciallyInvalidMaskB.ravel()) : 
-            LOG.info("Mismatch in number of spatially invalid points. " +
-                     "Files may not have corresponding data where expected.")
-            
-            # figure out which points are only valid in one of the two files
-            validOnlyInAMask = (~spaciallyInvalidMaskA) & spaciallyInvalidMaskB
-            spatialInfo['file A']['numInvPts'] = len(validOnlyInAMask[validOnlyInAMask])
-            validOnlyInBMask = (~spaciallyInvalidMaskB) & spaciallyInvalidMaskA
-            spatialInfo['file B']['numInvPts'] = len(validOnlyInBMask[validOnlyInBMask])
-            
-            # so how many do they have together?
-            spatialInfo['perInvPtsInBoth'], totalNumSpaciallyInvPts = _get_percentage_from_mask(spaciallyInvalidMask)
-            # make a "clean" version of the lon/lat
-            longitude[validOnlyInAMask] = longitudeA[validOnlyInAMask]
-            longitude[validOnlyInBMask] = longitudeB[validOnlyInBMask]
-            latitude [validOnlyInAMask] = latitudeA [validOnlyInAMask]
-            latitude [validOnlyInBMask] = latitudeB [validOnlyInBMask]
-            
-            # plot the points that are only valid one file and not the other
-            if (spatialInfo['file A']['numInvPts'] > 0) and (runInfo['shouldIncludeImages']) :
-                plot.plot_and_save_spacial_trouble(longitude, latitude,
-                                                   validOnlyInAMask,
-                                                   spaciallyInvalidMaskA,
-                                                   "A", "Points only spatially valid\nin File A",
-                                                   "SpatialMismatch",
-                                                   outputPath, True)
-            if (spatialInfo['file B']['numInvPts'] > 0) and (runInfo['shouldIncludeImages']) :
-                plot.plot_and_save_spacial_trouble(longitude, latitude,
-                                                   validOnlyInBMask,
-                                                   spaciallyInvalidMaskB,
-                                                   "B", "Points only spatially valid\nin File B",
-                                                   "SpatialMismatch",
-                                                   outputPath, True)
+        # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
+        spaciallyInvalidMask, spatialInfo, longitudeCommon, latitudeCommon = \
+                                _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
+                                                            longitudeA, longitudeB, latitudeA, latitudeB,
+                                                            runInfo['shouldIncludeImages'], outputPath)
             
         # set some things up to hold info for our reports
         # this is going to be in the form
@@ -687,21 +709,22 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             
             # check if this data can be displayed
             if ((aData.shape == bData.shape) and
-                (aData.shape == longitude.shape) and
-                (bData.shape == longitude.shape)) :
+                (aData.shape == longitudeCommon.shape) and
+                (bData.shape == longitudeCommon.shape)) :
                 
                 # if we should be making images, then make them for this variable
                 if (runInfo['shouldIncludeImages']) :
                     # create the images comparing that variable
-                    plot.plot_and_save_figure_comparison(aData, bData, varRunInfo['variable_name'], 
-                                                         files['file A']['path'], files['file B']['path'],
-                                                         latitude, longitude,
+                    plot.plot_and_save_figure_comparison(aData, bData, varRunInfo, 
+                                                         files['file A']['path'],
+                                                         files['file B']['path'],
+                                                         latitudeA, longitudeA,
+                                                         latitudeB, longitudeB,
+                                                         latitudeCommon, longitudeCommon,
                                                          spaciallyInvalidMaskA,
                                                          spaciallyInvalidMaskB,
                                                          spaciallyInvalidMask,
-                                                         outputPath, varRunInfo['epsilon'],
-                                                         varRunInfo['missing_value'], True,
-                                                         displayName)
+                                                         outputPath, True)
                 
                 # generate the report for this variable
                 if (runInfo['shouldIncludeReport']) :

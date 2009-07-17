@@ -136,7 +136,7 @@ def generate_and_save_summary_report(files,
                'variables': variables 
                }
               
-    _make_and_save_page((outputPath + "/" + reportFileName), './mainreport.txt', **kwargs)
+    _make_and_save_page((outputPath + "/" + reportFileName), 'mainreport.txt', **kwargs)
     
     return
 
@@ -146,7 +146,7 @@ def generate_and_save_doc_page(definitions, outputPath) :
     """
     kwargs = {'definitions': definitions
               }
-    _make_and_save_page(outputPath + "/doc.html", './doc.txt', **kwargs)
+    _make_and_save_page(outputPath + "/doc.html", 'doc.txt', **kwargs)
     
     return
 
@@ -209,7 +209,7 @@ def generate_and_save_variable_report(files,
                'statGroups': statGroups 
                }
     
-    _make_and_save_page((outputPath + "/" + reportFileName), './variablereport.txt', **kwargs)
+    _make_and_save_page((outputPath + "/" + reportFileName), 'variablereport.txt', **kwargs)
     
     return
 
