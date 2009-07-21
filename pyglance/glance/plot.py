@@ -7,14 +7,19 @@ Created by rayg Apr 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-import os, sys, logging
+# these first two lines must stay before the pylab import
+import matplotlib
+matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
+
 from pylab import *
-import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.colors as colors
 from matplotlib.ticker import FormatStrFormatter
+
+import os, sys, logging
+import numpy as np
 
 import keoni.map.graphics as maps
 
