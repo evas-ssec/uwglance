@@ -10,12 +10,13 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     import glance.report as report
 %>
 
-## we will use this a lot, so hang on to it
+## we will use this stuff often, so hang on to it
 <%
     variableName = runInfo['variable_name']
     variableDisplayName = variableName
     if (runInfo.has_key('display_name')):
         variableDisplayName = runInfo['display_name']
+    hideComparisonImages = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
 %>
 
 <title>${variableDisplayName} Variable Comparison</title>
@@ -58,7 +59,34 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         % else :
             longitude: ${runInfo['longitude']}<br>
         % endif
+        
+        % if ('lon_lat_epsilon' in runInfo) and (runInfo['lon_lat_epsilon'] > 0.0) :
+            longitude/latitude comparison epsilon: ${runInfo['lon_lat_epsilon']}
+        % endif
     </p>
+    
+    ## if there is a problem with the longitude/latitude correlation between the two files,
+    ## make a nice big warning for the user
+    % if spatial.has_key('lon_lat_not_equal_points_count') and (spatial['lon_lat_not_equal_points_count'] > 0) :
+        <p>
+            WARNING: ${spatial['lon_lat_not_equal_points_count']} data points
+            (${report.make_formatted_display_string(spatial['lon_lat_not_equal_points_percent'])}% of all data)
+            show possible mismatch in values stored in file a
+            and file b longitude and latitude values. Depending on the degree of mismatch, some data value comparisons
+            in this report may be distorted or spatially nonsensical. Please consider re-running this report and including an
+            examination of your longitude and latitude variables with appropriate epsilons in order to analyze the significance
+            of the difference.<br>
+            ## if we're showing images, link to graphs showing the problem
+            % if runInfo['shouldIncludeImages'] :
+                <a href="./LonLatMismatch.A.png">
+                    View mismatching points in A's lon/lat system
+                </a><br>
+                <a href="./LonLatMismatch.B.png">
+                    View mismatching points in B's lon/lat system
+                </a>
+            % endif
+        </p>
+    % endif
     
     <% shouldIncludeImages = runInfo['shouldIncludeImages'] %>
     % if shouldIncludeImages :
@@ -107,7 +135,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     % endfor
     </dl>
     
-    % if shouldIncludeImages :
+    % if shouldIncludeImages and (not hideComparisonImages) :
     <p>
         <a href="./${variableName}.AbsDiff.png"><img src="./${variableName}.AbsDiff.small.png"></a>
         <a href="./${variableName}.Diff.png"><img src="./${variableName}.Diff.small.png"></a>

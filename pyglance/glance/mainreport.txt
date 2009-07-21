@@ -49,15 +49,21 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         % else :
             longitude: ${runInfo['longitude']}<br>
         % endif
+        
+         % if ('lon_lat_epsilon' in runInfo) and (runInfo['lon_lat_epsilon'] > 0.0) :
+            longitude/latitude comparison epsilon: ${runInfo['lon_lat_epsilon']}
+        % endif
     </p>
     
     ## if there is a problem with the longitude/latitude correlation between the two files,
     ## make a nice big warning for the user
-    % if spatial.has_key('num_lon_lat_not_equal_points') and (spatial['num_lon_lat_not_equal_points'] > 0) :
+    % if spatial.has_key('lon_lat_not_equal_points_count') and (spatial['lon_lat_not_equal_points_count'] > 0) :
         <p>
-            WARNING: ${spatial['num_lon_lat_not_equal_points']} data points show possible mismatch in values stored in file a
+            WARNING: ${spatial['lon_lat_not_equal_points_count']} data points
+            (${report.make_formatted_display_string(spatial['lon_lat_not_equal_points_percent'])}% of all data)
+            show possible mismatch in values stored in file a
             and file b longitude and latitude values. Depending on the degree of mismatch, some data value comparisons
-            in this report may be distorted or spacially nonsensical. Please consider re-running this report and including an
+            in this report may be distorted or spatially nonsensical. Please consider re-running this report and including an
             examination of your longitude and latitude variables with appropriate epsilons in order to analyze the significance
             of the difference.<br>
             ## if we're showing images, link to graphs showing the problem
@@ -72,44 +78,31 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         </p>
     % endif
     
-    ## if we have some unique spacially invalid points, report them
-    <% haveUniqueSpacialInvalidity = False %>
-    ## we will assume the whole substructure will be present if there's a problem with file A
-    ## that we need to report on specifically
+    ## if we have some unique spatially invalid points, report them
+    ## are there any in file A?
     %if spatial.has_key('file A') and spatial['file A'].has_key('numInvPts') and (spatial['file A']['numInvPts'] > 0) :
         <%
             fileAInfo = spatial['file A']
-            haveUniqueSpacialInvalidity = True
         %>
         <p>
-            File A has
             % if runInfo['shouldIncludeImages'] :
-                <a href="./SpatialMismatch.A.png">
+                <a href="./SpatialMismatch.A.png"><img src="./SpatialMismatch.A.small.png"></a><br>
             % endif
-            ${fileAInfo['numInvPts']} spacially valid data points not present in File B.<br>
-            % if runInfo['shouldIncludeImages'] :
-                </a>
-            % endif
-            File A has a total of ${report.make_formatted_display_string(fileAInfo['perInvPts'])}% spacially invalid data. <br>
+            File A has ${fileAInfo['numInvPts']} valid data points not present in File B.<br>
+            File A has a total of ${report.make_formatted_display_string(fileAInfo['perInvPts'])}% invalid longitude/latitude data. <br>
         </p>
     % endif
-    ## we will assume the whole substructure will be present if there's a problem with file B
-    ## that we need to report on specifically
+    ## are there any in file B?
     %if spatial.has_key('file B') and spatial['file B'].has_key('numInvPts') and (spatial['file B']['numInvPts'] > 0) :
         <%
             fileBInfo = spatial['file B']
-            haveUniqueSpacialInvalidity = True
         %>
         <p>
-            File B has
             % if runInfo['shouldIncludeImages'] :
-                <a href="./SpatialMismatch.B.png">
+                <a href="./SpatialMismatch.B.png"><img src="./SpatialMismatch.B.small.png"></a><br>
             % endif
-            ${fileBInfo['numInvPts']} spacially valid data points not present in File A.<br>
-            % if runInfo['shouldIncludeImages'] :
-                </a>
-            % endif
-            File B has a total of ${report.make_formatted_display_string(fileBInfo['perInvPts'])}% spacially invalid data. <br>
+            File B has ${fileBInfo['numInvPts']} valid data points not present in File A.<br>
+            File B has a total of ${report.make_formatted_display_string(fileBInfo['perInvPts'])}% longitude/latitude invalid data. <br>
         </p>
     % endif
     ## report on shared spatial invalidity if there is any
@@ -117,31 +110,54 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         <% perInBoth = spatial['perInvPtsInBoth'] %>
         % if perInBoth > 0 :
             <p>
-                data that is spacially invalid in either file: ${report.make_formatted_display_string(perInBoth)}%
+                lon/lat data that is invalid in either file A or file B: ${report.make_formatted_display_string(perInBoth)}%
             </p>
         % endif
     % endif
     
-    <h3>Compared Variables</h3>
+    % if len(variables.keys()) > 0 : 
     
-    ## report on all the variables that were compared and give a basic stat idea of how well they did
-    <blockquote>
-        <p>
-            % for variableName in sorted(list(variables)) :
-                <%
-                    tempVariableInfo = variables[variableName]
-                    varDisplayName = variableName
-                    if (tempVariableInfo['variable_run_info'].has_key('display_name')) :
-                        varDisplayName = tempVariableInfo['variable_run_info']['display_name']
-                %>
-                Variable: <a href="${variableName | u}.html">${varDisplayName}</a> <br>
-                Epsilon used: ${tempVariableInfo['variable_run_info']['epsilon']} <br>
-                Finite values within one epsilon of difference:
-                ${report.make_formatted_display_string(tempVariableInfo['pass_epsilon_percent'])}% <br>
-                <br>
-            % endfor
-        </p>
-    </blockquote>
+        <h3>Compared Variables</h3>
+        
+        ## report on all the variables that were compared and give a basic stat idea of how well they did
+        <blockquote>
+            <p>
+                ## TODO replace the table with floating boxes in some form
+                <table> 
+                    
+                    
+                    % for variableName in sorted(list(variables)) :
+                        <%
+                            tempVariableInfo = variables[variableName]
+                            varDisplayName = variableName
+                            if (tempVariableInfo['variable_run_info'].has_key('display_name')) :
+                                varDisplayName = tempVariableInfo['variable_run_info']['display_name']
+                            passPercent = tempVariableInfo['pass_epsilon_percent']
+                            didPass = tempVariableInfo['variable_run_info']['did_pass']
+                        %>
+                        <tr>
+                            <td>
+                                % if not (didPass is None) :
+                                    %if didPass :
+                                        <img src="./pass.gif">
+                                    %else :
+                                        <img src="./fail.gif">
+                                    % endif
+                                % endif
+                            </td>
+                            <td>
+                                Variable: <a href="${variableName | u}.html">${varDisplayName}</a> <br>
+                                Epsilon used: ${tempVariableInfo['variable_run_info']['epsilon']} <br>
+                                Finite values within one epsilon of difference:
+                                ${report.make_formatted_display_string(passPercent)}%
+                            </td>
+                        </tr>
+                    % endfor
+                </table>
+            </p>
+        </blockquote>
+    
+    % endif
     
     ## report the names of variables shared between the two files
     <% sharedVars = varNames['sharedVars'] %>

@@ -108,12 +108,13 @@ def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(Non
              'correlation_with_noise': rpn,
              }
 
-def stats(dif, mask, bad, *etc):
-    rms = sum(abs(dif[mask] ** 2)) / dif.size    
+def stats(diffData, mask, *etc):
+    rms = sum(abs(diffData[mask] ** 2)) / diffData.size    
     return {    'rms_diff': rms, 
-                'std_diff': std(dif[mask]), 
-                'mean_diff': mean(dif[mask]), 
-                'median_diff': median(dif[mask]) 
+                'std_diff': std(diffData[mask]), 
+                'mean_diff': mean(diffData[mask]), 
+                'median_diff': median(diffData[mask]),
+                'max_diff': max(diffData[mask])
                 }
 
 def _get_num_perfect(a, b, ignoreMask=None):
@@ -342,6 +343,7 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'correlation': "Pearson correlation r-coefficient (0.0-1.0) for finite values of A and B",
                     'diff_outside_epsilon_count': "number of finite differences falling outside epsilon",
                     'diff_outside_epsilon_fraction': "fraction of finite differences falling outside epsilon (out of common_finite_count)",
+                    'max_diff': "Maximum difference of finite values",
                     'mean_diff': "mean difference of finite values",
                     'median_diff': "median difference of finite values",
                     'perfect_match_count': "number of perfectly matched finite data points between A and B",
@@ -351,8 +353,8 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     
                     # note: the statistics described below may no longer be generated?
                     'mean_percent_change': "Percent change from A to B for finite values, averaged",
-                    'max_percent_change': "Percent change from A to B for finite values, maximum value",
-                    'max_diff': "Maximum difference of finite values",
+                    'max_percent_change': "Percent change from A to B for finite values, maximum value"
+                    
                     }
 STATISTICS_DOC_STR = '\n'.join( '%s:\n    %s' % x for x in sorted(list(STATISTICS_DOC.items())) ) + '\n'
 

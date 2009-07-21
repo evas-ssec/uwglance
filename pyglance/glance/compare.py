@@ -12,7 +12,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 import os, sys, logging, re, subprocess, datetime
 import imp as imp
 from pprint import pprint, pformat
-import numpy as np
+from numpy import *
 
 import glance.io as io
 import glance.delta as delta
@@ -27,8 +27,8 @@ glance_default_latitude_name = 'pixel_latitude'
 # these are the built in default settings
 glance_analysis_defaults = {'epsilon': 0.0,
                             'missing_value': None,
-                            'epsilon_failure_tolerance': None, # this means don't do the check
-                            'nonfinite_data_tolerance': None # this means don't do the check
+                            'epsilon_failure_tolerance': 0.0, 
+                            'nonfinite_data_tolerance':  0.0 
                             }
 
 def _cvt_names(namelist, epsilon, missing):
@@ -127,11 +127,15 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
             finalFromCommandLine = _parse_varnames(fileCommonNames, ['.*'],
                                                    defaultValues['epsilon'], defaultValues['missing_value'])
             for name, epsilon, missing in finalFromCommandLine :
-                # note that we'll use the variable's name as the display name for the time being
-                finalNames[name] = {'variable_name': name,
-                                    'epsilon': defaultValues['epsilon'],
-                                    'missing_value': defaultValues['missing_value']
-                                    }
+                # we'll use the variable's name as the display name for the time being
+                finalNames[name] = {}
+                # make sure we pick up any other controlling defaults
+                finalNames[name].update(defaultValues) 
+                # but override the values that would have been determined by _parse_varnames
+                finalNames[name]['variable_name'] = name
+                finalNames[name]['epsilon'] = epsilon
+                finalNames[name]['missing_value'] = missing
+                
         # otherwise just do the ones the user asked for
         else : 
             # check each of the names the user asked for to see if it is either in the list of common names
@@ -146,15 +150,19 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                     finalNames[name]['variable_name'] = name
                     finalNames[name].update(requestedNames[name])
     else:
-        # format this similarly to the stuff from the config file
+        # format command line input similarly to the stuff from the config file
+        print (requestedNames)
         finalFromCommandLine = _parse_varnames(fileCommonNames, requestedNames,
                                                defaultValues['epsilon'], defaultValues['missing_value'])
         for name, epsilon, missing in finalFromCommandLine :
-            # note that we'll use the variable's name as the display name for the time being
-            finalNames[name] = {'variable_name': name,
-                                'epsilon': defaultValues['epsilon'],
-                                'missing_value': defaultValues['missing_value']
-                                }
+            ## we'll use the variable's name as the display name for the time being
+            finalNames[name] = {}
+            # make sure we pick up any other controlling defaults
+            finalNames[name].update(defaultValues) 
+            # but override the values that would have been determined by _parse_varnames
+            finalNames[name]['variable_name'] = name
+            finalNames[name]['epsilon'] = epsilon
+            finalNames[name]['missing_value'] = missing
     
     LOG.debug("Final selected set of variables to analyze:")
     LOG.debug(str(finalNames))
@@ -173,6 +181,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
     runInfo['shouldIncludeImages'] = False
     runInfo['latitude'] = glance_default_latitude_name
     runInfo['longitude'] = glance_default_longitude_name
+    runInfo['lon_lat_epsilon'] = 0.0
     # by default, we don't have any particular variables to analyze
     desiredVariables = {}
     # use the built in default values, to start with
@@ -232,6 +241,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
         runInfo['shouldIncludeImages'] = not optionsSet.htmlOnly
         runInfo['latitude'] = optionsSet.latitudeVar or runInfo['latitude']
         runInfo['longitude'] = optionsSet.longitudeVar or runInfo['longitude']
+        runInfo['lon_lat_epsilon'] = optionsSet.lonlatepsilon
         
         # get any requested names from the command line
         requestedNames = originalArgs[2:] or ['.*']
@@ -249,8 +259,8 @@ def _get_and_analyze_lon_lat (fileObject, latitudeVariableName, longitudeVariabl
     and analyze them to identify spacially invalid data (ie. data that would fall off the earth)
     """
     # get the data from the file
-    longitudeData = np.array(fileObject[longitudeVariableName][:], dtype=np.float)
-    latitudeData  = np.array(fileObject[latitudeVariableName][:],  dtype=np.float)
+    longitudeData = array(fileObject[longitudeVariableName][:], dtype=float)
+    latitudeData  = array(fileObject[latitudeVariableName][:],  dtype=float)
     
     # build a mask of our spacially invalid data
     invalidLatitude = (latitudeData < -90) | (latitudeData > 90)
@@ -275,23 +285,33 @@ def _get_percentage_from_mask(dataMask) :
     
     return percentage, numMarkedDataPts
 
-def _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB, ignoreMaskA, ignoreMaskB, doMakeImages, outputPath) :
+def _check_lon_lat_equality(longitudeA, latitudeA,
+                            longitudeB, latitudeB,
+                            ignoreMaskA, ignoreMaskB,
+                            llepsilon, doMakeImages, outputPath) :
     """
     check to make sure the longitude and latitude are equal everywhere that's not in the ignore masks
     if they are not and doMakeImages was passed as True, generate appropriate figures to show where
     return the number of points where they are not equal (0 would mean they're the same)
     """
-    num_lon_lat_not_equal_points = 0
-    
     # first of all, if the latitude and longitude are not the same shape, then things can't ever be "equal"
     if (longitudeA.shape != longitudeB.shape) | (latitudeA.shape != latitudeB.shape) :
-        return -1
+        return None
     
-    lon_lat_not_equal_mask = ((longitudeA != longitudeB) | (latitudeA != latitudeB)) & (~ (ignoreMaskA | ignoreMaskB))
-    # if we ever want to limit the difference by an epsilon, here's the basic form
-    #lon_lat_not_equal_mask = ((abs(longitudeA - longitudeB) > 0.001) | (abs(latitudeA - latitudeB) > 0.001)) & (~ (ignoreMaskA | ignoreMaskB))
-    num_lon_lat_not_equal_points = sum(lon_lat_not_equal_mask.ravel())
-    if (num_lon_lat_not_equal_points > 0) :
+    lon_lat_not_equal_points_count = 0
+    lon_lat_not_equal_points_percent = 0.0
+    combinedIgnoreMask = ignoreMaskA | ignoreMaskB
+    
+    # get information about how the latitude and longitude differ
+    longitudeDiff, finiteLongitudeMask = delta.diff(longitudeA, longitudeB, llepsilon, ignoreMask=combinedIgnoreMask)[0:2]
+    latitudeDiff,  finiteLatitudeMask  = delta.diff(latitudeA,  latitudeB,  llepsilon, ignoreMask=combinedIgnoreMask)[0:2]
+    lon_lat_not_equal_mask = ((abs(longitudeDiff) > llepsilon) | (abs(latitudeDiff)  > llepsilon)) & (~combinedIgnoreMask)  \
+                             & finiteLatitudeMask & finiteLongitudeMask
+    lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask.ravel())
+    lon_lat_not_equal_points_percent = float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)
+    
+    # if we have unequal points, create user legible info about the problem
+    if (lon_lat_not_equal_points_count > 0) :
         LOG.warn("Possible mismatch in values stored in file a and file b longitude and latitude values."
                  + " Depending on the degree of mismatch, some data value comparisons may be "
                  + "distorted or spacially nonsensical.")
@@ -311,8 +331,13 @@ def _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB, ignore
                                                "(Shown in B)",
                                                "LonLatMismatch",
                                                outputPath, True)
-        
-    return num_lon_lat_not_equal_points
+    
+    # setup our return data
+    returnInfo = {}
+    returnInfo['lon_lat_not_equal_points_count'] = lon_lat_not_equal_points_count
+    returnInfo['lon_lat_not_equal_points_percent'] = lon_lat_not_equal_points_percent
+    
+    return returnInfo
 
 def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_info,
                                 longitude_a, longitude_b, latitude_a, latitude_b,
@@ -358,14 +383,14 @@ def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_in
             plot.plot_and_save_spacial_trouble(longitude_a, latitude_a,
                                                valid_only_in_mask_a,
                                                invalid_in_a_mask,
-                                               "A", "Points only spatially valid\nin File A",
+                                               "A", "Points only valid in\nFile A\'s longitude & latitude",
                                                "SpatialMismatch",
                                                output_path, True)
         if (spatial_info['file B']['numInvPts'] > 0) and (do_include_images) :
             plot.plot_and_save_spacial_trouble(longitude_b, latitude_b,
                                                valid_only_in_mask_b,
                                                invalid_in_b_mask,
-                                               "B", "Points only spatially valid\nin File B",
+                                               "B", "Points only valid in\nFile B\'s longitude & latitude",
                                                "SpatialMismatch",
                                                output_path, True)
     
@@ -411,6 +436,8 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                       help="generate only html report files (no images)")
     parser.add_option('-c', '--configfile', dest="configFile", type='string', default=None,
                       help="set optional configuration file")
+    parser.add_option('-l', '--llepsilon', dest='lonlatepsilon', type='float', default=0.0,
+                      help="set default epsilon for longitude and latitude comparsion")
     
                     
     options, args = parser.parse_args()
@@ -631,6 +658,10 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         
         # deal with the input and output files
         outputPath = pathsTemp['out']
+        if not (os.path.isdir(outputPath)) :
+            LOG.info("Specified output directory (" + outputPath + ") does not exist.")
+            LOG.info("Creating output directory.")
+            os.makedirs(outputPath)
         # open the files
         files = {}
         LOG.info("Processing File A:")
@@ -639,7 +670,6 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         bFile, files['file B'] = _setup_file(pathsTemp['b'], "\t")
         
         # get information about the names the user requested
-        hadUserRequest = (not (requestedNames is None)) and (len(requestedNames) > 0)
         finalNames, nameStats = _resolve_names(aFile, bFile,
                                                defaultValues,
                                                requestedNames, usedConfigFile)
@@ -658,19 +688,25 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             _get_and_analyze_lon_lat (bFile, b_latitude, b_longitude)
         
         # test the "valid" values in our lon/lat
-        spatialInfo['num_lon_lat_not_equal_points'] = _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB,
-                                                                              spaciallyInvalidMaskA, spaciallyInvalidMaskB,
-                                                                              runInfo['shouldIncludeImages'], outputPath)
+        moreSpatialInfo = _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB,
+                                                  spaciallyInvalidMaskA, spaciallyInvalidMaskB,
+                                                  runInfo['lon_lat_epsilon'], runInfo['shouldIncludeImages'],
+                                                  outputPath)
         # if we got the worst type of error result from the comparison we need to stop now, because the data is too
         # dissimilar to be used
-        if spatialInfo['num_lon_lat_not_equal_points'] < 0 :
+        if moreSpatialInfo is None :
             LOG.warn("Unable to reconcile sizes of longitude and latitude for variables "
                      + str(runInfo['longitude']) + str(longitudeA.shape) + "/"
                      + str(runInfo['latitude'])  + str(latitudeA.shape) + " in file A and variables "
                      + str(b_longitude) + str(longitudeB.shape) + "/"
                      + str(b_latitude)  + str(latitudeB.shape) + " in file B. Aborting attempt to compare files.")
-            # TODO, should we make some sort of error report instead?
             sys.exit(1) # things have gone wrong
+        # update our existing spatial information
+        spatialInfo.update(moreSpatialInfo)
+        # if we have some points outside epsilon, we still want to make a report to show the user this problem, but
+        # we can't trust most of our other comparison images
+        if spatialInfo['lon_lat_not_equal_points_count'] > 0 :
+            runInfo['short_circuit_diffs'] = True # I could simply run the above test every time, but this is simpler and clearer
         
         # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
         spaciallyInvalidMask, spatialInfo, longitudeCommon, latitudeCommon = \
@@ -714,6 +750,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                 
                 # if we should be making images, then make them for this variable
                 if (runInfo['shouldIncludeImages']) :
+                    doShortCircuit = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
                     # create the images comparing that variable
                     plot.plot_and_save_figure_comparison(aData, bData, varRunInfo, 
                                                          files['file A']['path'],
@@ -724,7 +761,8 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                                                          spaciallyInvalidMaskA,
                                                          spaciallyInvalidMaskB,
                                                          spaciallyInvalidMask,
-                                                         outputPath, True)
+                                                         outputPath, True,
+                                                         doShortCircuit)
                 
                 # generate the report for this variable
                 if (runInfo['shouldIncludeReport']) :
@@ -735,21 +773,46 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                                                     (varRunInfo['missing_value'], varRunInfo['missing_value']),
                                                     spaciallyInvalidMaskA, spaciallyInvalidMaskB)
                     # hang on to our good % and our epsilon value to describe our comparison
-                    variableComparisons[varRunInfo['variable_name']] = \
-                            {'pass_epsilon_percent': ((1.0 -
-                                                       variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']) * 100.0),
-                             'variable_run_info': varRunInfo
-                             }
+                    passedFraction = (1.0 - variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction'])
+                    passedPercent = passedFraction * 100.0
+                    variableComparisons[varRunInfo['variable_name']] = {'pass_epsilon_percent': passedPercent,
+                                                                        'variable_run_info': varRunInfo
+                                                                        }
+                    # check to see if the variable passed, failed, or wasn't quantitatively tested
+                    didPass = None
+                    # check to see if it failed on epsilon
+                    epsilonTolerance = None
+                    if ('epsilon_failure_tolerance' in varRunInfo) :
+                        epsilonTolerance = varRunInfo['epsilon_failure_tolerance']
+                    else :
+                        epsilonTolerance = defaultValues['epsilon_failure_tolerance']
+                    if not (epsilonTolerance is None) :
+                        didPass =         passedFraction >= (1.0 - epsilonTolerance)
+                    # check to see if it failed on nonfinite data
+                    nonfiniteTolerance = None
+                    if ('nonfinite_data_tolerance'  in varRunInfo) :
+                        nonfiniteTolerance = varRunInfo['nonfinite_data_tolerance']
+                    else :
+                        nonfiniteTolerance = defaultValues['nonfinite_data_tolerance']
+                    if not (nonfiniteTolerance is None) :
+                        passedNonFinite = (passedFraction >= (1.0 - nonfiniteTolerance)) 
+                        if (didPass is None) :
+                            didPass = passedNonFinite
+                        else :
+                            didPass = didPass and passedNonFinite
+                    varRunInfo['did_pass'] = didPass
+                    
                     print ('generating report for: ' + displayName) 
                     report.generate_and_save_variable_report(files,
                                                              varRunInfo, runInfo,
-                                                             variableStats, 
+                                                             variableStats,
+                                                             spatialInfo,
                                                              outputPath, varRunInfo['variable_name'] + ".html") 
                                                              
                                                              
                     
             # only log a warning if the user themselves picked the faulty variable
-            elif hadUserRequest :
+            else :
                 LOG.warn(explanationName + ' ' + 
                          'could not be compared. This may be because the data for this variable does not match in shape ' +
                          'between the two files or the data may not match the shape of the selected longitude and ' +

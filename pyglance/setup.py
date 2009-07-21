@@ -23,6 +23,6 @@ setup( name="glance",
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
        packages = find_packages('.'),
        install_requires=[ 'numpy' ],
-       package_data = {'': ['*.txt'], }
+       package_data = {'': ['*.txt', '*.gif'], }
        )
 

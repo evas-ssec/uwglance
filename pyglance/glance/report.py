@@ -9,10 +9,11 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys, logging
 
-from pkg_resources import resource_string
+from pkg_resources import resource_string, resource_stream, resource_filename
 from mako.template import Template
 import types as types
 import numpy as np
+import shutil as shutil
 
 LOG = logging.getLogger(__name__)
 
@@ -77,7 +78,8 @@ def generate_and_save_summary_report(files,
                    'longitude': longitudeName,
                    'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
                    'longitude_alt_name_in_b': longitudeNameInB,     # optional, if not defined, B's using the normal longitude
-                   'shouldIncludeImages': shouldIncludeImages # this key/value is optional, defaults to True
+                   'shouldIncludeImages': shouldIncludeImages,      # this key/value is optional, defaults to True
+                   'short_circuit_diffs': if the diff related information should be shown
                    }
                    
     files is a dictionary in the form
@@ -138,6 +140,12 @@ def generate_and_save_summary_report(files,
               
     _make_and_save_page((outputPath + "/" + reportFileName), 'mainreport.txt', **kwargs)
     
+    # copy the pass/fail images, TODO move this to a list input in the parameters
+    passFile = resource_filename(__name__, 'pass.gif') # TODO, how can this be done without unzipping the egg?
+    failFile = resource_filename(__name__, 'fail.gif') # TODO, how can this be done without unzipping the egg?
+    shutil.copy(passFile, outputPath)
+    shutil.copy(failFile, outputPath)
+    
     return
 
 def generate_and_save_doc_page(definitions, outputPath) :
@@ -154,6 +162,7 @@ def generate_and_save_variable_report(files,
                                       variableRunInfo, # contains variable specific run information
                                       generalRunInfo,  # contains run information not related to the variable
                                       statGroups,
+                                      spatial,
                                       outputPath, reportFileName
                                       ) :
     """
@@ -166,14 +175,15 @@ def generate_and_save_variable_report(files,
     ie. there may be many different groups of stats that should each be displayed
     
     generalRunInfo is a dictionary in the form
-        generalRunInfo = {'machine': currentMachine,
+        generalRunInfo = {  'machine': currentMachine,
                             'user': currentUser,
                             'time': currentTime,
                             'latitude': latitudeName,
                             'longitude': longitudeName,
                             'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
                             'longitude_alt_name_in_b': longitudeNameInB,     # optional, if not defined, B's using the normal longitude
-                            'shouldIncludeImages': shouldIncludeImages
+                            'shouldIncludeImages': shouldIncludeImages,
+                            'short_circuit_diffs': if the diff related information should be shown
                             }
     
     variableRunInfo is a dictionary in the form
@@ -181,6 +191,8 @@ def generate_and_save_variable_report(files,
                             'epsilon': epsilon,
                             'missing_value': missingDataValue,
                             'display_name': displayName
+                            'did_pass': boolean value or None # optional, boolean means it did or did not pass, None means it was
+                                                              # not qualitatively tested against a set of tolerances
                             }
                             
     files is a dictionary in the form
@@ -195,6 +207,24 @@ def generate_and_save_variable_report(files,
                             'md5sum': bMD5SUM
                             }
                     }
+                    
+    spatial is a dictionary in the form
+        spatial = {
+                     'file A': {'numInvPts': number of spatially invalid points only in A (and not corrspondingly in B),
+                                'perInvPts': percent of spatially invalid points in A (out of all pts in A)
+                                },
+                     'file B': {'numInvPts': number of spatially invalid points only in B (and not corrspondingly in A),
+                                'perInvPts': percent of spatially invalid points in B (out of all pts in B)
+                                },
+                     'perInvPtsInBoth': the percent of points that are spatially invalid in at least one of the two files,
+                     'num_lon_lat_not_equal_points': number of points that do not match in the sets of lon/lat
+                                # if the 'num_lon_lat_not_equal_points' key is defined it means there are mismatching
+                                # longitude/latitude pairs in the data that was compared!
+        }
+    any of the first level of keys in spatial are optional,
+    although it is assumed that if you include an entry for 'file A' or 'file B' it
+    will have both of the expected keys in its dictionary (ie. both numInvPts and perInvPts)
+    
     """
     
     # pack up all the data for a report on a particular variable
@@ -206,7 +236,8 @@ def generate_and_save_variable_report(files,
     # put all the info together in the kwargs
     kwargs = { 'runInfo': runInfo,
                'files' : files,
-               'statGroups': statGroups 
+               'statGroups': statGroups,
+               'spatial': spatial
                }
     
     _make_and_save_page((outputPath + "/" + reportFileName), 'variablereport.txt', **kwargs)

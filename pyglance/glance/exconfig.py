@@ -12,7 +12,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
 # whether or not images should be generated and shown in the report
-shouldIncludeImages = True
+shouldIncludeImages = False
 
 # the names of the latitude and longitude variables that will be used
 lat_lon_info = {}
@@ -24,6 +24,13 @@ lat_lon_info ['latitude'] = 'imager_prof_retr_abi_r4_generic2' # 'pixel_latitude
 lat_lon_info['longitude_alt_name_in_b'] = 'resampled_longitude' # the alternate name of the longitude in file B
 lat_lon_info ['latitude_alt_name_in_b'] = 'resampled_latitude'  # the alternate name of the latitude in file A
 """
+# this value can be used to control how similar the longitude and latitude must be to be considered matching
+# if all of your longitude and latitude do not match under this epsilon, most of the comparison report will
+# not be generated, since the data would not correlate spatially
+# Note: this value is only intended to allow you to avoid very small floating point errors that would make glance
+# think that your data is disparate, when really it is very close together. If you put a large epsilon in here
+# the various comparison plots may contain misleading data
+lat_lon_info['lon_lat_epsilon'] = 0.0001
 
 # per variable defaults
 # these default variables will only apply if you don't define them in a given variable
@@ -40,12 +47,12 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
                  'missing_value': -999,                 # the value to be interpreted as "missing" data
                  
                  'epsilon_failure_tolerance': None,     # the allowed fraction of epsilon comparison failure
-                                                        # None indicates that this variable should not pass/fail
-                                                        # based on nearness of epsilon comparison
+                                                        # None indicates that variables should not be tested
+                                                        # on nearness of epsilon comparison
                                                         
-                 'nonfinite_data_tolerance': 0.02       # the allowed fraction of non-finite data
-                                                        # None indicates that this variable should not pass/fail
-                                                        # based on amount of non-finite data
+                 'nonfinite_data_tolerance': None       # the allowed fraction of non-finite data
+                                                        # None indicates that variables should not be tested
+                                                        # on amount of non-finite data
                  }
 
 # a list of all the variables to analyze, all of the details are optional,
@@ -71,13 +78,15 @@ setOfVariables['imager_prof_retr_abi_total_totals_index'] = {           # this s
                                   
                                   'missing_value': -999,                # the value to be interpreted as "missing" data
                                   
-                                  'epsilon_failure_tolerance': 0.0,     # the allowed fraction of epsilon comparison failure
-                                                                        # None indicates that this variable should not pass/fail
-                                                                        # based on nearness of epsilon comparison
-                                                                        
+                                  'epsilon_failure_tolerance': 0.02,    # the allowed fraction of epsilon comparison failure
+                                                                        # None indicates that this variable should not be tested
+                                                                        # on nearness of epsilon comparison
+                                                                        # note, this setting overrides the default
+                                  
                                   'nonfinite_data_tolerance': None,     # the allowed fraction of non-finite data
-                                                                        # None indicates that this variable should not pass/fail
-                                                                        # based on amount of non-finite data
+                                                                        # None indicates that this variable should not be tested
+                                                                        # on amount of non-finite data
+                                                                        # note, this setting overrides the default
                                   }
 setOfVariables['imager_prof_retr_abi_total_precipitable_water_high'] = {
                                   'display_name': 'Total Precipitable Water, High',
@@ -89,7 +98,7 @@ setOfVariables['imager_prof_retr_abi_total_precipitable_water_high'] = {
                                                                         # defined, our primary variable name will be expected
                                                                         # to appear only in file A)
                                   }
-"""
+
 setOfVariables['imager_prof_retr_abi_total_precipitable_water'] = {
                                   'display_name': 'Total Precipitable Water',
                                   'epsilon': 3.0
@@ -129,4 +138,3 @@ setOfVariables['imager_prof_retr_abi_showalter_index'] = {
                                   'display_name': 'Showalter Index',
                                   'epsilon': 2.0
                                   }
-"""
