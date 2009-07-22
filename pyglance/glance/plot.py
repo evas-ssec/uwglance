@@ -200,7 +200,8 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
         kwargs['cmap'] = colorMap
     
     # draw our data placed on a map
-    bMap, x, y = maps.mapshow(longitudeCleaned, latitudeCleaned, data, boundingAxes, **kwargs)
+    bMap, x, y = maps.mapshow(longitudeCleaned, latitudeCleaned, data, boundingAxes, #projection='sinu',
+                              **kwargs)
     
     # and some informational stuff
     axes.set_title(title)
@@ -399,6 +400,9 @@ def plot_and_save_figure_comparison(aData, bData,
     visibleAxesA    = _get_visible_axes (longitudeAData,      latitudeAData,      spaciallyInvalidMaskA)
     visibleAxesB    = _get_visible_axes (longitudeBData,      latitudeBData,      spaciallyInvalidMaskB)
     visibleAxesBoth = _get_visible_axes (longitudeCommonData, latitudeCommonData, spaciallyInvalidMaskBoth)
+    LOG.debug ("visible axes in A: "    + str(visibleAxesA))
+    LOG.debug ("visible axes in B: "    + str(visibleAxesB))
+    LOG.debug ("visible axes in Both: " + str(visibleAxesBoth))
     
     # make the original data figures
     print("\tcreating image of file a")

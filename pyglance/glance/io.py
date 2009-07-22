@@ -9,12 +9,14 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys, logging
 
-from pyhdf.SD import SD,SDC
+from pyhdf.SD import SD,SDC, SDS, HDF4Error
 try:
     import h5py
 except ImportError:
     pass
 from pycdf import CDF, NC
+
+import numpy as np
 
 LOG = logging.getLogger(__name__)
 
@@ -31,9 +33,45 @@ class hdf(SD):
         "yield names of variables to be compared"
         return self.datasets().keys()
     
+    # this returns a numpy array with a copy of the full, scaled
+    # data for this variable, if the data type must be changed to allow
+    # for scaling it will be (so the return type may not reflect the
+    # type found in the original file)
     def __getitem__(self, name):
-        return self.select(name)
+        # defaults
+        scale_factor = 1.0
+        add_offset = 0.0
+        data_type = np.float32 # TODO temporary
         
+        # get the variable object and use it to
+        # get our raw data and scaling info
+        variable_object = self.get_variable_object(name)
+        raw_data_copy = variable_object[:]
+        try :
+            # TODO, this currently won't work with geocat data, work around it for now
+            scale_factor, scale_factor_error, add_offset, add_offset_error, data_type = SDS.getcal(variable_object)
+        except HDF4Error:
+            # load just the scale factor and add offset
+            temp_attributes = variable_object.attributes()
+            if ('scale_factor' in temp_attributes) :
+                scale_factor = temp_attributes['scale_factor']
+            if ('add_offset' in temp_attributes) :
+                add_offset = temp_attributes['add_offset']
+        SDS.endaccess(variable_object)
+        
+        # don't do lots of work if we don't need to scale things
+        if (scale_factor == 1.0) and (add_offset == 0.0) :
+            return raw_data_copy
+        
+        # create the scaled version of the data
+        scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
+        scaled_data_copy = (scaled_data_copy - add_offset) * scale_factor #TODO, type truncation issues?
+        
+        return scaled_data_copy 
+    
+    def get_variable_object(self, name):
+        return self.select(name)
+    
     def missing_value(self, name):
         return getattr(self.select(name),'_FillValue',None)
         
@@ -51,9 +89,41 @@ class nc(CDF):
         "yield names of variables to be compared"
         return self.variables().keys()
     
+    # this returns a numpy array with a copy of the full, scaled
+    # data for this variable, if the data type must be changed to allow
+    # for scaling it will be (so the return type may not reflect the
+    # type found in the original file)
     def __getitem__(self, name):
-        return self.var(name)
+        # defaults
+        scale_factor = 1.0
+        add_offset = 0.0
+        data_type = np.float32 # TODO temporary
         
+        # get the variable object and use it to
+        # get our raw data and scaling info
+        variable_object = self.get_variable_object(name)
+        raw_data_copy = variable_object[:]
+        # load the scale factor and add offset
+        temp_attributes = variable_object.attributes()
+        if ('scale_factor' in temp_attributes) :
+            scale_factor = temp_attributes['scale_factor']
+        if ('add_offset' in temp_attributes) :
+            add_offset = temp_attributes['add_offset']
+        # todo, does cdf have an equivalent of endaccess to close the variable?
+        
+        # don't do lots of work if we don't need to scale things
+        if (scale_factor == 1.0) and (add_offset == 0.0) :
+            return raw_data_copy
+        
+        # create the scaled version of the data
+        scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
+        scaled_data_copy = (scaled_data_copy - add_offset) * scale_factor #TODO, type truncation issues?
+        
+        return scaled_data_copy 
+    
+    def get_variable_object(self, name):
+        return self.var(name)
+    
     def missing_value(self, name):
         return getattr(self.var(name),'_FillValue',getattr(self.var(name),'missing_value',None))
 nc4 = nc
@@ -78,7 +148,39 @@ class h5(object):
     def trav(h5,pth): 
         return reduce( lambda x,a: x[a] if a else x, pth.split('/'), h5)
         
-    def __getitem__(self,name):
+    # this returns a numpy array with a copy of the full, scaled
+    # data for this variable, if the data type must be changed to allow
+    # for scaling it will be (so the return type may not reflect the
+    # type found in the original file)
+    def __getitem__(self, name):
+        # defaults
+        scale_factor = 1.0
+        add_offset = 0.0
+        data_type = np.float32 # TODO temporary
+        
+        # get the variable object and use it to
+        # get our raw data and scaling info
+        variable_object = self.get_variable_object(name)
+        raw_data_copy = variable_object[:]
+        # load the scale factor and add offset
+        temp_attributes = variable_object.attributes()
+        if ('scale_factor' in temp_attributes) :
+            scale_factor = temp_attributes['scale_factor']
+        if ('add_offset' in temp_attributes) :
+            add_offset = temp_attributes['add_offset']
+        # todo, does cdf have an equivalent of endaccess to close the variable?
+        
+        # don't do lots of work if we don't need to scale things
+        if (scale_factor == 1.0) and (add_offset == 0.0) :
+            return raw_data_copy
+        
+        # create the scaled version of the data
+        scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
+        scaled_data_copy = (scaled_data_copy - add_offset) * scale_factor #TODO, type truncation issues?
+        
+        return scaled_data_copy
+    
+    def get_variable_object(self,name):
         return h5.trav(self._h5, name)
     
     def missing_value(self, name):

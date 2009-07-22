@@ -258,6 +258,9 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     """return dictionary of statistics dictionaries
     stats not including 'nan' in name exclude nans in either arrays
     """
+    #print('a type: ' + str(a.dtype))
+    #print('b type: ' + str(b.dtype))
+    
     # select/build our ignore masks
     # if the user didn't send us any, don't ignore anything
     if (ignoreInAMask is None) :

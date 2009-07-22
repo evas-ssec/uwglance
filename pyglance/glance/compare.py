@@ -259,12 +259,12 @@ def _get_and_analyze_lon_lat (fileObject, latitudeVariableName, longitudeVariabl
     and analyze them to identify spacially invalid data (ie. data that would fall off the earth)
     """
     # get the data from the file
-    longitudeData = array(fileObject[longitudeVariableName][:], dtype=float)
-    latitudeData  = array(fileObject[latitudeVariableName][:],  dtype=float)
+    longitudeData = array(fileObject[longitudeVariableName], dtype=float)
+    latitudeData  = array(fileObject[latitudeVariableName],  dtype=float)
     
     # build a mask of our spacially invalid data
     invalidLatitude = (latitudeData < -90) | (latitudeData > 90)
-    invalidLongitude = (longitudeData < -180)   | (longitudeData > 180)
+    invalidLongitude = (longitudeData < -180)   | (longitudeData > 360)
     spaciallyInvalidMask = invalidLatitude | invalidLongitude
     
     # analyze our spacially invalid data
@@ -506,17 +506,17 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         pats = args[3:] or ['.*']
         names = _parse_varnames( cnames, pats, options.epsilon, options.missing )
         for name,epsilon,missing in names:
-            avar = a[name]
-            bvar = b[name]
-            nvar = noiz[name]
+            aData = a[name]
+            bData = b[name]
+            nData = noiz[name]
             if missing is None:
                 amiss = a.missing_value(name)
                 bmiss = b.missing_value(name)
             else:
                 amiss,bmiss = missing,missing
-            x = avar[:]
-            y = bvar[:]
-            z = nvar[:]
+            x = aData
+            y = bData
+            z = nData
             def scat(x,xn,y):
                 from pylab import plot,show,scatter
                 scatter(x,y)
@@ -555,16 +555,16 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         doc_each = (options.verbose or options.debug) and len(names)==1
         doc_atend = (options.verbose or options.debug) and len(names)!=1
         for name,epsilon,missing in names:
-            avar = a[name]
-            bvar = b[name]
+            aData = a[name]
+            bData = b[name]
             if missing is None:
                 amiss = a.missing_value(name)
                 bmiss = b.missing_value(name)
             else:
                 amiss,bmiss = missing,missing
             LOG.debug('comparing %s with epsilon %s and missing %s,%s' % (name,epsilon,amiss,bmiss))
-            aval = avar[:]
-            bval = bvar[:]
+            aval = aData
+            bval = bData
             print '-'*32
             print name
             print 
@@ -731,6 +731,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             explanationName = name
             if (varRunInfo.has_key('alternate_name_in_B')) :
                 explanationName = explanationName + " / " + varRunInfo['alternate_name_in_B']
+            print('analyzing variable: ' + explanationName)
             
             # if B has an alternate variable name, figure that out
             has_alt_B_variable = False
@@ -740,8 +741,8 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                 b_variable = varRunInfo['alternate_name_in_B']
             
             # get the data for the variable
-            aData = aFile[varRunInfo['variable_name']][:]
-            bData = bFile[b_variable][:]
+            aData = aFile[varRunInfo['variable_name']]
+            bData = bFile[b_variable]
             
             # check if this data can be displayed
             if ((aData.shape == bData.shape) and
@@ -857,7 +858,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         LOG.info("\topening " + file_path)
         file_object = io.open(file_path)
         LOG.info("\tgetting " + old_var_name)
-        variable_object_old = file_object[old_var_name]
+        variable_object_old = file_object.get_variable_object(old_var_name)
         temp, old_rank, old_shape, old_type, old_num_attributes = SDS.info(variable_object_old)
         old_attributes = SDS.attributes(variable_object_old)
         
