@@ -42,7 +42,7 @@ class hdf(SD):
         scale_factor = 1.0
         add_offset = 0.0
         data_type = np.float32 # TODO temporary
-        scale_method = None
+        scaling_method = None
         
         # get the variable object and use it to
         # get our raw data and scaling info
@@ -59,7 +59,7 @@ class hdf(SD):
             if ('add_offset' in temp_attributes) :
                 add_offset = temp_attributes['add_offset']
             if ('scaling_method' in temp_attributes) :
-                scale_method = temp_attributes['scaling_method']
+                scaling_method = temp_attributes['scaling_method']
         SDS.endaccess(variable_object)
         
         # don't do lots of work if we don't need to scale things

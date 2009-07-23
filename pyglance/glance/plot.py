@@ -200,8 +200,8 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
         kwargs['cmap'] = colorMap
     
     # set up the projection information
-    longitudeRange  = boundingAxes[1] - boundingAxes[0]
-    latitudeRange   = boundingAxes[3] - boundingAxes[2]
+    longitudeRange  = abs(boundingAxes[1] - boundingAxes[0])
+    latitudeRange   = abs(boundingAxes[3] - boundingAxes[2])
     # chose the projection based on the range we have to cover
     if (longitudeRange > 180) or (latitudeRange > 90) :
         kwargs['projection'] = 'merc' # use a mercator projection to show the whole world
