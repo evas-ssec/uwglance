@@ -203,9 +203,9 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
     longitudeRange  = abs(boundingAxes[1] - boundingAxes[0])
     latitudeRange   = abs(boundingAxes[3] - boundingAxes[2])
     # chose the projection based on the range we have to cover
-    if (longitudeRange > 180) or (latitudeRange > 90) :
+    if (longitudeRange > 180) :
         kwargs['projection'] = 'merc' # use a mercator projection to show the whole world
-    elif (longitudeRange > 80) or (latitudeRange > 40) :
+    elif (longitudeRange > 80) or (latitudeRange > 80) :
         kwargs['projection'] = 'ortho'
     # otherwise the default is just fine!
     
