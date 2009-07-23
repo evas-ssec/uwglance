@@ -731,7 +731,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
             explanationName = name
             if (varRunInfo.has_key('alternate_name_in_B')) :
                 explanationName = explanationName + " / " + varRunInfo['alternate_name_in_B']
-            print('analyzing: ' + display_name + ' (' + explanationName + ')')
+            print('analyzing: ' + displayName + ' (' + explanationName + ')')
             
             # if B has an alternate variable name, figure that out
             has_alt_B_variable = False
