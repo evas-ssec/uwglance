@@ -200,7 +200,7 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
         kwargs['cmap'] = colorMap
     
     # draw our data placed on a map
-    bMap, x, y = maps.mapshow(longitudeCleaned, latitudeCleaned, data, boundingAxes, projection='merc',
+    bMap, x, y = maps.mapshow(longitudeCleaned, latitudeCleaned, data, boundingAxes, #projection='merc',
                               **kwargs)
     
     # and some informational stuff

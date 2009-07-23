@@ -308,7 +308,7 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     lon_lat_not_equal_mask = ((abs(longitudeDiff) > llepsilon) | (abs(latitudeDiff)  > llepsilon)) & (~combinedIgnoreMask)  \
                              & finiteLatitudeMask & finiteLongitudeMask
     lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask.ravel())
-    lon_lat_not_equal_points_percent = float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)
+    lon_lat_not_equal_points_percent = (float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)) * 100.0
     
     # if we have unequal points, create user legible info about the problem
     if (lon_lat_not_equal_points_count > 0) :
