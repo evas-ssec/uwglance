@@ -42,6 +42,7 @@ class hdf(SD):
         scale_factor = 1.0
         add_offset = 0.0
         data_type = np.float32 # TODO temporary
+        scale_method = None
         
         # get the variable object and use it to
         # get our raw data and scaling info
@@ -57,11 +58,27 @@ class hdf(SD):
                 scale_factor = temp_attributes['scale_factor']
             if ('add_offset' in temp_attributes) :
                 add_offset = temp_attributes['add_offset']
+            if ('scaling_method' in temp_attributes) :
+                scale_method = temp_attributes['scaling_method']
         SDS.endaccess(variable_object)
         
         # don't do lots of work if we don't need to scale things
         if (scale_factor == 1.0) and (add_offset == 0.0) :
             return raw_data_copy
+        
+        # at the moment geocat has several scaling methods that don't match the normal standards for hdf
+        """
+        please see constant.f90 for a more up to date version of this information:
+            INTEGER(kind=int1) :: NO_SCALE              ! 0
+            INTEGER(kind=int1) :: LINEAR_SCALE          ! 1
+            INTEGER(kind=int1) :: LOG_SCALE             ! 2
+            INTEGER(kind=int1) :: SQRT_SCALE            ! 3 
+        """
+        if (scaling_method == 0) :
+            return raw_data_copy
+        if not ((scaling_method is None) or (scaling_method > 1)) :
+            LOG.warn ('Scaling method of \"' + scaling_method + '\" will be ignored in favor of hdf standard method. " \
+                      + "This may cause problems with data consistency')
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
