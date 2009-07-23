@@ -378,7 +378,7 @@ def plot_and_save_figure_comparison(aData, bData,
     if 'display_name' in variableRunInfo :
         variableDisplayName = variableRunInfo['display_name']
     
-    print("Creating figures for: " + variableDisplayName)
+    print("\tCreating figures for: " + variableDisplayName)
     
     # compare the two data sets to get our difference data and trouble info
     rawDiffData, goodMask, troubleMask, (aNotFiniteMask, bNotFiniteMask), \
@@ -405,33 +405,33 @@ def plot_and_save_figure_comparison(aData, bData,
     LOG.debug ("visible axes in Both: " + str(visibleAxesBoth))
     
     # make the original data figures
-    print("\tcreating image of file a")
+    print("\t\tcreating image of file a")
     figureA = _create_mapped_figure(aData, latitudeAData, longitudeAData, visibleAxesA,
                                     (variableDisplayName + "\nin File A"),
                                     invalidMask=(spaciallyInvalidMaskA | invalidDataMaskA))
-    print("\tcreating image of file b")
+    print("\t\tcreating image of file b")
     figureB = _create_mapped_figure(bData, latitudeBData, longitudeBData, visibleAxesB,
                                     (variableDisplayName + "\nin File B"),
                                     invalidMask=(spaciallyInvalidMaskB | invalidDataMaskB))
     
     # make the data comparison figures
     if not shortCircuitComparisons :
-        print("\tcreating image of the absolute value of difference")
+        print("\t\tcreating image of the absolute value of difference")
         figureAbsDiff = _create_mapped_figure(diffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
                                               ("Absolute value of difference in\n" + variableDisplayName),
                                               invalidMask=(everyThingWrongButEpsilon))
-        print("\tcreating image of the difference")
+        print("\t\tcreating image of the difference")
         figureDiff = _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
                                               ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
                                               invalidMask=(everyThingWrongButEpsilon))
         # this figure is more complex because we want to mark the trouble points on it
-        print("\tcreating image marking trouble data")
+        print("\t\tcreating image marking trouble data")
         figureBadDataInDiff = _create_mapped_figure(bData, latitudeCommonData, longitudeCommonData, visibleAxesBoth,
                                                     ("Areas of trouble data in\n" + variableDisplayName),
                                                     spaciallyInvalidMaskBoth | invalidDataMaskB,
                                                     mediumGrayColorMap, troubleMask)
         # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
-        print("\tcreating histogram of the amount of difference")
+        print("\t\tcreating histogram of the amount of difference")
         numBinsToUse = 50
         diffHistogramFigure = _create_histogram(rawDiffData[~everyThingWrongButEpsilon].ravel(), numBinsToUse,
                                                 ("Difference in\n" + variableDisplayName),
@@ -439,33 +439,33 @@ def plot_and_save_figure_comparison(aData, bData,
                                                 ('Number of Data Points with a Given Difference'),
                                                 True)
         # scatter plot of file a and b comparison
-        print("\tcreating scatter plot of file a values vs file b values")
+        print("\t\tcreating scatter plot of file a values vs file b values")
         diffScatterPlot = _create_scatter_plot(aData[~everyThingWrongButEpsilon].ravel(), bData[~everyThingWrongButEpsilon].ravel(),
                                                "Value in File A vs Value in File B", "File A Value", "File B Value",
                                                tooDifferentMask[~everyThingWrongButEpsilon].ravel(), variableRunInfo['epsilon'])
     
     # save the figures to disk
     variableName = variableRunInfo['variable_name']
-    print("Saving figures for: " + variableDisplayName)
-    print("\tsaving image of file a")
+    print("\tSaving figures for: " + variableDisplayName)
+    print("\t\tsaving image of file a")
     figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200) 
-    print("\tsaving image of file b")
+    print("\t\tsaving image of file b")
     figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=200)
     if not shortCircuitComparisons :
-        print("\tsaving image of the absolute value of difference")
+        print("\t\tsaving image of the absolute value of difference")
         figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.png", dpi=200)
-        print("\tsaving image of the difference")
+        print("\t\tsaving image of the difference")
         figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=200) 
-        print("\tsaving image marking trouble data")
+        print("\t\tsaving image marking trouble data")
         figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=200) 
-        print("\tsaving histogram of the amount of difference")
+        print("\t\tsaving histogram of the amount of difference")
         diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=200) 
-        print("\tsaving scatter plot of file a values vs file b values")
+        print("\t\tsaving scatter plot of file a values vs file b values")
         diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=200) 
     
     # also save smaller versions of the figures if the parameter says the caller wants us to
     if (makeSmall) :
-        print("\tsaving smaller versions of images")
+        print("\t\tsaving smaller versions of images")
         figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=50)
         figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=50)
         if not shortCircuitComparisons :

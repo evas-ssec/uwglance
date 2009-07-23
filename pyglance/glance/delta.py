@@ -308,9 +308,9 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'num_data_points': "number of data values in A",
                     'shape': "shape of A",
                     'spatially_invalid_pts_ignored_in_a': 'number of points with invalid latitude/longitude information in A that were' +
-                                                            ' ignored for the purposes for data analysis and presentation',
+                                                            ' ignored for the purposes of data analysis and presentation',
                     'spatially_invalid_pts_ignored_in_b': 'number of points with invalid latitude/longitude information in B that were' +
-                                                            ' ignored for the purposes for data analysis and presentation',
+                                                            ' ignored for the purposes of data analysis and presentation',
                     'trouble_points_count': 'number of points that are nonfinite or missing in either input data set (A or B),' +
                                             ' or are unacceptable when compared (according to the current epsilon value)',
                     'trouble_points_fraction': 'fraction of points that are nonfinite or missing in either input data set (A or B),' +
