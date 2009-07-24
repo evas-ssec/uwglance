@@ -316,7 +316,7 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     latitudeDiff,  finiteLatitudeMask,  _, _, _, lat_not_equal_mask = delta.diff(latitudeA,  latitudeB,
                                                                                  llepsilon,
                                                                                  ignoreMask=combinedIgnoreMask)
-    lon_lat_not_equal_mask = lon_not_equal_mask & lat_not_equal_mask
+    lon_lat_not_equal_mask = lon_not_equal_mask | lat_not_equal_mask
     lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask.ravel())
     lon_lat_not_equal_points_percent = (float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)) * 100.0
     
