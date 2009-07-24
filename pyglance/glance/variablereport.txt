@@ -16,7 +16,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     variableDisplayName = variableName
     if (runInfo.has_key('display_name')):
         variableDisplayName = runInfo['display_name']
-    hideComparisonImages = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
+    #hideComparisonImages = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
 %>
 
 <title>${variableDisplayName} Variable Comparison</title>
@@ -135,12 +135,13 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     % endfor
     </dl>
     
-    % if shouldIncludeImages and (not hideComparisonImages) :
+    % if shouldIncludeImages : ## and (not hideComparisonImages) :
     <p>
         <a href="./${variableName}.AbsDiff.png"><img src="./${variableName}.AbsDiff.small.png"></a>
         <a href="./${variableName}.Diff.png"><img src="./${variableName}.Diff.small.png"></a>
         <a href="./${variableName}.Trouble.png"><img src="./${variableName}.Trouble.small.png"></a>
         <a href="./${variableName}.Hist.png"><img src="./${variableName}.Hist.small.png"></a>
+        ##<a href="./${variableName}.ImpHist.png"><img src="./${variableName}.ImpHist.small.png"></a>
         <a href="./${variableName}.Scatter.png"><img src="./${variableName}.Scatter.small.png"></a>
     </p>
     % endif

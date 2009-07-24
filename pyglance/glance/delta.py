@@ -59,7 +59,10 @@ def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None), ignoreMask=None):
     
     # trouble areas - mismatched nans, mismatched missing-values, differences > epsilon
     trouble = (anfin ^ bnfin) | (amis ^ bmis) | (abs(d)>epsilon)
-    return d, mask, trouble, (anfin, bnfin), (amis, bmis)
+    # the outside epsilon mask
+    outeps = (abs(d) > epsilon) & mask
+    
+    return d, mask, trouble, (anfin, bnfin), (amis, bmis), outeps
 
 def corr(x,y,mask):
     "compute correlation coefficient"
@@ -81,7 +84,7 @@ def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(Non
     x=truth
     y=actual
     z=noiz
-    d,good,bad,_,_ = diff(x,y,epsilon,(amissing,bmissing))
+    d,good,bad,_,_,_ = diff(x,y,epsilon,(amissing,bmissing))
     # compute RMS error
     rmse = sqrt(sum(d[good]**2)) / d.size
     gf = good.flatten()
@@ -97,7 +100,7 @@ def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(Non
     xpn[good] += z[good]
     xpnf = xpn.flatten()[gf]
     # compute RMS error versus noise
-    dpn,good,bad,_,_ = diff(xpn,y,epsilon,(amissing,bmissing))
+    dpn,good,bad,_,_,_ = diff(xpn,y,epsilon,(amissing,bmissing))
     rmsepn = sqrt(sum(dpn[good]**2)) / d.size
     assert(sum(~isfinite(xpnf))==0)
     rpn = compute_r(xpnf,yf)[0]
@@ -109,12 +112,13 @@ def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(Non
              }
 
 def stats(diffData, mask, *etc):
-    rms = sum(abs(diffData[mask] ** 2)) / diffData.size    
+    absDiffData = abs(diffData)
+    rms = sqrt( sum(diffData[mask] ** 2) / sum(mask) )   
     return {    'rms_diff': rms, 
-                'std_diff': std(diffData[mask]), 
-                'mean_diff': mean(diffData[mask]), 
-                'median_diff': median(diffData[mask]),
-                'max_diff': max(diffData[mask])
+                'std_diff': std(absDiffData[mask]), 
+                'mean_diff': mean(absDiffData[mask]), 
+                'median_diff': median(absDiffData[mask]),
+                'max_diff': max(absDiffData[mask])
                 }
 
 def _get_num_perfect(a, b, ignoreMask=None):
@@ -230,14 +234,15 @@ def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_m
     
     return general_stats
 
-def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, epsilon, additional_statistics={}) :
+def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsilon_mask,
+                              additional_statistics={}) : 
     """
     Get a list of numerical comparison related statistics about a and b,
     given a and b and some other information about them.
     the return value will be a dictionary of statistics
     """
     # calculate our various statistics
-    num_finite_values_too_different = sum(abs(diff_data[data_is_finite_mask]) > epsilon)
+    num_finite_values_too_different = sum(outside_epsilon_mask)
     num_perfect = _get_num_perfect(a, b, ~data_is_finite_mask)
     r_corr = corr(a, b, data_is_finite_mask)
     
@@ -269,7 +274,7 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
         ignoreInBMask = zeros(b.shape, dtype=bool)
     ignoreMask = ignoreInAMask | ignoreInBMask
     
-    d, mask, trouble, (anfin, bnfin), (amis, bmis) = nfo = diff(a,b,epsilon,(a_missing_value, b_missing_value),ignoreMask)
+    d, mask, trouble, (anfin, bnfin), (amis, bmis), outside_epsilon = nfo = diff(a,b,epsilon,(a_missing_value, b_missing_value),ignoreMask)
     
     # build some other finite data masks that we'll need
     finite_a_mask = ~(anfin | amis)
@@ -284,7 +289,7 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     
     general_stats = _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble, ignoreInAMask, ignoreInBMask) 
     additional_statistics = stats(*nfo) # grab some additional comparison statistics
-    comparison_stats = _get_numerical_data_stats(a, b, d, finite_mask, epsilon, additional_statistics) 
+    comparison_stats = _get_numerical_data_stats(a, b, d, finite_mask, outside_epsilon, additional_statistics) 
     nan_stats = _get_nan_stats(a, b)
     missing_stats = _get_missing_value_stats(amis, bmis)
     finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask) 

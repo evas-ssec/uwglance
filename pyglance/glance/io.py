@@ -76,7 +76,7 @@ class hdf(SD):
         """
         if (scaling_method == 0) :
             return raw_data_copy
-        if not ((scaling_method is None) or (scaling_method > 1)) :
+        if not ((scaling_method is None) or (atoi(scaling_method) > 1)) :
             LOG.warn ('Scaling method of \"' + str(scaling_method) + '\" will be ignored in favor of hdf standard method. '
                       + 'This may cause problems with data consistency')
         

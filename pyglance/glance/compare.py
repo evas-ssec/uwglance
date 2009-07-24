@@ -27,6 +27,7 @@ glance_default_latitude_name = 'pixel_latitude'
 # these are the built in default settings
 glance_analysis_defaults = {'epsilon': 0.0,
                             'missing_value': None,
+                            'missing_value_alt_in_b': None, 
                             'epsilon_failure_tolerance': 0.0, 
                             'nonfinite_data_tolerance':  0.0 
                             }
@@ -134,7 +135,12 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                 # but override the values that would have been determined by _parse_varnames
                 finalNames[name]['variable_name'] = name
                 finalNames[name]['epsilon'] = epsilon
-                finalNames[name]['missing_value'] = missing
+                missing_b = missing
+                if missing is None:
+                    missing   = fileAObject.missing_value(name)
+                    missing_b = fileBObject.missing_value(name)
+                finalNames[name]['missing_value'] = missing 
+                finalNames[name]['missing_value_alt_in_b'] = missing_b
                 
         # otherwise just do the ones the user asked for
         else : 
@@ -149,6 +155,7 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                     finalNames[name] = defaultValues.copy()
                     finalNames[name]['variable_name'] = name
                     finalNames[name].update(requestedNames[name])
+                    # TODO what's the correct behavior here for missing?
     else:
         # format command line input similarly to the stuff from the config file
         print (requestedNames)
@@ -162,7 +169,7 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
             # but override the values that would have been determined by _parse_varnames
             finalNames[name]['variable_name'] = name
             finalNames[name]['epsilon'] = epsilon
-            finalNames[name]['missing_value'] = missing
+            finalNames[name]['missing_value'] = missing # TODO, what's the correct behavior here?
     
     LOG.debug("Final selected set of variables to analyze:")
     LOG.debug(str(finalNames))
@@ -303,10 +310,13 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     combinedIgnoreMask = ignoreMaskA | ignoreMaskB
     
     # get information about how the latitude and longitude differ
-    longitudeDiff, finiteLongitudeMask = delta.diff(longitudeA, longitudeB, llepsilon, ignoreMask=combinedIgnoreMask)[0:2]
-    latitudeDiff,  finiteLatitudeMask  = delta.diff(latitudeA,  latitudeB,  llepsilon, ignoreMask=combinedIgnoreMask)[0:2]
-    lon_lat_not_equal_mask = ((abs(longitudeDiff) > llepsilon) | (abs(latitudeDiff)  > llepsilon)) & (~combinedIgnoreMask)  \
-                             & finiteLatitudeMask & finiteLongitudeMask
+    longitudeDiff, finiteLongitudeMask, _, _, _, lon_not_equal_mask = delta.diff(longitudeA, longitudeB,
+                                                                                     llepsilon,
+                                                                                     ignoreMask=combinedIgnoreMask)
+    latitudeDiff,  finiteLatitudeMask,  _, _, _, lat_not_equal_mask = delta.diff(latitudeA,  latitudeB,
+                                                                                 llepsilon,
+                                                                                 ignoreMask=combinedIgnoreMask)
+    lon_lat_not_equal_mask = lon_not_equal_mask & lat_not_equal_mask
     lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask.ravel())
     lon_lat_not_equal_points_percent = (float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)) * 100.0
     
@@ -396,6 +406,30 @@ def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_in
     
     return invalid_in_common_mask, spatial_info, longitude_common, latitude_common
 
+def _open_and_process_files (args, numFilesExpected):
+    """
+    open files listed in the args and get information about the variables in them
+    """
+    # get all the file names
+    fileNames = args[:numFilesExpected]
+    # open all the files & get their variable names
+    files = {}
+    commonNames = None
+    for fileName in fileNames:
+        LOG.info("opening %s" % fileName)
+        files[fileName] = {}
+        tempFileObject = (io.open(fileName))
+        files[fileName]['fileObject'] = tempFileObject
+        tempNames = set(tempFileObject())
+        files[fileName]['varNames'] = tempNames
+        if commonNames is None :
+            commonNames = tempNames
+        else :
+            commonNames = commonNames.intersection(tempNames)
+    files['commonVarNames'] = commonNames
+    
+    return files
+
 def main():
     import optparse
     usage = """
@@ -469,7 +503,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         """compare sdr_cris output
         parameters are variable name followed by detector number
         sdr_cris desired.h5 actual.h5 ESRealLW 0
-        """
+        """ # TODO ******* standardize with method?
         afn,bfn = args[:2]
         LOG.info("opening %s" % afn)
         a = io.open(afn)
@@ -491,7 +525,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
         """gives statistics for dataset comparisons against truth with and without noise
         usage: noisecheck truth-file noise-file actual-file variable1{:epsilon{:missing}} {variable2...}
         glance noisecheck /Volumes/snaapy/data/justins/abi_graffir/coreg/pure/l2_data/geocatL2.GOES-R.2005155.220000.hdf.gz /Volumes/snaapy/data/justins/abi_graffir/noise/noise1x/l2_data/geocatL2.GOES-R.2005155.220000.hdf 
-        """
+        """ # TODO ******* standardize with method?
         afn,noizfn,bfn = args[:3]
         LOG.info("opening truth file %s" % afn)
         a = io.open(afn)
@@ -542,24 +576,21 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
          python -m glance.compare -w stats --epsilon=0.00001 A.hdf A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
         """ 
         afn,bfn = args[:2]
-        LOG.info("opening %s" % afn)
-        a = io.open(afn)
-        LOG.info("opening %s" % bfn)
-        b = io.open(bfn)
-        anames = set(a())
-        bnames = set(b()) 
-        cnames = anames.intersection(bnames) # common names
+        filesInfo = _open_and_process_files(args, 2)
+        aFile = filesInfo[afn]['fileObject']
+        bFile = filesInfo[bfn]['fileObject']
+        
         pats = args[2:] or ['.*']
-        names = _parse_varnames( cnames, pats, options.epsilon, options.missing )
+        names = _parse_varnames( filesInfo['commonVarNames'], pats, options.epsilon, options.missing )
         LOG.debug(str(names))
         doc_each = (options.verbose or options.debug) and len(names)==1
         doc_atend = (options.verbose or options.debug) and len(names)!=1
         for name,epsilon,missing in names:
-            aData = a[name]
-            bData = b[name]
+            aData = aFile[name]
+            bData = bFile[name]
             if missing is None:
-                amiss = a.missing_value(name)
-                bmiss = b.missing_value(name)
+                amiss = aFile.missing_value(name)
+                bmiss = bFile.missing_value(name)
             else:
                 amiss,bmiss = missing,missing
             LOG.debug('comparing %s with epsilon %s and missing %s,%s' % (name,epsilon,amiss,bmiss))
@@ -753,6 +784,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                 if (runInfo['shouldIncludeImages']) :
                     doShortCircuit = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
                     # create the images comparing that variable
+                    print("\tcreating figures for: " + displayName)
                     plot.plot_and_save_figure_comparison(aData, bData, varRunInfo, 
                                                          files['file A']['path'],
                                                          files['file B']['path'],
