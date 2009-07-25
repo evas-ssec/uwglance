@@ -137,7 +137,7 @@ def _create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
         medianVal = tempStats['median_diff']
         meanVal = tempStats['mean_diff']
         stdVal = tempStats['std_diff']
-        numPts = len(data.ravel())
+        numPts = data.size
         
         # info on the display of our statistics
         xbounds = axes.get_xbound()
@@ -207,7 +207,9 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
         kwargs['projection'] = 'mill' # use a miller cylindrical projection to show the whole world
     elif (longitudeRange > 100) or (latitudeRange > 70) :
         kwargs['projection'] = 'ortho' # use an orthographic projection to show half the globe
-    # otherwise the default is just fine!
+    else :
+        # TODO figure out why the default is cutting off the field of view, until then, use miller
+        kwargs['projection'] = 'mill'
     
     # draw our data placed on a map
     bMap, x, y = maps.mapshow(longitudeCleaned, latitudeCleaned, data, boundingAxes, **kwargs)
@@ -494,14 +496,16 @@ def plot_and_save_figure_comparison(aData, bData,
         LOG.info("\t\tsaving smaller versions of images")
         figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=50)
         figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=50)
-        if not shortCircuitComparisons :
-            figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.small.png", dpi=50)
-            figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=50)
-            figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=50)
-            diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=50)
-            if not (imperfectHistogramFigure is None) :
-                imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.small.png", dpi=50)
-            diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=50)
+        #if not shortCircuitComparisons :
+        figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.small.png", dpi=50)
+        figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=50)
+        figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=50)
+        diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=50)
+        '''
+        if not (imperfectHistogramFigure is None) :
+            imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.small.png", dpi=50)
+        '''
+        diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=50)
     
     return
 

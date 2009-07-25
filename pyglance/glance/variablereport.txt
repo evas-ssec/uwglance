@@ -101,19 +101,23 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     
     ## comparison parameters
     <p>
+        ## display the variable names
         % if 'alternate_name_in_B' in runInfo :
             variable name in A: ${variableName} <br>
             variable name in B: ${runInfo['alternate_name_in_B']} <br>
         % else :
             variable name: ${variableName} <br>
         % endif
+        
+        ## display the epsilon
         epsilon value: ${runInfo['epsilon']} <br>
-        "missing" data value:
-        <% missingDataValue = runInfo['missing_value'] %>
-        % if missingDataValue is None :
-            None
+        
+        ## display the missing value
+        % if ('missing_value_alt_in_b' in runInfo) and (not (runInfo['missing_value_alt_in_b'] is runInfo['missing_value'])) :
+            "missing" data value in A: ${str(runInfo['missing_value'])}<br>
+            "missing" data value in B: ${str(runInfo['missing_value_alt_in_b'])}<br>
         % else :
-            ${missingDataValue}
+            "missing" data value: ${str(runInfo['missing_value'])}
         % endif
     </p>
     

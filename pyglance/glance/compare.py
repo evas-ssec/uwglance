@@ -135,6 +135,8 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                 # but override the values that would have been determined by _parse_varnames
                 finalNames[name]['variable_name'] = name
                 finalNames[name]['epsilon'] = epsilon
+                
+                # load the missing value if it was not provided
                 missing_b = missing
                 if missing is None:
                     missing   = fileAObject.missing_value(name)
@@ -155,7 +157,12 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                     finalNames[name] = defaultValues.copy()
                     finalNames[name]['variable_name'] = name
                     finalNames[name].update(requestedNames[name])
-                    # TODO what's the correct behavior here for missing?
+                    
+                    # load the missing value if it was not provided
+                    if finalNames[name]['missing_value'] is None :
+                        finalNames[name]['missing_value'] = fileAObject.missing_value(name)
+                    if not('missing_value_alt_in_b' in finalNames[name]) or (finalNames[name]['missing_value_alt_in_b'] is None) :
+                        finalNames[name]['missing_value_alt_in_b'] = fileBObject.missing_value(name)
     else:
         # format command line input similarly to the stuff from the config file
         print (requestedNames)
@@ -169,7 +176,14 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
             # but override the values that would have been determined by _parse_varnames
             finalNames[name]['variable_name'] = name
             finalNames[name]['epsilon'] = epsilon
-            finalNames[name]['missing_value'] = missing # TODO, what's the correct behavior here?
+            
+            # load the missing value if it was not provided
+            missing_b = missing
+            if missing is None:
+                missing   = fileAObject.missing_value(name)
+                missing_b = fileBObject.missing_value(name)
+            finalNames[name]['missing_value'] = missing 
+            finalNames[name]['missing_value_alt_in_b'] = missing_b
     
     LOG.debug("Final selected set of variables to analyze:")
     LOG.debug(str(finalNames))
@@ -381,7 +395,6 @@ def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_in
         
         # so how many do they have together?
         spatial_info['perInvPtsInBoth'] = _get_percentage_from_mask(invalid_in_common_mask)[0]
-        #spatial_info['perInvPtsInBoth'], totalNumSpaciallyInvPts = _get_percentage_from_mask(invalid_in_common_mask) todo, remove?
         # make a "clean" version of the lon/lat
         longitude_common[valid_only_in_mask_a] = longitude_a[valid_only_in_mask_a]
         longitude_common[valid_only_in_mask_b] = longitude_b[valid_only_in_mask_b]
@@ -439,7 +452,9 @@ examples:
 
 python -m glance.compare info A.hdf
 python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0'
-python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
+python -m glance.compare plotDiffs A.hdf B.hdf
+python -m glance compare reportGen A.hdf B.hdf
+python -m glance 
 
 """
     parser = optparse.OptionParser(usage)
@@ -803,7 +818,7 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                     runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
                     #get info on the variable
                     variableStats = delta.summarize(aData, bData, varRunInfo['epsilon'],
-                                                    (varRunInfo['missing_value'], varRunInfo['missing_value']),
+                                                    (varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b']),
                                                     spaciallyInvalidMaskA, spaciallyInvalidMaskB)
                     # hang on to our good % and our epsilon value to describe our comparison
                     passedFraction = (1.0 - variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction'])
@@ -828,7 +843,11 @@ python -m glance.compare plotDiffs A.hdf B.hdf [optional output path]
                     else :
                         nonfiniteTolerance = defaultValues['nonfinite_data_tolerance']
                     if not (nonfiniteTolerance is None) :
-                        passedNonFinite = (passedFraction >= (1.0 - nonfiniteTolerance)) 
+                        non_finite_pts = variableStats['Finite Data Statistics']['finite_in_only_one_count']
+                        non_finite_pts = non_finite_pts + variableStats['Missing Value Statistics']['common_missing_count']
+                        non_finite_pts = non_finite_pts + variableStats['NaN Statistics']['common_nan_count']
+                        non_finite_fraction = float(non_finite_pts) / float(variableStats['General Statistics']['num_data_points'])
+                        passedNonFinite = non_finite_fraction <= nonfiniteTolerance 
                         if (didPass is None) :
                             didPass = passedNonFinite
                         else :

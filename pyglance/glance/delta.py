@@ -11,7 +11,7 @@ import os, sys, logging
 from numpy import *
 from scipy.stats import pearsonr, spearmanr, pointbiserialr
 
-compute_r = spearmanr
+compute_r = pearsonr #spearmanr
 
 LOG = logging.getLogger(__name__)
 
@@ -53,14 +53,14 @@ def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None), ignoreMask=None):
     
     # build the comparison data that includes the "good" values
     d = empty_like(a)
-    mask = ~(anfin | bnfin | amis | bmis | ignoreMask)
-    d[~mask] = nan
+    mask = ~(anfin | bnfin | amis | bmis | ignoreMask) # mask to get just the "valid" data
+    d[~mask] = nan # throw away invalid data
     d[mask] = b[mask] - a[mask]
     
-    # trouble areas - mismatched nans, mismatched missing-values, differences > epsilon
-    trouble = (anfin ^ bnfin) | (amis ^ bmis) | (abs(d)>epsilon)
-    # the outside epsilon mask
+    # the valid data that's outside epsilon
     outeps = (abs(d) > epsilon) & mask
+    # trouble areas - mismatched nans, mismatched missing-values, differences > epsilon
+    trouble = (anfin ^ bnfin) | (amis ^ bmis) | outeps
     
     return d, mask, trouble, (anfin, bnfin), (amis, bmis), outeps
 
@@ -279,13 +279,11 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     # build some other finite data masks that we'll need
     finite_a_mask = ~(anfin | amis)
     finite_b_mask = ~(bnfin | bmis)
-    finite_mask = finite_a_mask & finite_b_mask
-    if not (ignoreInAMask is None) :
-        finite_a_mask = finite_a_mask & (~ ignoreInAMask)
-    if not (ignoreInBMask is None) :
-        finite_b_mask = finite_b_mask & (~ ignoreInBMask)
-    if not (ignoreMask is None) :
-        finite_mask = finite_mask & (~ ignoreMask)
+    finite_mask   = finite_a_mask & finite_b_mask
+    # also factor in the ignore masks
+    finite_a_mask = finite_a_mask & (~ ignoreInAMask)
+    finite_b_mask = finite_b_mask & (~ ignoreInBMask)
+    finite_mask   = finite_mask   & (~ ignoreMask)
     
     general_stats = _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble, ignoreInAMask, ignoreInBMask) 
     additional_statistics = stats(*nfo) # grab some additional comparison statistics
