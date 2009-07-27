@@ -443,6 +443,49 @@ def _open_and_process_files (args, numFilesExpected):
     
     return files
 
+def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
+    """
+    Check whether the variable passed analysis, failed analysis, or
+    did not need to be quantitatively tested
+    """
+    didPass = None
+    
+    # get our tolerance values
+    
+    # get the tolerance for failures in comparison compared to epsilon
+    epsilonTolerance = None
+    if ('epsilon_failure_tolerance' in varRunInfo) :
+        epsilonTolerance = varRunInfo['epsilon_failure_tolerance']
+    else :
+        epsilonTolerance = defaultValues['epsilon_failure_tolerance']
+    # get the tolerance for failures in amount of nonfinite data
+    # found in spatially valid areas
+    nonfiniteTolerance = None
+    if ('nonfinite_data_tolerance'  in varRunInfo) :
+        nonfiniteTolerance = varRunInfo['nonfinite_data_tolerance']
+    else :
+        nonfiniteTolerance = defaultValues['nonfinite_data_tolerance']
+    
+    # test to see if we passed or failed
+    
+    # check for our epsilon tolerance
+    if not (epsilonTolerance is None) :
+        failed_fraction = variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']
+        didPass = failed_fraction <= epsilonTolerance
+    # check to see if it failed on nonfinite data
+    if not (nonfiniteTolerance is None) :
+        non_finite_pts = variableStats['Finite Data Statistics']['finite_in_only_one_count']
+        non_finite_pts = non_finite_pts + variableStats['Missing Value Statistics']['common_missing_count']
+        non_finite_pts = non_finite_pts + variableStats['NaN Statistics']['common_nan_count']
+        non_finite_fraction = float(non_finite_pts) / float(variableStats['General Statistics']['num_data_points'])
+        passedNonFinite = non_finite_fraction <= nonfiniteTolerance 
+        if (didPass is None) :
+            didPass = passedNonFinite
+        else :
+            didPass = didPass and passedNonFinite
+    
+    return didPass
+
 def main():
     import optparse
     usage = """
@@ -656,7 +699,7 @@ python -m glance
         reportGen(*args)
         
         return
-    
+
     def reportGen(*args) :
         """generate a report comparing two files
         This option creates a report comparing variables in the two given hdf files.
@@ -761,9 +804,11 @@ python -m glance
                                                             runInfo['shouldIncludeImages'], outputPath)
             
         # set some things up to hold info for our reports
-        # this is going to be in the form
-        # [var_name] = {"passEpsilonPercent": percent ok with epsilon, "epsilon": epsilon)
-        variableComparisons = {}
+        
+        # this will hold our variable report information in the form
+        # [var_name] = {"var_stats": dictionary of statistics info, "run_info": information specific to that variable run,
+        #               "data": {"A": data from file A, "B": data from file B}}
+        variableAnalysisInfo = {}
         
         # go through each of the possible variables in our files
         # and make a report section with images for whichever ones we can
@@ -771,13 +816,16 @@ python -m glance
             
             # pull out the information for this variable analysis run
             varRunInfo = finalNames[name].copy()
+            
+            # make some local copies of our name info for display and labeling
             displayName = name
             if (varRunInfo.has_key('display_name')) :
                 displayName = varRunInfo['display_name']
             explanationName = name
             if (varRunInfo.has_key('alternate_name_in_B')) :
                 explanationName = explanationName + " / " + varRunInfo['alternate_name_in_B']
-            print('analyzing: ' + displayName + ' (' + explanationName + ')')
+            explanationName = displayName + '(' + explanationName + ')'
+            print('analyzing: ' + explanationName + ')')
             
             # if B has an alternate variable name, figure that out
             has_alt_B_variable = False
@@ -786,7 +834,7 @@ python -m glance
                 has_alt_B_variable = True
                 b_variable = varRunInfo['alternate_name_in_B']
             
-            # get the data for the variable
+            # get the data for the variable 
             aData = aFile[varRunInfo['variable_name']]
             bData = bFile[b_variable]
             
@@ -795,12 +843,53 @@ python -m glance
                 (aData.shape == longitudeCommon.shape) and
                 (bData.shape == longitudeCommon.shape)) :
                 
-                # if we should be making images, then make them for this variable
-                if (runInfo['shouldIncludeImages']) :
-                    doShortCircuit = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
+                # build a dictionary of information on the variable
+                variableAnalysisInfo[varRunInfo['variable_name']] = {}
+                variableAnalysisInfo[varRunInfo['variable_name']]['data'] = {'A': aData,
+                                                                             'B': bData}
+                variableAnalysisInfo[varRunInfo['variable_name']]['var_stats'] = delta.summarize(aData, bData,
+                                                                                                 varRunInfo['epsilon'],
+                                                                                                 (varRunInfo['missing_value'],
+                                                                                                  varRunInfo['missing_value_alt_in_b']),
+                                                                                                 spaciallyInvalidMaskA, spaciallyInvalidMaskB)
+                # add a little additional info to our variable run info before we squirrel it away
+                varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now()) 
+                passedFraction = (1.0 - variableAnalysisInfo[name]['var_stats']
+                                  ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction'])
+                varRunInfo['did_pass'] = _check_pass_or_fail(varRunInfo,
+                                                             variableAnalysisInfo[name]['var_stats'],
+                                                             defaultValues)
+                variableAnalysisInfo[varRunInfo['variable_name']]['run_info'] = varRunInfo
+                variableAnalysisInfo[varRunInfo['variable_name']]['exp_name'] = explanationName
+                
+            # if we can't compare the variable, we should tell the user 
+            else :
+                LOG.warn(explanationName + ' ' + 
+                         'could not be compared. This may be because the data for this variable does not match in shape ' +
+                         'between the two files or the data may not match the shape of the selected longitude and ' +
+                         'latitude variables.')
+        
+        # from this point on, we will be forking to create child processes so we can parallelize our image and
+        # report generation
+        
+        isParent = True 
+        childPids = []
+        
+        # loop to create the images for all our variables
+        if (runInfo['shouldIncludeImages']) :
+            for name in variableAnalysisInfo :
+                # create a child to handle this variable's images
+                pid = os.fork()
+                isParent = not (pid is 0)
+                if (isParent) :
+                    childPids.append(pid)
+                    LOG.debug ("Started child process (pid: " + str(pid) + ") to create reports for variable " + name)
+                else :
                     # create the images comparing that variable
-                    print("\tcreating figures for: " + displayName)
-                    plot.plot_and_save_figure_comparison(aData, bData, varRunInfo, 
+                    print("\tcreating figures for: " + variableAnalysisInfo[name]['exp_name'])
+                    plot.plot_and_save_figure_comparison(variableAnalysisInfo[name]['data']['A'],
+                                                         variableAnalysisInfo[name]['data']['B'],
+                                                         variableAnalysisInfo[name]['run_info'],
                                                          files['file A']['path'],
                                                          files['file B']['path'],
                                                          latitudeA, longitudeA,
@@ -809,69 +898,35 @@ python -m glance
                                                          spaciallyInvalidMaskA,
                                                          spaciallyInvalidMaskB,
                                                          spaciallyInvalidMask,
-                                                         outputPath, True,
-                                                         doShortCircuit)
-                
-                # generate the report for this variable
-                if (runInfo['shouldIncludeReport']) :
-                    # get the current time
-                    runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
-                    #get info on the variable
-                    variableStats = delta.summarize(aData, bData, varRunInfo['epsilon'],
-                                                    (varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b']),
-                                                    spaciallyInvalidMaskA, spaciallyInvalidMaskB)
-                    # hang on to our good % and our epsilon value to describe our comparison
-                    passedFraction = (1.0 - variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction'])
-                    passedPercent = passedFraction * 100.0
-                    variableComparisons[varRunInfo['variable_name']] = {'pass_epsilon_percent': passedPercent,
-                                                                        'variable_run_info': varRunInfo
-                                                                        }
-                    # check to see if the variable passed, failed, or wasn't quantitatively tested
-                    didPass = None
-                    # check to see if it failed on epsilon
-                    epsilonTolerance = None
-                    if ('epsilon_failure_tolerance' in varRunInfo) :
-                        epsilonTolerance = varRunInfo['epsilon_failure_tolerance']
-                    else :
-                        epsilonTolerance = defaultValues['epsilon_failure_tolerance']
-                    if not (epsilonTolerance is None) :
-                        didPass =         passedFraction >= (1.0 - epsilonTolerance)
-                    # check to see if it failed on nonfinite data
-                    nonfiniteTolerance = None
-                    if ('nonfinite_data_tolerance'  in varRunInfo) :
-                        nonfiniteTolerance = varRunInfo['nonfinite_data_tolerance']
-                    else :
-                        nonfiniteTolerance = defaultValues['nonfinite_data_tolerance']
-                    if not (nonfiniteTolerance is None) :
-                        non_finite_pts = variableStats['Finite Data Statistics']['finite_in_only_one_count']
-                        non_finite_pts = non_finite_pts + variableStats['Missing Value Statistics']['common_missing_count']
-                        non_finite_pts = non_finite_pts + variableStats['NaN Statistics']['common_nan_count']
-                        non_finite_fraction = float(non_finite_pts) / float(variableStats['General Statistics']['num_data_points'])
-                        passedNonFinite = non_finite_fraction <= nonfiniteTolerance 
-                        if (didPass is None) :
-                            didPass = passedNonFinite
-                        else :
-                            didPass = didPass and passedNonFinite
-                    varRunInfo['did_pass'] = didPass
-                    
-                    print ('\tgenerating report for: ' + displayName) 
-                    report.generate_and_save_variable_report(files,
-                                                             varRunInfo, runInfo,
-                                                             variableStats,
-                                                             spatialInfo,
-                                                             outputPath, varRunInfo['variable_name'] + ".html") 
-                                                             
-                                                             
-                    
-            # only log a warning if the user themselves picked the faulty variable
-            else :
-                LOG.warn(explanationName + ' ' + 
-                         'could not be compared. This may be because the data for this variable does not match in shape ' +
-                         'between the two files or the data may not match the shape of the selected longitude and ' +
-                         'latitude variables.')
+                                                         outputPath, True)
+                    print("\tfinished creating figures for: " + variableAnalysisInfo[name]['exp_name'])
+                    sys.exit(0) # this child has successfully finished it's tasks
         
+        # reports are fast, so the parent thread will just do this
         # generate our general report pages once we've looked at all the variables
         if (runInfo['shouldIncludeReport']) :
+            
+            # this is going to be in the form
+            # [var_name] = {"passEpsilonPercent": percent ok with epsilon, "epsilon": epsilon)
+            variableComparisons = {}
+            
+            # generate the variable reports
+            for name in variableAnalysisInfo :
+                
+                # hang on to our good % and other info to describe our comparison
+                passedPercent = (1.0 - variableAnalysisInfo[name]['var_stats']
+                                  ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']) * 100.0
+                variableComparisons[name] = {'pass_epsilon_percent': passedPercent,
+                                             'variable_run_info': variableAnalysisInfo[name]['run_info']
+                                             }
+                
+                print ('\tgenerating report for: ' + variableAnalysisInfo[name]['exp_name']) 
+                report.generate_and_save_variable_report(files,
+                                                         variableAnalysisInfo[name]['run_info'], runInfo,
+                                                         variableAnalysisInfo[name]['var_stats'],
+                                                         spatialInfo,
+                                                         outputPath, name + ".html")
+            
             print ('generating summary report')
             # get the current time
             runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
@@ -886,6 +941,13 @@ python -m glance
             print ('generating glossary')
             report.generate_and_save_doc_page(delta.STATISTICS_DOC, outputPath)
         
+        # if we're the parent, wait for any children to catch up
+        if isParent:
+            if len(childPids) > 0 :
+                print ("waiting for completion of report and\/or figure generation...")
+            for pid in childPids:
+                os.waitpid(pid, 0)
+        print("... report and figure generation complete")
         return
     
     """

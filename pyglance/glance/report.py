@@ -177,7 +177,6 @@ def generate_and_save_variable_report(files,
     generalRunInfo is a dictionary in the form
         generalRunInfo = {  'machine': currentMachine,
                             'user': currentUser,
-                            'time': currentTime,
                             'latitude': latitudeName,
                             'longitude': longitudeName,
                             'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
@@ -191,8 +190,9 @@ def generate_and_save_variable_report(files,
                             'epsilon': epsilon,
                             'missing_value': missingDataValue,
                             'display_name': displayName
-                            'did_pass': boolean value or None # optional, boolean means it did or did not pass, None means it was
-                                                              # not qualitatively tested against a set of tolerances
+                            'did_pass': boolean value or None, # optional, boolean means it did or did not pass, None means it was
+                                                               # not qualitatively tested against a set of tolerances
+                            'time': currentTime
                             }
                             
     files is a dictionary in the form
