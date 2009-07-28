@@ -415,97 +415,161 @@ def plot_and_save_figure_comparison(aData, bData,
     LOG.debug ("visible axes in B: "    + str(visibleAxesB))
     LOG.debug ("visible axes in Both: " + str(visibleAxesBoth))
     
-    # the original data figures
-    LOG.info("\t\tcreating image of file a")
-    figureA = _create_mapped_figure(aData, latitudeAData, longitudeAData, visibleAxesA,
-                                    (variableDisplayName + "\nin File A"),
-                                    invalidMask=(spaciallyInvalidMaskA | invalidDataMaskA))
-    LOG.info("\t\tsaving image of file a")
-    figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200)
+    # from this point on, we will be forking to create child processes so we can parallelize our image and
+    # report generation
     
-    LOG.info("\t\tcreating image of file b")
-    figureB = _create_mapped_figure(bData, latitudeBData, longitudeBData, visibleAxesB,
-                                    (variableDisplayName + "\nin File B"),
-                                    invalidMask=(spaciallyInvalidMaskB | invalidDataMaskB))
-    LOG.info("\t\tsaving image of file b")
-    figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=200)
+    isParent = True 
+    childPids = []
+    
+    # the original data figures
+    LOG.info("\t\tcreating image of " + variableDisplayName + " in file a")
+    pid = os.fork()
+    isParent = not (pid is 0)
+    if (isParent) :
+        childPids.append(pid)
+        LOG.debug ("Started child process (pid: " + str(pid) + ") to create file a image for " + variableDisplayName)
+    else :
+        figureA = _create_mapped_figure(aData, latitudeAData, longitudeAData, visibleAxesA,
+                                        (variableDisplayName + "\nin File A"),
+                                        invalidMask=(spaciallyInvalidMaskA | invalidDataMaskA))
+        LOG.info("\t\tsaving image of " + variableDisplayName + " for file a")
+        figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200)
+        if (makeSmall) :
+            figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=50)
+        sys.exit(0) # the child is done now
+    
+    LOG.info("\t\tcreating image of " + variableDisplayName + " in file b")
+    pid = os.fork()
+    isParent = not (pid is 0)
+    if (isParent) :
+        childPids.append(pid)
+        LOG.debug ("Started child process (pid: " + str(pid) + ") to create file b image for " + variableDisplayName)
+    else :
+        figureB = _create_mapped_figure(bData, latitudeBData, longitudeBData, visibleAxesB,
+                                        (variableDisplayName + "\nin File B"),
+                                        invalidMask=(spaciallyInvalidMaskB | invalidDataMaskB))
+        LOG.info("\t\tsaving image of " + variableDisplayName + " in file b")
+        figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=200)
+        if (makeSmall) :
+            figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=50)
+        sys.exit(0) # the child is done now
     
     # make the data comparison figures
-    #if not shortCircuitComparisons :
-    LOG.info("\t\tcreating image of the absolute value of difference")
-    figureAbsDiff = _create_mapped_figure(diffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
-                                          ("Absolute value of difference in\n" + variableDisplayName),
-                                          invalidMask=(everyThingWrongButEpsilon))
-    LOG.info("\t\tsaving image of the absolute value of difference")
-    figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.png", dpi=200)
-    
-    LOG.info("\t\tcreating image of the difference")
-    figureDiff = _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
-                                          ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
-                                          invalidMask=(everyThingWrongButEpsilon))
-    LOG.info("\t\tsaving image of the difference")
-    figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=200)
-    
-    # this figure is more complex because we want to mark the trouble points on it
-    LOG.info("\t\tcreating image marking trouble data")
-    figureBadDataInDiff = _create_mapped_figure(bData, latitudeCommonData, longitudeCommonData, visibleAxesBoth,
-                                                ("Areas of trouble data in\n" + variableDisplayName),
-                                                spaciallyInvalidMaskBoth | invalidDataMaskB,
-                                                mediumGrayColorMap, troubleMask)
-    LOG.info("\t\tsaving image marking trouble data")
-    figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=200)
-    
-    # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
-    LOG.info("\t\tcreating histogram of the amount of difference")
-    numBinsToUse = 50
-    valuesForHist = rawDiffData[~everyThingWrongButEpsilon]
-    diffHistogramFigure = _create_histogram(valuesForHist, numBinsToUse,
-                                            ("Difference in\n" + variableDisplayName),
-                                            ('Value of (Data File B - Data File A) at a Data Point'),
-                                            ('Number of Data Points with a Given Difference'),
-                                            True)
-    LOG.info("\t\tsaving histogram of the amount of difference")
-    diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=200)
-    
-    '''
-    # a histogram of the values of fileA - file B, excluding epsilon mismatched values (to show errors more clearly)
-    LOG.info("\t\tcreating histogram of the amount of difference for imperfect matches")
-    numBinsToUse = 50
-    valuesForHist = rawDiffData[outsideEpsilonMask] # select only the imperfectly matched points
-    imperfectHistogramFigure = None
-    if (valuesForHist.size > 0) :
-        imperfectHistogramFigure = _create_histogram(valuesForHist, numBinsToUse,
-                                                     ("Difference in " + variableDisplayName + "\nExcluding Epsilon Matches"),
-                                                     ('Value of (Data File B - Data File A) at a Data Point'),
-                                                     ('Number of Data Points with a Given Difference'),
-                                                     True)
-        LOG.info("\t\tsaving histogram of the amount of difference for imperfect matches")
-        imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.png", dpi=200)
-    '''
-    
-    # scatter plot of file a and b comparison
-    LOG.info("\t\tcreating scatter plot of file a values vs file b values")
-    diffScatterPlot = _create_scatter_plot(aData[~everyThingWrongButEpsilon].ravel(), bData[~everyThingWrongButEpsilon].ravel(),
-                                           "Value in File A vs Value in File B", "File A Value", "File B Value",
-                                           outsideEpsilonMask[~everyThingWrongButEpsilon].ravel(), variableRunInfo['epsilon'])
-    LOG.info("\t\tsaving scatter plot of file a values vs file b values")
-    diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=200) 
-    
-    # also save smaller versions of the figures if the parameter says the caller wants us to
-    if (makeSmall) :
-        LOG.info("\t\tsaving smaller versions of images")
-        figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=50)
-        figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=50)
-        #if not shortCircuitComparisons :
-        figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.small.png", dpi=50)
-        figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=50)
-        figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=50)
-        diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=50)
+    if not shortCircuitComparisons :
+        
+        LOG.info("\t\tcreating image of the absolute value of difference in " + variableDisplayName)
+        pid = os.fork()
+        isParent = not (pid is 0)
+        if (isParent) :
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create absolute value of difference image for " + variableDisplayName)
+        else :
+            figureAbsDiff = _create_mapped_figure(diffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
+                                                  ("Absolute value of difference in\n" + variableDisplayName),
+                                                  invalidMask=(everyThingWrongButEpsilon))
+            LOG.info("\t\tsaving image of the absolute value of difference for " + variableDisplayName)
+            figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.png", dpi=200)
+            if (makeSmall) :
+                figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.small.png", dpi=50)
+            sys.exit(0) # the child is done now
+        
+        LOG.info("\t\tcreating image of the difference in " + variableDisplayName)
+        pid = os.fork()
+        isParent = not (pid is 0)
+        if (isParent) :
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference image for " + variableDisplayName)
+        else :
+            figureDiff = _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
+                                                  ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
+                                                  invalidMask=(everyThingWrongButEpsilon))
+            LOG.info("\t\tsaving image of the difference in " + variableDisplayName)
+            figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=200)
+            if (makeSmall) :
+                figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=50)
+            sys.exit(0) # the child is done now
+        
+        # this figure is more complex because we want to mark the trouble points on it
+        LOG.info("\t\tcreating image marking trouble data in " + variableDisplayName)
+        pid = os.fork()
+        isParent = not (pid is 0)
+        if (isParent) :
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create trouble image for " + variableDisplayName)
+        else :
+            figureBadDataInDiff = _create_mapped_figure(bData, latitudeCommonData, longitudeCommonData, visibleAxesBoth,
+                                                        ("Areas of trouble data in\n" + variableDisplayName),
+                                                        spaciallyInvalidMaskBoth | invalidDataMaskB,
+                                                        mediumGrayColorMap, troubleMask)
+            LOG.info("\t\tsaving image marking trouble data in " + variableDisplayName)
+            figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=200)
+            if (makeSmall) :
+                figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=50)
+            sys.exit(0) # the child is done now
+        
+        # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
+        LOG.info("\t\tcreating histogram of the amount of difference in " + variableDisplayName)
+        pid = os.fork()
+        isParent = not (pid is 0)
+        if (isParent) :
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference histogram image for " + variableDisplayName)
+        else :
+            numBinsToUse = 50
+            valuesForHist = rawDiffData[~everyThingWrongButEpsilon]
+            diffHistogramFigure = _create_histogram(valuesForHist, numBinsToUse,
+                                                    ("Difference in\n" + variableDisplayName),
+                                                    ('Value of (Data File B - Data File A) at a Data Point'),
+                                                    ('Number of Data Points with a Given Difference'),
+                                                    True)
+            LOG.info("\t\tsaving histogram of the amount of difference in " + variableDisplayName)
+            diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=200)
+            if (makeSmall) :
+                diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=50)
+            sys.exit(0) # the child is done now
+        
+        ''' TODO, is this actually useful in many cases?
+        # a histogram of the values of fileA - file B, excluding epsilon mismatched values (to show errors more clearly)
+        LOG.info("\t\tcreating histogram of the amount of difference for imperfect matches")
+        numBinsToUse = 50
+        valuesForHist = rawDiffData[outsideEpsilonMask] # select only the imperfectly matched points
+        imperfectHistogramFigure = None
+        if (valuesForHist.size > 0) :
+            imperfectHistogramFigure = _create_histogram(valuesForHist, numBinsToUse,
+                                                         ("Difference in " + variableDisplayName + "\nExcluding Epsilon Matches"),
+                                                         ('Value of (Data File B - Data File A) at a Data Point'),
+                                                         ('Number of Data Points with a Given Difference'),
+                                                         True)
+            LOG.info("\t\tsaving histogram of the amount of difference for imperfect matches")
+            imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.png", dpi=200)
+            if (makeSmall):
+                imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.small.png", dpi=50)
         '''
-        if not (imperfectHistogramFigure is None) :
-            imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.small.png", dpi=50)
-        '''
-        diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=50)
+        
+        # scatter plot of file a and b comparison
+        LOG.info("\t\tcreating scatter plot of file a values vs file b values for " + variableDisplayName)
+        pid = os.fork()
+        isParent = not (pid is 0)
+        if (isParent) :
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create scatter plot image for " + variableDisplayName)
+        else :
+            diffScatterPlot = _create_scatter_plot(aData[~everyThingWrongButEpsilon].ravel(), bData[~everyThingWrongButEpsilon].ravel(),
+                                                   "Value in File A vs Value in File B", "File A Value", "File B Value",
+                                                   outsideEpsilonMask[~everyThingWrongButEpsilon].ravel(), variableRunInfo['epsilon'])
+            LOG.info("\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName)
+            diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=200)
+            if (makeSmall):
+                diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=50)
+            sys.exit(0) # the child is done now
+    
+    # now we need to wait for all of our child processes to terminate before returning
+    if (isParent) : # just in case
+        if len(childPids) > 0 :
+            print ("waiting for completion of " + variableDisplayName + " images...")
+        for pid in childPids:
+            os.waitpid(pid, 0)
+        print("... creation and saving of images for " + variableDisplayName + " completed")
     
     return
 

@@ -13,6 +13,7 @@ import os, sys, logging, re, subprocess, datetime
 import imp as imp
 from pprint import pprint, pformat
 from numpy import *
+import pkg_resources
 
 import glance.io as io
 import glance.delta as delta
@@ -203,6 +204,8 @@ def _load_config_or_options(optionsSet, originalArgs) :
     runInfo['latitude'] = glance_default_latitude_name
     runInfo['longitude'] = glance_default_longitude_name
     runInfo['lon_lat_epsilon'] = 0.0
+    runInfo['version'] = _get_glance_version_string()
+    
     # by default, we don't have any particular variables to analyze
     desiredVariables = {}
     # use the built in default values, to start with
@@ -486,6 +489,11 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     
     return didPass
 
+def _get_glance_version_string() :
+    version_num = pkg_resources.require('glance')[0].version
+    
+    return "glance, version " + str(version_num) 
+
 def main():
     import optparse
     usage = """
@@ -530,6 +538,8 @@ python -m glance
                       help="set optional configuration file")
     parser.add_option('-l', '--llepsilon', dest='lonlatepsilon', type='float', default=0.0,
                       help="set default epsilon for longitude and latitude comparsion")
+    parser.add_option('-n', '--version', dest='version',
+                      action="store_true", default=False, help="view the glance version")
     
                     
     options, args = parser.parse_args()
@@ -543,6 +553,10 @@ python -m glance
     elif options.verbose: lvl = logging.INFO
     elif options.quiet: lvl = logging.ERROR
     logging.basicConfig(level = lvl)
+    
+    # display the version
+    if options.version :
+        print (_get_glance_version_string() + '\n')
 
     commands = {}
     prior = None
@@ -944,9 +958,10 @@ python -m glance
         # if we're the parent, wait for any children to catch up
         if isParent:
             if len(childPids) > 0 :
-                print ("waiting for completion of report and\/or figure generation...")
+                print ("waiting for completion of report and/or figure generation...")
             for pid in childPids:
                 os.waitpid(pid, 0)
+        
         print("... report and figure generation complete")
         return
     

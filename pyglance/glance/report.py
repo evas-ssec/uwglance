@@ -74,6 +74,7 @@ def generate_and_save_summary_report(files,
         runInfo = {'machine': currentMachine,
                    'user': currentUser,
                    'time': currentTime,
+                   'version': a version string describing glance,
                    'latitude': latitudeName,
                    'longitude': longitudeName,
                    'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
@@ -177,6 +178,7 @@ def generate_and_save_variable_report(files,
     generalRunInfo is a dictionary in the form
         generalRunInfo = {  'machine': currentMachine,
                             'user': currentUser,
+                            'version': a version string describing glance,
                             'latitude': latitudeName,
                             'longitude': longitudeName,
                             'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude

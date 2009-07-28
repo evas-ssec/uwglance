@@ -26,7 +26,10 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     <h1>${variableDisplayName} Variable Comparison</h1>
     
     <p>
-        comparison produced ${runInfo['time']} by user ${runInfo['user']} on ${runInfo['machine']}
+        % if 'version' in runInfo :
+            report produced with ${runInfo['version']} <br>
+        % endif
+        comparison generated ${runInfo['time']} by user ${runInfo['user']} on ${runInfo['machine']}
     </p>
     
     ## show information on each of the files we're comparing (should only be two)
