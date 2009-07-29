@@ -71,12 +71,19 @@ def _setup_file(fileNameAndPath, prefexText='') :
     # some info to return
     fileInfo = {'path': fileNameAndPath}
     
+    # check to see if the path exists to be opened
+    if not (os.path.exists(fileNameAndPath)) :
+        LOG.warn("Requested file " + fileNameAndPath + " could not be opened because it does not exist.")
+        return None, fileInfo
+    
     # open the file
     LOG.info(prefexText + "opening " + fileNameAndPath)
+    fileNameAndPath = os.path.abspath(os.path.expanduser(fileNameAndPath))
+    LOG.debug("User provided path after normalization and user expansion: " + fileNameAndPath)
     fileObject = io.open(fileNameAndPath)
     
     # get the file md5sum
-    tempSubProcess = subprocess.Popen("md5sum " + fileNameAndPath, shell=True, stdout=subprocess.PIPE)
+    tempSubProcess = subprocess.Popen("md5sum \'" + fileNameAndPath + "\'", shell=True, stdout=subprocess.PIPE)
     fileInfo['md5sum'] = tempSubProcess.communicate()[0].split()[0]
     LOG.info(prefexText + "file md5sum: " + str(fileInfo['md5sum']))
     
@@ -772,8 +779,14 @@ python -m glance
         files = {}
         LOG.info("Processing File A:")
         aFile, files['file A'] = _setup_file(pathsTemp['a'], "\t")
+        if aFile is None:
+            LOG.warn("Unable to continue with comparison because file a (" + pathsTemp['a'] + ") could not be opened.")
+            sys.exit(1)
         LOG.info("Processing File B:")
         bFile, files['file B'] = _setup_file(pathsTemp['b'], "\t")
+        if bFile is None:
+            LOG.warn("Unable to continue with comparison because file b (" + pathsTemp['b'] + ") could not be opened.")
+            sys.exit(1)
         
         # get information about the names the user requested
         finalNames, nameStats = _resolve_names(aFile, bFile,

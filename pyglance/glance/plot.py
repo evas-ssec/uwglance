@@ -30,7 +30,7 @@ LOG = logging.getLogger(__name__)
 
 # TODO this value is being used to work around a problem with the contourf
 # and how it handles range boundaries. Find a better solution if at all possible.
-offsetToRange = 0.00000000000000001
+offsetToRange = 0.0000000000000000001
 
 # the value that will denote "bad" longitudes and latitudes
 badLonLat = 1.0E30
@@ -168,7 +168,8 @@ def _create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
 # if any masks are passed in in the tagData list they will be plotted as an overlays
 # set on the existing image
 def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
-                          invalidMask=None, colorMap=None, tagData=None) :
+                          invalidMask=None, colorMap=None, tagData=None,
+                          dataRanges=None, dataRangeNames=None) :
     
     # this is very inefficient, TODO find a better way?
     latitudeCleaned = empty_like(latitude)
@@ -185,15 +186,20 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
     # build extra info to go to the map plotting function
     kwargs = {}
     
-    # figure the range for the color bars TODO this should be user controllable for discrete data
+    # figure the range for the color bars
+    # this is controllable with the "dataRanges" parameter for discrete data display
     if not (data is None) :
-        # todo, the use off the offset here is covering a problem with
-        # contourf hiding data exactly at the end of the range and should
-        # be removed if a better solution can be found
-        minVal = _min_with_mask(data, invalidMask) - offsetToRange
-        maxVal = _max_with_mask(data, invalidMask) + offsetToRange
-        rangeForBar = np.linspace(minVal, maxVal, 50) 
-        kwargs['levelsToUse'] = rangeForBar
+        if dataRanges is None :
+            # todo, the use off the offset here is covering a problem with
+            # contourf hiding data exactly at the end of the range and should
+            # be removed if a better solution can be found
+            minVal = _min_with_mask(data, invalidMask) - offsetToRange
+            maxVal = _max_with_mask(data, invalidMask) + offsetToRange
+            dataRanges = np.linspace(minVal, maxVal, 50)
+        else: # make sure the user range will not discard data TODO, find a better way to handle this
+            dataRanges[0] = dataRanges[0] - offsetToRange
+            dataRanges[len(dataRanges) - 1] = dataRanges[len(dataRanges) - 1] + offsetToRange
+        kwargs['levelsToUse'] = dataRanges
     
     # if we've got a color map, pass it to the list of things we want to tell the plotting function
     if not (colorMap is None) :
@@ -218,7 +224,22 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
     axes.set_title(title)
     # show a generic color bar
     if not (data is None) :
-        colorbar(format='%.3f') 
+        cbar = colorbar(format='%.3f')
+        # if there are specific requested labels, add them
+        if not (dataRangeNames is None) :
+            yPosition = None
+            '''
+            # TODO, this strategy doesn't work, find some other way to label the centers of
+            # the sections, or build a legend/key instead?
+            if (len(dataRangeNames) < len(dataRanges)) :
+                yPosition=[]
+                tickPositions = cbar.ax.get_yticks()
+                for posNum in range(len(tickPositions) - 1) :
+                    currentPos = tickPositions[posNum]
+                    nextPos = tickPositions[posNum + 1]
+                    yPosition.append(0) #(currentPos + ((nextPos - currentPos) / 2.0))
+            '''
+            cbar.ax.set_yticklabels(dataRangeNames, y=yPosition)
     
     # if there are "tag" masks, plot them over the existing map
     if not (tagData is None) :
@@ -415,6 +436,14 @@ def plot_and_save_figure_comparison(aData, bData,
     LOG.debug ("visible axes in B: "    + str(visibleAxesB))
     LOG.debug ("visible axes in Both: " + str(visibleAxesBoth))
     
+    # some more display info, pull it out for convenience
+    dataRanges = None
+    if ('display_ranges' in variableRunInfo) :
+        dataRanges = variableRunInfo['display_ranges']
+    dataRangeNames = None
+    if ('display_range_names' in variableRunInfo) : 
+        dataRangeNames = variableRunInfo['display_range_names'] 
+    
     # from this point on, we will be forking to create child processes so we can parallelize our image and
     # report generation
     
@@ -431,7 +460,9 @@ def plot_and_save_figure_comparison(aData, bData,
     else :
         figureA = _create_mapped_figure(aData, latitudeAData, longitudeAData, visibleAxesA,
                                         (variableDisplayName + "\nin File A"),
-                                        invalidMask=(spaciallyInvalidMaskA | invalidDataMaskA))
+                                        invalidMask=(spaciallyInvalidMaskA | invalidDataMaskA),
+                                        dataRanges=dataRanges,
+                                        dataRangeNames=dataRangeNames)
         LOG.info("\t\tsaving image of " + variableDisplayName + " for file a")
         figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200)
         if (makeSmall) :
@@ -447,7 +478,9 @@ def plot_and_save_figure_comparison(aData, bData,
     else :
         figureB = _create_mapped_figure(bData, latitudeBData, longitudeBData, visibleAxesB,
                                         (variableDisplayName + "\nin File B"),
-                                        invalidMask=(spaciallyInvalidMaskB | invalidDataMaskB))
+                                        invalidMask=(spaciallyInvalidMaskB | invalidDataMaskB),
+                                        dataRanges=dataRanges,
+                                        dataRangeNames=dataRangeNames)
         LOG.info("\t\tsaving image of " + variableDisplayName + " in file b")
         figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=200)
         if (makeSmall) :
@@ -500,7 +533,9 @@ def plot_and_save_figure_comparison(aData, bData,
             figureBadDataInDiff = _create_mapped_figure(bData, latitudeCommonData, longitudeCommonData, visibleAxesBoth,
                                                         ("Areas of trouble data in\n" + variableDisplayName),
                                                         spaciallyInvalidMaskBoth | invalidDataMaskB,
-                                                        mediumGrayColorMap, troubleMask)
+                                                        mediumGrayColorMap, troubleMask,
+                                                        dataRanges=dataRanges,
+                                                        dataRangeNames=dataRangeNames)
             LOG.info("\t\tsaving image marking trouble data in " + variableDisplayName)
             figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=200)
             if (makeSmall) :
