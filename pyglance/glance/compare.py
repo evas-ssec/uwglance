@@ -475,13 +475,16 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     if not (epsilonTolerance is None) :
         failed_fraction = variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']
         didPass = failed_fraction <= epsilonTolerance
+    
     # check to see if it failed on nonfinite data
     if not (nonfiniteTolerance is None) :
         non_finite_pts = variableStats['Finite Data Statistics']['finite_in_only_one_count']
         non_finite_pts = non_finite_pts + variableStats['Missing Value Statistics']['common_missing_count']
         non_finite_pts = non_finite_pts + variableStats['NaN Statistics']['common_nan_count']
         non_finite_fraction = float(non_finite_pts) / float(variableStats['General Statistics']['num_data_points'])
-        passedNonFinite = non_finite_fraction <= nonfiniteTolerance 
+        passedNonFinite = non_finite_fraction <= nonfiniteTolerance
+        
+        # combine the two test results
         if (didPass is None) :
             didPass = passedNonFinite
         else :

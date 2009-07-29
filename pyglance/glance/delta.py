@@ -135,9 +135,9 @@ def _get_nan_stats(a, b) :
     the return value will be a dictionary of statistics
     """
     # find the nan values in the data
-    a_nans = isnan(a)
+    a_nans = ~isfinite(a)
     num_a_nans = sum(a_nans)
-    b_nans = isnan(b)
+    b_nans = ~isfinite(b)
     num_b_nans = sum(b_nans)
     num_common_nans = sum(a_nans & b_nans)
     
@@ -179,7 +179,7 @@ def _get_missing_value_stats(a_missing_mask, b_missing_mask) :
     
     return missing_value_stats
     
-def _get_finite_data_stats(a_is_finite_mask, b_is_finite_mask) :
+def _get_finite_data_stats(a_is_finite_mask, b_is_finite_mask, common_ignore_mask) :
     """
     Get a list of statistics about finite data values in data sets a and b,
     given masks describing the positions of the finite data in each file (such masks
@@ -190,7 +190,7 @@ def _get_finite_data_stats(a_is_finite_mask, b_is_finite_mask) :
     num_a_finite = sum(a_is_finite_mask)
     num_b_finite = sum(b_is_finite_mask)
     num_common_finite = sum(a_is_finite_mask & b_is_finite_mask)
-    num_finite_in_only_one = sum(a_is_finite_mask ^ b_is_finite_mask) # use an exclusive OR
+    num_finite_in_only_one = sum((a_is_finite_mask ^ b_is_finite_mask) & (~ common_ignore_mask)) # use an exclusive OR
     
     # make the assumption that a and b are the same size and only use the size of a's mask
     total_num_values = a_is_finite_mask.size
@@ -290,7 +290,7 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     comparison_stats = _get_numerical_data_stats(a, b, d, finite_mask, outside_epsilon, additional_statistics) 
     nan_stats = _get_nan_stats(a, b)
     missing_stats = _get_missing_value_stats(amis, bmis)
-    finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask) 
+    finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask, ignoreMask) 
     
     out = {}
     out['NaN Statistics'] = nan_stats
@@ -326,8 +326,10 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'b_finite_fraction': "fraction of finite values in B (out of all data points in B)",
                     'common_finite_count': "number of finite values in common between A and B",
                     'common_finite_fraction': "fraction of finite values in common between A and B",
-                    'finite_in_only_one_count': "number of values that changed finite-ness between A and B",
-                    'finite_in_only_one_fraction': "fraction of values that changed finite-ness between A and B",
+                    'finite_in_only_one_count': "number of values that changed finite-ness between A and B; " +
+                                                "only the common spatially valid area is considerd for this statistic",
+                    'finite_in_only_one_fraction': "fraction of values that changed finite-ness between A and B; " +
+                                                "only the common spatially valid area is considerd for this statistic",
                     
                     # missing data value statistics
                     'a_missing_count': "number of values flagged missing in A",
