@@ -12,17 +12,30 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
 # whether or not images should be generated and shown in the report
-shouldIncludeImages = False
+shouldIncludeImages = True
 
 # the names of the latitude and longitude variables that will be used
 lat_lon_info = {}
 lat_lon_info['longitude'] = 'imager_prof_retr_abi_r4_generic1' # 'pixel_longitude'# the name of the longitude variable
 lat_lon_info ['latitude'] = 'imager_prof_retr_abi_r4_generic2' # 'pixel_latitude' # the name of the latitude variable
+
+"""
+# the following two functions can be defined in order to filter the longitude and latitude data, for example, these could be used to compensate
+# for differening data types (like ints/floats or float32/float64) or to handle slicing out only a subset of the data for analysis
+# note: these two filters will only be applied to the longitude and latitude data in file A
+lat_lon_info['data_filter_function_lon_in_a'] = (insert lambda function here)
+lat_lon_info['data_filter_function_lat_in_a'] = (insert lambda function here)
+
 # the following two values are optional and only need to be set if the the latitude and longitude have
 # different names in file A and file B
-"""
 lat_lon_info['longitude_alt_name_in_b'] = 'resampled_longitude' # the alternate name of the longitude in file B
 lat_lon_info ['latitude_alt_name_in_b'] = 'resampled_latitude'  # the alternate name of the latitude in file A
+
+# the following two functions can be defined in order to filter the longitude and latitude data, for example, these could be used to compensate
+# for differening data types (like ints/floats or float32/float64) or to handle slicing out only a subset of the data for analysis
+# note: these two filters will only be applied to the longitude and latitude data in file B
+lat_lon_info['data_filter_function_lon_in_b'] = (insert lambda function here)
+lat_lon_info['data_filter_function_lon_in_b'] = (insert lambda function here)
 """
 # this value can be used to control how similar the longitude and latitude must be to be considered matching
 # if all of your longitude and latitude do not match under this epsilon, most of the comparison report will
@@ -87,6 +100,33 @@ setOfVariables['imager_prof_retr_abi_total_totals_index'] = {           # this s
                                                                         # None indicates that this variable should not be tested
                                                                         # on amount of non-finite data
                                                                         # note, this setting overrides the default
+                                  
+                                    'display_ranges':         [13.0,   14.0,  15.0,  20.0,  32.0,  40.0,  54.0,  60.0],
+                                                                        # this array of ranges can be defined in order to control
+                                                                        # a custom display of color ranges in any graphs produced
+                                                                        # for this variable, ranges will fall between the numbers
+                                                                        # in the list (inclusive of the beginning and endding numbers)
+                                                                        # please list your range in increasing value if you choose
+                                                                        # to use this feature
+                                  
+                                  'display_range_names':    [    'a',    'b',   'c',   'd',   'e',   'f',   'g'],
+                                                                        # this array of labels can be defined in order to control
+                                                                        # the display labels associated with your range boundaries
+                                                                        # if less labels are given than boundaries, the boundaries
+                                                                        # will be labeled starting with the lowest valued boundary
+                                                                        # and working upwards until there are no more labels, any
+                                                                        # remaining boundaries will be left unlabeled
+                                                                        # TODO In the future this array may have the ability to
+                                                                        # let you label your ranges (ie, the space between two
+                                                                        # boundaries) or your boundaries.
+                                  
+                                  
+                                  # the following two functions can be defined in order to filter the variable data,
+                                  # for example, these could be used to compensate
+                                  # for differening data types (like ints/floats or float32/float64)
+                                  # or to handle slicing out only a subset of the data for analysis
+#                                  'data_filter_function_a': (insert lambda function here), # note: will only be applied to file A data
+#                                  'data_filter_function_b': (insert lambda function here)  # note: will only be applied to file B data
                                   }
 setOfVariables['imager_prof_retr_abi_total_precipitable_water_high'] = {
                                   'display_name': 'Total Precipitable Water, High',

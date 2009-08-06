@@ -22,8 +22,13 @@ import glance.report as report
 
 LOG = logging.getLogger(__name__)
 
-glance_default_longitude_name = 'pixel_longitude' 
-glance_default_latitude_name = 'pixel_latitude'
+glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
+                           'latitude':  'pixel_latitude',
+                           'data_filter_function_lon_in_a': None,
+                           'data_filter_function_lat_in_a': None,
+                           'data_filter_function_lon_in_b': None,
+                           'data_filter_function_lat_in_b': None
+                           }
 
 # these are the built in default settings
 glance_analysis_defaults = {'epsilon': 0.0,
@@ -208,8 +213,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
     runInfo = {}
     runInfo['shouldIncludeReport'] = True
     runInfo['shouldIncludeImages'] = False
-    runInfo['latitude'] = glance_default_latitude_name
-    runInfo['longitude'] = glance_default_longitude_name
+    runInfo.update(glance_lon_lat_defaults) # get the default lon/lat info
     runInfo['lon_lat_epsilon'] = 0.0
     runInfo['version'] = _get_glance_version_string()
     
@@ -284,7 +288,9 @@ def _load_config_or_options(optionsSet, originalArgs) :
     
     return paths, runInfo, defaultsToUse, requestedNames, usedConfigFile
 
-def _get_and_analyze_lon_lat (fileObject, latitudeVariableName, longitudeVariableName) :
+def _get_and_analyze_lon_lat (fileObject,
+                              latitudeVariableName, longitudeVariableName,
+                              latitudeDataFilterFn=None, longitudeDataFilterFn=None) :
     """
     get the longitude and latitude data from the given file, assuming they are in the given variable names
     and analyze them to identify spacially invalid data (ie. data that would fall off the earth)
@@ -292,6 +298,14 @@ def _get_and_analyze_lon_lat (fileObject, latitudeVariableName, longitudeVariabl
     # get the data from the file
     longitudeData = array(fileObject[longitudeVariableName], dtype=float)
     latitudeData  = array(fileObject[latitudeVariableName],  dtype=float)
+    
+    # if we have filters, use them
+    if not (latitudeDataFilterFn is None) :
+        latitudeData = latitudeDataFilterFn(latitudeData)
+        LOG.debug ('latitude size after application of filter: '  + str(latitudeData.shape))
+    if not (longitudeDataFilterFn is None) :
+        longitudeData = longitudeDataFilterFn(longitudeData)
+        LOG.debug ('longitude size after application of filter: ' + str(longitudeData.shape))
     
     # build a mask of our spacially invalid data
     invalidLatitude = (latitudeData < -90) | (latitudeData > 90)
@@ -309,9 +323,11 @@ def _get_percentage_from_mask(dataMask) :
     given a mask that marks the elements we want the percentage of as True (and is the size of our original data),
     figure out what percentage of the whole they are
     """
-    numMarkedDataPts = len(dataMask[dataMask].ravel())
-    dataShape = dataMask.shape
-    totalDataPts = dataShape[0] * dataShape[1]
+    numMarkedDataPts = sum(dataMask)
+    totalDataPts = dataMask.size
+    # avoid dividing by 0
+    if totalDataPts is 0 :
+        return 0.0, 0
     percentage = 100.0 * float(numMarkedDataPts) / float(totalDataPts)
     
     return percentage, numMarkedDataPts
@@ -331,17 +347,27 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     
     lon_lat_not_equal_points_count = 0
     lon_lat_not_equal_points_percent = 0.0
-    combinedIgnoreMask = ignoreMaskA | ignoreMaskB
     
     # get information about how the latitude and longitude differ
+    longitudeDiff, finiteLongitudeMask, _, _, lon_not_equal_mask, _, _, _ = delta.diff(longitudeA, longitudeB,
+                                                                                       llepsilon,
+                                                                                       (None, None),
+                                                                                       (ignoreMaskA, ignoreMaskB))
+    latitudeDiff,  finiteLatitudeMask,  _, _, lat_not_equal_mask, _, _, _ = delta.diff(latitudeA,  latitudeB,
+                                                                                       llepsilon,
+                                                                                       (None, None),
+                                                                                       (ignoreMaskA, ignoreMaskB))
+    '''
     longitudeDiff, finiteLongitudeMask, _, _, _, lon_not_equal_mask = delta.diff(longitudeA, longitudeB,
                                                                                      llepsilon,
                                                                                      ignoreMask=combinedIgnoreMask)
     latitudeDiff,  finiteLatitudeMask,  _, _, _, lat_not_equal_mask = delta.diff(latitudeA,  latitudeB,
                                                                                  llepsilon,
                                                                                  ignoreMask=combinedIgnoreMask)
+    '''
+    
     lon_lat_not_equal_mask = lon_not_equal_mask | lat_not_equal_mask
-    lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask.ravel())
+    lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask)
     lon_lat_not_equal_points_percent = (float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)) * 100.0
     
     # if we have unequal points, create user legible info about the problem
@@ -682,7 +708,6 @@ python -m glance
             print name
             print 
             lal = list(delta.summarize(aval,bval,epsilon,(amiss,bmiss)).items()) 
-            # lal = list(delta.stats(*delta.diff(aval,bval,epsilon,(amiss,bmiss))).items())
             lal.sort()
             for dictionary_title, dict_data in lal:
                 print '%s' %  dictionary_title
@@ -802,9 +827,11 @@ python -m glance
         if ( 'latitude_alt_name_in_b' in runInfo):
             b_latitude  = runInfo['latitude_alt_name_in_b']
         longitudeA, latitudeA, spaciallyInvalidMaskA, spatialInfo['file A'] = \
-            _get_and_analyze_lon_lat (aFile, runInfo['latitude'], runInfo['longitude'])
+            _get_and_analyze_lon_lat (aFile, runInfo['latitude'], runInfo['longitude'],
+                                      runInfo['data_filter_function_lat_in_a'], runInfo['data_filter_function_lon_in_a'])
         longitudeB, latitudeB, spaciallyInvalidMaskB, spatialInfo['file B'] = \
-            _get_and_analyze_lon_lat (bFile, b_latitude, b_longitude)
+            _get_and_analyze_lon_lat (bFile, b_latitude, b_longitude,
+                                      runInfo['data_filter_function_lat_in_b'], runInfo['data_filter_function_lon_in_b'])
         
         # test the "valid" values in our lon/lat
         moreSpatialInfo = _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB,
@@ -832,7 +859,7 @@ python -m glance
                                 _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
                                                             longitudeA, longitudeB, latitudeA, latitudeB,
                                                             runInfo['shouldIncludeImages'], outputPath)
-            
+        
         # set some things up to hold info for our reports
         
         # this will hold our variable report information in the form
@@ -867,6 +894,14 @@ python -m glance
             # get the data for the variable 
             aData = aFile[varRunInfo['variable_name']]
             bData = bFile[b_variable]
+            
+            # apply any data filter functions we may have
+            if ('data_filter_function_a' in varRunInfo) :
+                aData = varRunInfo['data_filter_function_a'](aData)
+                LOG.debug ("filter function was applied to file A data for variable: " + explanationName)
+            if ('data_filter_function_b' in varRunInfo) :
+                bData = varRunInfo['data_filter_function_b'](bData)
+                LOG.debug ("filter function was applied to file B data for variable: " + explanationName)
             
             # check if this data can be displayed
             if ((aData.shape == bData.shape) and
@@ -908,29 +943,32 @@ python -m glance
         # loop to create the images for all our variables
         if (runInfo['shouldIncludeImages']) :
             for name in variableAnalysisInfo :
+                """ TODO for the moment, I think this is resulting in too many processes, so only generate figs for one var at a time
                 # create a child to handle this variable's images
                 pid = os.fork()
                 isParent = not (pid is 0)
+                # only the child needs to make figures, the parent can move on
                 if (isParent) :
                     childPids.append(pid)
                     LOG.debug ("Started child process (pid: " + str(pid) + ") to create reports for variable " + name)
+                
                 else :
-                    # create the images comparing that variable
-                    print("\tcreating figures for: " + variableAnalysisInfo[name]['exp_name'])
-                    plot.plot_and_save_figure_comparison(variableAnalysisInfo[name]['data']['A'],
-                                                         variableAnalysisInfo[name]['data']['B'],
-                                                         variableAnalysisInfo[name]['run_info'],
-                                                         files['file A']['path'],
-                                                         files['file B']['path'],
-                                                         latitudeA, longitudeA,
-                                                         latitudeB, longitudeB,
-                                                         latitudeCommon, longitudeCommon,
-                                                         spaciallyInvalidMaskA,
-                                                         spaciallyInvalidMaskB,
-                                                         spaciallyInvalidMask,
-                                                         outputPath, True)
-                    print("\tfinished creating figures for: " + variableAnalysisInfo[name]['exp_name'])
-                    sys.exit(0) # this child has successfully finished it's tasks
+                """
+                # create the images comparing that variable
+                print("\tcreating figures for: " + variableAnalysisInfo[name]['exp_name'])
+                plot.plot_and_save_figure_comparison(variableAnalysisInfo[name]['data']['A'],
+                                                     variableAnalysisInfo[name]['data']['B'],
+                                                     variableAnalysisInfo[name]['run_info'],
+                                                     files['file A']['path'],
+                                                     files['file B']['path'],
+                                                     latitudeA, longitudeA,
+                                                     latitudeB, longitudeB,
+                                                     latitudeCommon, longitudeCommon,
+                                                     spaciallyInvalidMaskA,
+                                                     spaciallyInvalidMaskB,
+                                                     outputPath, True)
+                print("\tfinished creating figures for: " + variableAnalysisInfo[name]['exp_name'])
+                    #sys.exit(0) # this child has successfully finished it's tasks
         
         # reports are fast, so the parent thread will just do this
         # generate our general report pages once we've looked at all the variables
@@ -974,7 +1012,7 @@ python -m glance
         # if we're the parent, wait for any children to catch up
         if isParent:
             if len(childPids) > 0 :
-                print ("waiting for completion of report and/or figure generation...")
+                print ("waiting for completion of figure generation...")
             for pid in childPids:
                 os.waitpid(pid, 0)
         

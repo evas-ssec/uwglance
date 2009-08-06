@@ -51,6 +51,7 @@ mediumGrayColorMap = colors.LinearSegmentedColormap('mediumGrayColorMap', medium
 
 # build a scatter plot of the x,y points
 def _create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsilon=None) :
+    
     # make the figure
     figure = plt.figure()
     axes = figure.add_subplot(111)
@@ -64,8 +65,14 @@ def _create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsi
         dataX = dataX[~badMask]
         dataY = dataY[~badMask]
     
-    # the scatter plot of the good data
+    # the scatter plot of the good data 
     axes.plot(dataX, dataY, 'b,', label='within\nepsilon')
+    # TODO, if we eventually want to plot the data with some sort of color, I think we will have to use scatter()
+    '''
+    if len(dataX) > 0 and len(dataY) > 0 :
+        diffData = np.abs(dataX - dataY)
+        axes.scatter(dataX, dataY, c=diffData, vmin=diffData.min(), vmax=diffData.max(), label='within\nepsilon')
+    '''
     
     # plot the bad data
     numTroublePts = 0
@@ -163,21 +170,31 @@ def _create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
     
     return figure
 
+# make a "clean" copy of the longitude or latitude array passed in by replacing all
+# values which would fall in the provided "invalid" mask with the default bad-lon-lat
+# value, which will keep them from being plotted
+def _clean_lon_or_lat_with_mask(lon_or_lat_data, invalid_data_mask):
+    clean_data = empty_like(lon_or_lat_data)
+    clean_data[~invalid_data_mask] = lon_or_lat_data[~invalid_data_mask]
+    clean_data[ invalid_data_mask] = badLonLat
+    
+    return clean_data
+
 # create a figure including our data mapped onto a map at the lon/lat given
 # the colorMap parameter can be used to control the colors the figure is drawn in
 # if any masks are passed in in the tagData list they will be plotted as an overlays
 # set on the existing image
-def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
+def _create_mapped_figure(data, latitude, longitude, title,
                           invalidMask=None, colorMap=None, tagData=None,
                           dataRanges=None, dataRangeNames=None) :
     
-    # this is very inefficient, TODO find a better way?
-    latitudeCleaned = empty_like(latitude)
-    latitudeCleaned[~invalidMask] = latitude[~invalidMask]
-    latitudeCleaned[invalidMask] = badLonLat
-    longitudeCleaned = empty_like(longitude)
-    longitudeCleaned[~invalidMask] = longitude[~invalidMask]
-    longitudeCleaned[invalidMask] = badLonLat
+    # make a clean version of our lon/lat
+    latitudeClean  = _clean_lon_or_lat_with_mask(latitude,  invalidMask)
+    longitudeClean = _clean_lon_or_lat_with_mask(longitude, invalidMask)
+    
+    # get the bounding axes 
+    boundingAxes = _get_visible_axes (longitudeClean, latitudeClean, invalidMask)
+    LOG.debug("Visible axes for figure \"" + title + "\" are: " + str(boundingAxes))
     
     # build the plot
     figure = plt.figure()
@@ -193,8 +210,8 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
             # todo, the use off the offset here is covering a problem with
             # contourf hiding data exactly at the end of the range and should
             # be removed if a better solution can be found
-            minVal = _min_with_mask(data, invalidMask) - offsetToRange
-            maxVal = _max_with_mask(data, invalidMask) + offsetToRange
+            minVal = delta.min_with_mask(data, invalidMask) - offsetToRange
+            maxVal = delta.max_with_mask(data, invalidMask) + offsetToRange
             dataRanges = np.linspace(minVal, maxVal, 50)
         else: # make sure the user range will not discard data TODO, find a better way to handle this
             dataRanges[0] = dataRanges[0] - offsetToRange
@@ -214,11 +231,23 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
     elif (longitudeRange > 100) or (latitudeRange > 70) :
         kwargs['projection'] = 'ortho' # use an orthographic projection to show half the globe
     else :
-        # TODO figure out why the default is cutting off the field of view, until then, use miller
+        # TODO at the moment the default (lcc) is cutting off the field of view,
+        # I think the same problem will occur with all of the conic projections, because
+        # they all allow you to specify the field of view either as corners or as a width/height in
+        # meters, but they do not take the distortion that a conic projection causes into account.
+        # This means that either the corners or the bottom curve of the data area will be clipped off
+        # the edge of the screen. There is also some sort of persistent bug that causes the basemap
+        # to ignore the requested corners for some data sets and shift west and north, cutting off
+        # a pretty considerable amount of data. I've tried various tactics to control the field of
+        # view and can't find any way to get the basemap to show an acceptable area programatically
+        # that will match arbitrary data sets.
+        # For the moment, I am setting this to use a cylindrical projection rather than a conic.
+        # At some point in the future this should be revisited so that glance will be able to handle
+        # a wider range of projections.
         kwargs['projection'] = 'mill'
     
     # draw our data placed on a map
-    bMap, x, y = maps.mapshow(longitudeCleaned, latitudeCleaned, data, boundingAxes, **kwargs)
+    bMap, x, y = maps.mapshow(longitudeClean, latitudeClean, data, boundingAxes, **kwargs)
     
     # and some informational stuff
     axes.set_title(title)
@@ -228,18 +257,19 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
         # if there are specific requested labels, add them
         if not (dataRangeNames is None) :
             yPosition = None
-            '''
-            # TODO, this strategy doesn't work, find some other way to label the centers of
-            # the sections, or build a legend/key instead?
+            # if we have fewer labels than tick marks, assume they wanted ranges labeled
             if (len(dataRangeNames) < len(dataRanges)) :
+                # TODO, try to display the range colors in an axis instead of a color bar?
+                '''
                 yPosition=[]
                 tickPositions = cbar.ax.get_yticks()
                 for posNum in range(len(tickPositions) - 1) :
                     currentPos = tickPositions[posNum]
                     nextPos = tickPositions[posNum + 1]
                     yPosition.append(0) #(currentPos + ((nextPos - currentPos) / 2.0))
-            '''
-            cbar.ax.set_yticklabels(dataRangeNames, y=yPosition)
+                '''
+            else : # we have enough data names to label the tick marks
+                cbar.ax.set_yticklabels(dataRangeNames, y=yPosition)
     
     # if there are "tag" masks, plot them over the existing map
     if not (tagData is None) :
@@ -248,15 +278,16 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
         newX = x[tagData]
         newY = y[tagData]
         
+        
         # look at how many trouble points we have
-        numTroublePoints = newX.shape[0]
+        numTroublePoints = newX.size
         hasTrouble = False
         neededHighlighting = False
         
         if numTroublePoints > 0 :
             hasTrouble = True
             # figure out how many bad points there are
-            totalNumPoints = x[~invalidMask].shape[0]
+            totalNumPoints = x.size # the number of points
             percentBad = (float(numTroublePoints) / float(totalNumPoints)) * 100.0
             LOG.debug('\t\tnumber of trouble points: ' + str(numTroublePoints))
             LOG.debug('\t\tpercent of trouble points: ' + str(percentBad))
@@ -277,24 +308,16 @@ def _create_mapped_figure(data, latitude, longitude, boundingAxes, title,
         # display the number of trouble points on the report if we were passed a set of tag data
         # I'm not thrilled with this solution for getting it below the labels drawn by the basemap
         # but I don't think there's a better one at the moment given matplotlib's workings
-        troublePtString = '\n\n\nShowing ' + str(numTroublePoints) + ' Trouble Points'
+        troublePtString = '\n\nShowing ' + str(numTroublePoints) + ' Trouble Points'
         # if our plot is more complex, add clarification
         if hasTrouble :
             troublePtString = troublePtString + ' in Green'
             if neededHighlighting :
                 troublePtString = troublePtString + '\nwith Purple Circles for Visual Clarity'
         plt.xlabel(troublePtString)
-
+    
     return figure
 
-# get the min, ignoring the stuff in mask
-def _min_with_mask(data, mask) :
-    return data[~mask].ravel()[data[~mask].argmin()]
-    
-# get the max, ignoring the stuff in mask
-def _max_with_mask(data, mask) :
-    return data[~mask].ravel()[data[~mask].argmax()]
-    
 # figure out the bounding axes for the display given a set of
 # longitude and latitude and possible a mask of invalid values
 # that we should ignore in them
@@ -302,10 +325,10 @@ def _get_visible_axes(longitudeData, latitudeData, toIgnoreMask) :
     
     # calculate the bounding range for the display
     # this is in the form [longitude min, longitude max, latitude min, latitude max]
-    visibleAxes = [_min_with_mask(longitudeData, toIgnoreMask),
-                   _max_with_mask(longitudeData, toIgnoreMask),
-                   _min_with_mask(latitudeData, toIgnoreMask),
-                   _max_with_mask(latitudeData, toIgnoreMask)]
+    visibleAxes = [delta.min_with_mask(longitudeData, toIgnoreMask),
+                   delta.max_with_mask(longitudeData, toIgnoreMask),
+                   delta.min_with_mask(latitudeData,  toIgnoreMask),
+                   delta.max_with_mask(latitudeData,  toIgnoreMask)]
     
     return visibleAxes
 
@@ -359,12 +382,10 @@ def plot_and_save_spacial_trouble(longitude, latitude,
     on top of a background plot of a's data shown in grayscale, save this plot to the output path given
     if makeSmall is passed as true a smaller version of the image will also be saved
     """
-    # get bounding axes
-    visibleAxes = _get_visible_axes(longitude, latitude, spaciallyInvalidMask)
     
     # make the figure
     LOG.info("Creating spatial trouble image")
-    spatialTroubleFig = _create_mapped_figure(None, latitude, longitude, visibleAxes, title,
+    spatialTroubleFig = _create_mapped_figure(None, latitude, longitude, title,
                                               spaciallyInvalidMask, None, spacialTroubleMask)
     # save the figure
     LOG.info("Saving spatial trouble image")
@@ -385,7 +406,6 @@ def plot_and_save_figure_comparison(aData, bData,
                                     latitudeCommonData, longitudeCommonData,
                                     spaciallyInvalidMaskA,
                                     spaciallyInvalidMaskB,
-                                    spaciallyInvalidMaskBoth,
                                     outputPath, 
                                     makeSmall=False,
                                     shortCircuitComparisons=False) : 
@@ -413,28 +433,25 @@ def plot_and_save_figure_comparison(aData, bData,
     if 'display_name' in variableRunInfo :
         variableDisplayName = variableRunInfo['display_name']
     
+    # figure out what missing values we should be using
+    missing_value = variableRunInfo['missing_value']
+    missing_value_b = missing_value
+    if ('missing_value_alt_in_b' in variableRunInfo) :
+        missing_value_b = variableRunInfo['missing_value_alt_in_b']
+    
     # compare the two data sets to get our difference data and trouble info
+    rawDiffData, goodMask, (goodInAMask, goodInBMask), troubleMask, outsideEpsilonMask, \
+    (aNotFiniteMask, bNotFiniteMask), (aMissingMask, bMissingMask), \
+    (spaciallyInvalidMaskA, spaciallyInvalidMaskB) = delta.diff(aData, bData, variableRunInfo['epsilon'],
+                                                                (missing_value, missing_value_b),
+                                                                (spaciallyInvalidMaskA, spaciallyInvalidMaskB))
+    '''
     rawDiffData, goodMask, troubleMask, (aNotFiniteMask, bNotFiniteMask), \
     (aMissingMask, bMissingMask), outsideEpsilonMask = delta.diff(aData, bData, variableRunInfo['epsilon'],
-                                                                  (variableRunInfo['missing_value'],
-                                                                   variableRunInfo['missing_value']),
+                                                                  (missing_value, missing_value_b),
                                                                   spaciallyInvalidMaskBoth)
-    diffData = np.abs(rawDiffData) # we want to show the distance between our two, rather than which one's bigger
-    
-    # mark where our invalid data is for each of the files (a and b) 
-    invalidDataMaskA = aMissingMask | aNotFiniteMask
-    invalidDataMaskB = bMissingMask | bNotFiniteMask
-    # this mask potentially represents data we don't want to try to plot in our diff because it may be malformed
-    everyThingWrongButEpsilon = spaciallyInvalidMaskBoth | invalidDataMaskA | invalidDataMaskB
-    
-    # calculate the bounding range for the display
-    # this is in the form [longitude min, longitude max, latitude min, latitude max]
-    visibleAxesA    = _get_visible_axes (longitudeAData,      latitudeAData,      spaciallyInvalidMaskA)
-    visibleAxesB    = _get_visible_axes (longitudeBData,      latitudeBData,      spaciallyInvalidMaskB)
-    visibleAxesBoth = _get_visible_axes (longitudeCommonData, latitudeCommonData, spaciallyInvalidMaskBoth)
-    LOG.debug ("visible axes in A: "    + str(visibleAxesA))
-    LOG.debug ("visible axes in B: "    + str(visibleAxesB))
-    LOG.debug ("visible axes in Both: " + str(visibleAxesBoth))
+                                                                  '''
+    absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, rather than just which one's bigger/smaller
     
     # some more display info, pull it out for convenience
     dataRanges = None
@@ -458,9 +475,9 @@ def plot_and_save_figure_comparison(aData, bData,
         childPids.append(pid)
         LOG.debug ("Started child process (pid: " + str(pid) + ") to create file a image for " + variableDisplayName)
     else :
-        figureA = _create_mapped_figure(aData, latitudeAData, longitudeAData, visibleAxesA,
+        figureA = _create_mapped_figure(aData, latitudeAData, longitudeAData,
                                         (variableDisplayName + "\nin File A"),
-                                        invalidMask=(spaciallyInvalidMaskA | invalidDataMaskA),
+                                        invalidMask=(~goodInAMask),
                                         dataRanges=dataRanges,
                                         dataRangeNames=dataRangeNames)
         LOG.info("\t\tsaving image of " + variableDisplayName + " for file a")
@@ -476,9 +493,9 @@ def plot_and_save_figure_comparison(aData, bData,
         childPids.append(pid)
         LOG.debug ("Started child process (pid: " + str(pid) + ") to create file b image for " + variableDisplayName)
     else :
-        figureB = _create_mapped_figure(bData, latitudeBData, longitudeBData, visibleAxesB,
+        figureB = _create_mapped_figure(bData, latitudeBData, longitudeBData,
                                         (variableDisplayName + "\nin File B"),
-                                        invalidMask=(spaciallyInvalidMaskB | invalidDataMaskB),
+                                        invalidMask=(~ goodInBMask),
                                         dataRanges=dataRanges,
                                         dataRangeNames=dataRangeNames)
         LOG.info("\t\tsaving image of " + variableDisplayName + " in file b")
@@ -497,9 +514,9 @@ def plot_and_save_figure_comparison(aData, bData,
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create absolute value of difference image for " + variableDisplayName)
         else :
-            figureAbsDiff = _create_mapped_figure(diffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
+            figureAbsDiff = _create_mapped_figure(absDiffData, latitudeCommonData, longitudeCommonData, 
                                                   ("Absolute value of difference in\n" + variableDisplayName),
-                                                  invalidMask=(everyThingWrongButEpsilon))
+                                                  invalidMask=(~ goodMask))
             LOG.info("\t\tsaving image of the absolute value of difference for " + variableDisplayName)
             figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.png", dpi=200)
             if (makeSmall) :
@@ -513,9 +530,9 @@ def plot_and_save_figure_comparison(aData, bData,
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference image for " + variableDisplayName)
         else :
-            figureDiff = _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData, visibleAxesBoth, 
+            figureDiff = _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData, 
                                                   ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
-                                                  invalidMask=(everyThingWrongButEpsilon))
+                                                  invalidMask=(~ goodMask))
             LOG.info("\t\tsaving image of the difference in " + variableDisplayName)
             figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=200)
             if (makeSmall) :
@@ -530,9 +547,15 @@ def plot_and_save_figure_comparison(aData, bData,
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create trouble image for " + variableDisplayName)
         else :
-            figureBadDataInDiff = _create_mapped_figure(bData, latitudeCommonData, longitudeCommonData, visibleAxesBoth,
+            # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
+            # that our plot won't be totally destroyed by missing or non-finite data from B
+            bDataCopy = bData[:]
+            tempMask = goodInAMask & (~goodInBMask) 
+            bDataCopy[tempMask] = aData[tempMask]
+            # create the figure marked with the trouble points on top of B's data in grayscale
+            figureBadDataInDiff = _create_mapped_figure(bDataCopy, latitudeCommonData, longitudeCommonData,
                                                         ("Areas of trouble data in\n" + variableDisplayName),
-                                                        spaciallyInvalidMaskBoth | invalidDataMaskB,
+                                                        (~(goodInAMask | goodInBMask)),
                                                         mediumGrayColorMap, troubleMask,
                                                         dataRanges=dataRanges,
                                                         dataRangeNames=dataRangeNames)
@@ -551,7 +574,7 @@ def plot_and_save_figure_comparison(aData, bData,
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference histogram image for " + variableDisplayName)
         else :
             numBinsToUse = 50
-            valuesForHist = rawDiffData[~everyThingWrongButEpsilon]
+            valuesForHist = rawDiffData[goodMask]
             diffHistogramFigure = _create_histogram(valuesForHist, numBinsToUse,
                                                     ("Difference in\n" + variableDisplayName),
                                                     ('Value of (Data File B - Data File A) at a Data Point'),
@@ -563,7 +586,7 @@ def plot_and_save_figure_comparison(aData, bData,
                 diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=50)
             sys.exit(0) # the child is done now
         
-        ''' TODO, is this actually useful in many cases?
+        ''' TODO, is this actually useful?
         # a histogram of the values of fileA - file B, excluding epsilon mismatched values (to show errors more clearly)
         LOG.info("\t\tcreating histogram of the amount of difference for imperfect matches")
         numBinsToUse = 50
@@ -589,9 +612,9 @@ def plot_and_save_figure_comparison(aData, bData,
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create scatter plot image for " + variableDisplayName)
         else :
-            diffScatterPlot = _create_scatter_plot(aData[~everyThingWrongButEpsilon].ravel(), bData[~everyThingWrongButEpsilon].ravel(),
+            diffScatterPlot = _create_scatter_plot(aData[goodMask], bData[goodMask],
                                                    "Value in File A vs Value in File B", "File A Value", "File B Value",
-                                                   outsideEpsilonMask[~everyThingWrongButEpsilon].ravel(), variableRunInfo['epsilon'])
+                                                   outsideEpsilonMask[goodMask], variableRunInfo['epsilon'])
             LOG.info("\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName)
             diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=200)
             if (makeSmall):

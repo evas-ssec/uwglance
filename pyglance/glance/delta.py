@@ -21,7 +21,9 @@ def _missing(x,missing_value=None):
         return isnan(x) | (x==missing_value)
     return isnan(x)
 
-def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None), ignoreMask=None):
+def diff(aData, bData, epsilon=0.,
+         (a_missing_value, b_missing_value)=(None, None),
+         (ignore_mask_a, ignore_mask_b)=(None, None)):
     """
     take two arrays of similar size and composition
     if an ignoreMask is passed in values in the mask will not be analysed to
@@ -33,36 +35,44 @@ def diff(a, b, epsilon=0., (amissing,bmissing)=(None,None), ignoreMask=None):
     (a-notfinite-mask, b-notfinite-mask)
     (a-missing-mask, b-missing-mask)
     """
-    shape = a.shape
-    assert(b.shape==shape)
-    assert(a.dtype==b.dtype)
+    shape = aData.shape
+    assert(bData.shape==shape)
+    assert(aData.dtype==bData.dtype)
     
-    # if the ignore mask does not exist, set it to include none of the data
-    if (ignoreMask is None) :
-        ignoreMask = zeros(shape,dtype=bool)
+    # if the ignore masks do not exist, set them to include none of the data
+    if (ignore_mask_a is None) :
+        ignore_mask_a = zeros(shape,dtype=bool)
+    if (ignore_mask_b is None) :
+        ignore_mask_b = zeros(shape,dtype=bool)
     
     # deal with the basic masks
-    anfin, bnfin = ~isfinite(a) & ~ignoreMask, ~isfinite(b) & ~ignoreMask
-    amis, bmis = zeros(shape,dtype=bool), zeros(shape,dtype=bool)
-    if amissing is not None:
-        amis[a==amissing] = True
-        amis[ignoreMask] = False # don't analyse the ignored values
-    if bmissing is not None:
-        bmis[b==bmissing] = True
-        bmis[ignoreMask] = False # don't analyse the ignored values
+    a_not_finite_mask, b_not_finite_mask = ~isfinite(aData) & ~ignore_mask_a, ~isfinite(bData) & ~ignore_mask_b
+    a_missing_mask, b_missing_mask = zeros(shape,dtype=bool), zeros(shape,dtype=bool)
+    # if we were given missing values, mark where they are in the data
+    if a_missing_value is not None:
+        a_missing_mask[aData == a_missing_value] = True
+        a_missing_mask[ignore_mask_a] = False # don't analyse the ignored values
+    if b_missing_value is not None:
+        b_missing_mask[bData == b_missing_value] = True
+        b_missing_mask[ignore_mask_b] = False # don't analyse the ignored values
     
     # build the comparison data that includes the "good" values
-    d = empty_like(a)
-    mask = ~(anfin | bnfin | amis | bmis | ignoreMask) # mask to get just the "valid" data
-    d[~mask] = nan # throw away invalid data
-    d[mask] = b[mask] - a[mask]
+    valid_in_a_mask = ~(a_not_finite_mask | a_missing_mask | ignore_mask_a)
+    valid_in_b_mask = ~(b_not_finite_mask | b_missing_mask | ignore_mask_b)
+    valid_in_both = valid_in_a_mask & valid_in_b_mask
     
-    # the valid data that's outside epsilon
-    outeps = (abs(d) > epsilon) & mask
-    # trouble areas - mismatched nans, mismatched missing-values, differences > epsilon
-    trouble = (anfin ^ bnfin) | (amis ^ bmis) | outeps
+    # construct our diff'ed array
+    raw_diff = empty_like(aData)
+    raw_diff[~valid_in_both] = nan # throw away invalid data
+    raw_diff[valid_in_both] = bData[valid_in_both] - aData[valid_in_both]
     
-    return d, mask, trouble, (anfin, bnfin), (amis, bmis), outeps
+    # the valid data which is too different between the two sets according to the given epsilon
+    outside_epsilon_mask = (abs(raw_diff) > epsilon) & valid_in_both
+    # trouble points - mismatched nans, mismatched missing-values, differences that are too large 
+    trouble_pt_mask = (a_not_finite_mask ^ b_not_finite_mask) | (a_missing_mask ^ b_missing_mask) | outside_epsilon_mask
+    
+    return raw_diff, valid_in_both, (valid_in_a_mask, valid_in_b_mask), trouble_pt_mask, outside_epsilon_mask,  \
+           (a_not_finite_mask, b_not_finite_mask), (a_missing_mask, b_missing_mask), (ignore_mask_a, ignore_mask_b) 
 
 def corr(x,y,mask):
     "compute correlation coefficient"
@@ -84,7 +94,8 @@ def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(Non
     x=truth
     y=actual
     z=noiz
-    d,good,bad,_,_,_ = diff(x,y,epsilon,(amissing,bmissing))
+    d, good, _, bad, _, _, _, _ = diff(x,y,epsilon,(amissing,bmissing))
+    #d,good,bad,_,_,_ = diff(x,y,epsilon,(amissing,bmissing))
     # compute RMS error
     rmse = sqrt(sum(d[good]**2)) / d.size
     gf = good.flatten()
@@ -100,7 +111,8 @@ def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(Non
     xpn[good] += z[good]
     xpnf = xpn.flatten()[gf]
     # compute RMS error versus noise
-    dpn,good,bad,_,_,_ = diff(xpn,y,epsilon,(amissing,bmissing))
+    dpn, good, _, bad, _, _, _, _ = diff(xpn,y,epsilon,(amissing,bmissing))
+    #dpn,good,bad,_,_,_ = diff(xpn,y,epsilon,(amissing,bmissing))
     rmsepn = sqrt(sum(dpn[good]**2)) / d.size
     assert(sum(~isfinite(xpnf))==0)
     rpn = compute_r(xpnf,yf)[0]
@@ -129,20 +141,18 @@ def _get_num_perfect(a, b, ignoreMask=None):
         numPerfect = sum(a == b)
     return numPerfect
 
-def _get_nan_stats(a, b) :
+def _get_nan_stats(a_nan_mask, b_nan_mask) :
     """
     Get a list of statistics about non-numerical values in data sets a and b,
     the return value will be a dictionary of statistics
     """
     # find the nan values in the data
-    a_nans = ~isfinite(a)
-    num_a_nans = sum(a_nans)
-    b_nans = ~isfinite(b)
-    num_b_nans = sum(b_nans)
-    num_common_nans = sum(a_nans & b_nans)
+    num_a_nans = sum(a_nan_mask)
+    num_b_nans = sum(b_nan_mask)
+    num_common_nans = sum(a_nan_mask & b_nan_mask)
     
     # make the assumption that a and b are the same size and only use the size of a
-    total_num_values = a.size
+    total_num_values = a_nan_mask.size
     
     nan_stats = {'a_nan_count': num_a_nans,
                  'a_nan_fraction': (float(num_a_nans) / float(total_num_values)),
@@ -207,7 +217,12 @@ def _get_finite_data_stats(a_is_finite_mask, b_is_finite_mask, common_ignore_mas
     
     return finite_value_stats
 
-def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_mask, ignore_in_a_mask, ignore_in_b_mask) :
+def _get_general_data_stats(a, b,
+                            a_missing_value, b_missing_value,
+                            epsilon, trouble_mask,
+                            spatial_ignore_in_a_mask, spatial_ignore_in_b_mask,
+                            bad_in_a, bad_in_b
+                            ) :
     """
     Get a list of general statistics about a and b, given a and b and some other information
     about them.
@@ -215,8 +230,8 @@ def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_m
     """
     # figure out how much trouble we had
     num_trouble = sum(trouble_mask)
-    num_ignored_in_a = sum(ignore_in_a_mask)
-    num_ignored_in_b = sum(ignore_in_b_mask)
+    num_ignored_in_a = sum(spatial_ignore_in_a_mask)
+    num_ignored_in_b = sum(spatial_ignore_in_b_mask)
     
     # make the assumption that a and b are the same size/shape as their trouble mask
     total_num_values = trouble_mask.size
@@ -224,12 +239,16 @@ def _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble_m
     general_stats = {'a_missing_value': a_missing_value,
                      'b_missing_value': b_missing_value,
                      'epsilon': epsilon,
+                     'max_a': max_with_mask(a, bad_in_a),
+                     'max_b': max_with_mask(b, bad_in_b),
+                     'min_a': min_with_mask(a, bad_in_a),
+                     'min_b': min_with_mask(b, bad_in_b),
                      'num_data_points': total_num_values,
                      'shape': trouble_mask.shape,
                      'spatially_invalid_pts_ignored_in_a': num_ignored_in_a,
                      'spatially_invalid_pts_ignored_in_b': num_ignored_in_b,
                      'trouble_points_count': num_trouble,
-                     'trouble_points_fraction': num_trouble/ float(total_num_values)
+                     'trouble_points_fraction': float(num_trouble) / float(total_num_values)
                      }
     
     return general_stats
@@ -259,38 +278,38 @@ def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsi
     
     return comparison
 
+# get the min, ignoring the stuff in mask
+def min_with_mask(data, mask) :
+    return data[~mask][data[~mask].argmin()]
+    
+# get the max, ignoring the stuff in mask
+def max_with_mask(data, mask) :
+    return data[~mask][data[~mask].argmax()]
+
 def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), ignoreInAMask=None, ignoreInBMask=None):
     """return dictionary of statistics dictionaries
     stats not including 'nan' in name exclude nans in either arrays
     """
-    #print('a type: ' + str(a.dtype))
-    #print('b type: ' + str(b.dtype))
     
-    # select/build our ignore masks
-    # if the user didn't send us any, don't ignore anything
-    if (ignoreInAMask is None) :
-        ignoreInAMask = zeros(a.shape, dtype=bool)
-    if (ignoreInBMask is None) :
-        ignoreInBMask = zeros(b.shape, dtype=bool)
-    ignoreMask = ignoreInAMask | ignoreInBMask
+    diffData, finite_mask, (finite_a_mask, finite_b_mask), \
+    trouble, outside_epsilon, (anfin, bnfin), \
+    (amis, bmis), (ignoreInAMask, ignoreInBMask) = nfo = diff(a, b, epsilon,
+                                                              (a_missing_value, b_missing_value),
+                                                              (ignoreInAMask, ignoreInBMask))
+    '''
+    d, valid_mask, trouble, (anfin, bnfin), (amis, bmis), outside_epsilon = nfo = diff(a,b,
+                                                                                       epsilon,
+                                                                                       (a_missing_value, b_missing_value),
+                                                                                       (ignoreInAMask, ignoreInBMask))
+                                                                                       '''
     
-    d, mask, trouble, (anfin, bnfin), (amis, bmis), outside_epsilon = nfo = diff(a,b,epsilon,(a_missing_value, b_missing_value),ignoreMask)
-    
-    # build some other finite data masks that we'll need
-    finite_a_mask = ~(anfin | amis)
-    finite_b_mask = ~(bnfin | bmis)
-    finite_mask   = finite_a_mask & finite_b_mask
-    # also factor in the ignore masks
-    finite_a_mask = finite_a_mask & (~ ignoreInAMask)
-    finite_b_mask = finite_b_mask & (~ ignoreInBMask)
-    finite_mask   = finite_mask   & (~ ignoreMask)
-    
-    general_stats = _get_general_data_stats(a_missing_value, b_missing_value, epsilon, trouble, ignoreInAMask, ignoreInBMask) 
-    additional_statistics = stats(*nfo) # grab some additional comparison statistics
-    comparison_stats = _get_numerical_data_stats(a, b, d, finite_mask, outside_epsilon, additional_statistics) 
-    nan_stats = _get_nan_stats(a, b)
+    general_stats = _get_general_data_stats(a, b, a_missing_value, b_missing_value, epsilon, trouble,
+                                            ignoreInAMask, ignoreInBMask, ~finite_a_mask, ~finite_b_mask) 
+    additional_statistics = stats(*nfo) # grab some additional comparison statistics 
+    comparison_stats = _get_numerical_data_stats(a, b, diffData, finite_mask, outside_epsilon, additional_statistics) 
+    nan_stats = _get_nan_stats(anfin, bnfin)
     missing_stats = _get_missing_value_stats(amis, bmis)
-    finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask, ignoreMask) 
+    finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask, (ignoreInAMask | ignoreInBMask)) 
     
     out = {}
     out['NaN Statistics'] = nan_stats
@@ -308,6 +327,10 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'a_missing_value': 'the value that is considered \"missing\" data when it is found in A',
                     'b_missing_value': 'the value that is considered \"missing\" data when it is found in B',
                     'epsilon': 'amount of difference between matching data points in A and B that is considered acceptable',
+                    'max_a': 'the maximum finite, non-missing value found in A',
+                    'max_b': 'the maximum finite, non-missing value found in B',
+                    'min_a': 'the minimum finite, non-missing value found in A',
+                    'min_b': 'the minimum finite, non-missing value found in B',
                     'num_data_points': "number of data values in A",
                     'shape': "shape of A",
                     'spatially_invalid_pts_ignored_in_a': 'number of points with invalid latitude/longitude information in A that were' +
