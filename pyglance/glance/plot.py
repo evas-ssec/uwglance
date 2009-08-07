@@ -35,6 +35,11 @@ offsetToRange = 0.0000000000000000001
 # the value that will denote "bad" longitudes and latitudes
 badLonLat = 1.0E30
 
+# a constant for the larger size dpi
+fullSizeDPI = 150 # 200
+# a constant for the thumbnail size dpi
+thumbSizeDPI = 50
+
 # make a custom medium grayscale color map for putting our bad data on top of
 mediumGrayColorMapData = {
     'red'   : ((0.0, 1.00, 1.00),
@@ -389,12 +394,12 @@ def plot_and_save_spacial_trouble(longitude, latitude,
                                               spaciallyInvalidMask, None, spacialTroubleMask)
     # save the figure
     LOG.info("Saving spatial trouble image")
-    spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=200) 
+    spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=fullSizeDPI) 
     
     # we may also save a smaller versions of the figure
     if (makeSmall) :
         
-        spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=50)
+        spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=thumbSizeDPI)
     
     return
     
@@ -481,9 +486,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                         dataRanges=dataRanges,
                                         dataRangeNames=dataRangeNames)
         LOG.info("\t\tsaving image of " + variableDisplayName + " for file a")
-        figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=200)
+        figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=fullSizeDPI)
         if (makeSmall) :
-            figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=50)
+            figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=thumbSizeDPI)
         sys.exit(0) # the child is done now
     
     LOG.info("\t\tcreating image of " + variableDisplayName + " in file b")
@@ -499,9 +504,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                         dataRanges=dataRanges,
                                         dataRangeNames=dataRangeNames)
         LOG.info("\t\tsaving image of " + variableDisplayName + " in file b")
-        figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=200)
+        figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=fullSizeDPI)
         if (makeSmall) :
-            figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=50)
+            figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=thumbSizeDPI)
         sys.exit(0) # the child is done now
     
     # make the data comparison figures
@@ -518,9 +523,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                                   ("Absolute value of difference in\n" + variableDisplayName),
                                                   invalidMask=(~ goodMask))
             LOG.info("\t\tsaving image of the absolute value of difference for " + variableDisplayName)
-            figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.png", dpi=200)
+            figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.png", dpi=fullSizeDPI)
             if (makeSmall) :
-                figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.small.png", dpi=50)
+                figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.small.png", dpi=thumbSizeDPI)
             sys.exit(0) # the child is done now
         
         LOG.info("\t\tcreating image of the difference in " + variableDisplayName)
@@ -534,9 +539,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                                   ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
                                                   invalidMask=(~ goodMask))
             LOG.info("\t\tsaving image of the difference in " + variableDisplayName)
-            figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=200)
+            figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=fullSizeDPI)
             if (makeSmall) :
-                figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=50)
+                figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=thumbSizeDPI)
             sys.exit(0) # the child is done now
         
         # this figure is more complex because we want to mark the trouble points on it
@@ -560,9 +565,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                                         dataRanges=dataRanges,
                                                         dataRangeNames=dataRangeNames)
             LOG.info("\t\tsaving image marking trouble data in " + variableDisplayName)
-            figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=200)
+            figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=fullSizeDPI)
             if (makeSmall) :
-                figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=50)
+                figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=thumbSizeDPI)
             sys.exit(0) # the child is done now
         
         # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
@@ -581,9 +586,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                                     ('Number of Data Points with a Given Difference'),
                                                     True)
             LOG.info("\t\tsaving histogram of the amount of difference in " + variableDisplayName)
-            diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=200)
+            diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=fullSizeDPI)
             if (makeSmall) :
-                diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=50)
+                diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=thumbSizeDPI)
             sys.exit(0) # the child is done now
         
         ''' TODO, is this actually useful?
@@ -599,9 +604,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                                          ('Number of Data Points with a Given Difference'),
                                                          True)
             LOG.info("\t\tsaving histogram of the amount of difference for imperfect matches")
-            imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.png", dpi=200)
+            imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.png", dpi=fullSizeDPI)
             if (makeSmall):
-                imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.small.png", dpi=50)
+                imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.small.png", dpi=thumbSizeDPI)
         '''
         
         # scatter plot of file a and b comparison
@@ -616,9 +621,9 @@ def plot_and_save_figure_comparison(aData, bData,
                                                    "Value in File A vs Value in File B", "File A Value", "File B Value",
                                                    outsideEpsilonMask[goodMask], variableRunInfo['epsilon'])
             LOG.info("\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName)
-            diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=200)
+            diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=fullSizeDPI)
             if (makeSmall):
-                diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=50)
+                diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=thumbSizeDPI)
             sys.exit(0) # the child is done now
     
     # now we need to wait for all of our child processes to terminate before returning
