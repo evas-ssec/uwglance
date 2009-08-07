@@ -54,7 +54,30 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         % endif
         
          % if ('lon_lat_epsilon' in runInfo) and (runInfo['lon_lat_epsilon'] > 0.0) :
-            longitude/latitude comparison epsilon: ${runInfo['lon_lat_epsilon']}
+            longitude/latitude comparison epsilon: ${runInfo['lon_lat_epsilon']}<br>
+        % endif
+        
+        <br>
+        ## display information about any data filtering on the lons/lats
+        % if ('data_filter_function_lat_in_a' in runInfo) :
+            Note: The latitude in file A was filtered.
+            Please see <a href="${runInfo['config_file_name']}">this copy of
+            the original configuration file</a> to view the data filtering function.<br>
+        % endif
+        % if ('data_filter_function_lat_in_b' in runInfo) :
+            Note: The latitude in file B was filtered.
+            Please see <a href="${runInfo['config_file_name']}">this copy of
+            the original configuration file</a> to view the data filtering function.<br>
+        % endif
+        % if ('data_filter_function_lon_in_a' in runInfo) :
+            Note: The longitude in file A was filtered.
+            Please see <a href="${runInfo['config_file_name']}">this copy of
+            the original configuration file</a> to view the data filtering function.<br>
+        % endif
+        % if ('data_filter_function_lon_in_b' in runInfo) :
+            Note: The longitude in file B was filtered.
+            Please see <a href="${runInfo['config_file_name']}">this copy of
+            the original configuration file</a> to view the data filtering function.<br>
         % endif
     </p>
     

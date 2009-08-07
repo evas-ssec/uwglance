@@ -244,6 +244,10 @@ def _load_config_or_options(optionsSet, originalArgs) :
         splitFileName = fileName.split('.')
         fileBaseName = fileName[:-3] # remove the '.py' from the end
         
+        # hang onto info about the config file for later
+        runInfo['config_file_name'] = fileName
+        runInfo['config_file_path'] = requestedConfigFile
+        
         # load the file
         print('loading config file: ' + str(requestedConfigFile))
         glanceRunConfig = imp.load_module(fileBaseName, file(requestedConfigFile, 'U'),

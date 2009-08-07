@@ -141,11 +141,15 @@ def generate_and_save_summary_report(files,
               
     _make_and_save_page((outputPath + "/" + reportFileName), 'mainreport.txt', **kwargs)
     
-    # copy the pass/fail images, TODO move this to a list input in the parameters
+    # copy the pass/fail images, TODO should I move this to a list input in the parameters?
     passFile = resource_filename(__name__, 'pass.gif') # TODO, how can this be done without unzipping the egg?
     failFile = resource_filename(__name__, 'fail.gif') # TODO, how can this be done without unzipping the egg?
     shutil.copy(passFile, outputPath)
     shutil.copy(failFile, outputPath)
+    
+    # copy the original configuration file, TODO should I move this to a list input in the parameters?
+    originalConfigFile = runInfo['config_file_path']
+    shutil.copy(originalConfigFile, outputPath)
     
     return
 
