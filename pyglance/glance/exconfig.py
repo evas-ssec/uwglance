@@ -74,10 +74,8 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
                  'nonfinite_data_tolerance': None       # the allowed fraction of non-finite data
                                                         # None indicates that variables should not be tested
                                                         # on amount of non-finite data
-"""
-                 'data_filter_function_a': (insert lambda function here),
-                 'data_filter_function_b': (insert lambda function here)
-"""
+                 #'data_filter_function_a': (insert lambda function here),
+                 #'data_filter_function_b': (insert lambda function here)
                  }
 
 # a list of all the variables to analyze, all of the details are optional,
