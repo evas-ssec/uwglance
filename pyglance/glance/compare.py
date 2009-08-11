@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
                            'latitude':  'pixel_latitude',
+                           'lon_lat_epsilon': 0.0,
                            'data_filter_function_lon_in_a': None,
                            'data_filter_function_lat_in_a': None,
                            'data_filter_function_lon_in_b': None,
@@ -213,8 +214,8 @@ def _load_config_or_options(optionsSet, originalArgs) :
     runInfo = {}
     runInfo['shouldIncludeReport'] = True
     runInfo['shouldIncludeImages'] = False
+    runInfo['doFork'] = False # default
     runInfo.update(glance_lon_lat_defaults) # get the default lon/lat info
-    runInfo['lon_lat_epsilon'] = 0.0
     runInfo['version'] = _get_glance_version_string()
     
     # by default, we don't have any particular variables to analyze
@@ -254,7 +255,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
                                           filePath, ('.py' , 'U', 1))
         
         # get everything from the config file
-        runInfo['shouldIncludeImages'] = glanceRunConfig.shouldIncludeImages
+        runInfo.update(glanceRunConfig.settings)
         runInfo.update(glanceRunConfig.lat_lon_info) # get info on the lat/lon variables
         
         # get any requested names
@@ -278,6 +279,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
         # so get everything from the options directly
         runInfo['shouldIncludeReport'] = not optionsSet.imagesOnly
         runInfo['shouldIncludeImages'] = not optionsSet.htmlOnly
+        runInfo['doFork'] = optionsSet.doFork
         runInfo['latitude'] = optionsSet.latitudeVar or runInfo['latitude']
         runInfo['longitude'] = optionsSet.longitudeVar or runInfo['longitude']
         runInfo['lon_lat_epsilon'] = optionsSet.lonlatepsilon
@@ -580,6 +582,8 @@ python -m glance
                       help="set default epsilon for longitude and latitude comparsion")
     parser.add_option('-n', '--version', dest='version',
                       action="store_true", default=False, help="view the glance version")
+    parser.add_option('-f', '--fork', dest='doFork',
+                      action="store_true", default=False, help="start multiple processes to create images in parallel")
     
                     
     options, args = parser.parse_args()
@@ -935,8 +939,9 @@ python -m glance
             else :
                 LOG.warn(explanationName + ' ' + 
                          'could not be compared. This may be because the data for this variable does not match in shape ' +
-                         'between the two files or the data may not match the shape of the selected longitude and ' +
-                         'latitude variables.')
+                         'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: ' + str(bData.shape) +
+                         ') or the data may not match the shape of the selected longitude ' + str(longitudeCommon.shape) + ' and ' +
+                         'latitude ' + str(latitudeCommon.shape) + ' variables.')
         
         # from this point on, we will be forking to create child processes so we can parallelize our image and
         # report generation
@@ -947,17 +952,6 @@ python -m glance
         # loop to create the images for all our variables
         if (runInfo['shouldIncludeImages']) :
             for name in variableAnalysisInfo :
-                """ TODO for the moment, I think this is resulting in too many processes, so only generate figs for one var at a time
-                # create a child to handle this variable's images
-                pid = os.fork()
-                isParent = not (pid is 0)
-                # only the child needs to make figures, the parent can move on
-                if (isParent) :
-                    childPids.append(pid)
-                    LOG.debug ("Started child process (pid: " + str(pid) + ") to create reports for variable " + name)
-                
-                else :
-                """
                 # create the images comparing that variable
                 print("\tcreating figures for: " + variableAnalysisInfo[name]['exp_name'])
                 plot.plot_and_save_figure_comparison(variableAnalysisInfo[name]['data']['A'],
@@ -970,9 +964,9 @@ python -m glance
                                                      latitudeCommon, longitudeCommon,
                                                      spaciallyInvalidMaskA,
                                                      spaciallyInvalidMaskB,
-                                                     outputPath, True)
+                                                     outputPath, True,
+                                                     doFork=runInfo['doFork']) 
                 print("\tfinished creating figures for: " + variableAnalysisInfo[name]['exp_name'])
-                    #sys.exit(0) # this child has successfully finished it's tasks
         
         # reports are fast, so the parent thread will just do this
         # generate our general report pages once we've looked at all the variables

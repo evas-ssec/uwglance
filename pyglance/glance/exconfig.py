@@ -11,8 +11,16 @@ Created by Eva Schiffer Jun 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
+# various general settings to control how reports are created
+settings = {}
 # whether or not images should be generated and shown in the report
-shouldIncludeImages = True
+settings['shouldIncludeImages'] = True
+# should we create multiple processes to make more than one image at a time?
+# turning on this option can cause glance to use a very large amount of system
+# resources (if your data set is particularly large, your machine may not have
+# enough), but will speed up image generation in cases where your data set is
+# relatively small or your machine is very powerful
+settings['doFork'] = True
 
 # the names of the latitude and longitude variables that will be used
 lat_lon_info = {}
@@ -66,6 +74,10 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
                  'nonfinite_data_tolerance': None       # the allowed fraction of non-finite data
                                                         # None indicates that variables should not be tested
                                                         # on amount of non-finite data
+"""
+                 'data_filter_function_a': (insert lambda function here),
+                 'data_filter_function_b': (insert lambda function here)
+"""
                  }
 
 # a list of all the variables to analyze, all of the details are optional,

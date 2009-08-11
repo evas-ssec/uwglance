@@ -148,8 +148,9 @@ def generate_and_save_summary_report(files,
     shutil.copy(failFile, outputPath)
     
     # copy the original configuration file, TODO should I move this to a list input in the parameters?
-    originalConfigFile = runInfo['config_file_path']
-    shutil.copy(originalConfigFile, outputPath)
+    if ('config_file_path' in runInfo) :
+        originalConfigFile = runInfo['config_file_path']
+        shutil.copy(originalConfigFile, outputPath)
     
     return
 

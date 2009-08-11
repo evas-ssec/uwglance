@@ -403,6 +403,39 @@ def plot_and_save_spacial_trouble(longitude, latitude,
     
     return
     
+def _handle_fig_creation_task(child_figure_function, log_message,
+                              fullFigOutputNamePath, smallFigOutputNamePath,
+                              shouldMakeSmall, doFork) :
+    """
+    fork to do something.
+    the parent will return the child pid
+    the child will do it's work and then exit
+    """
+    
+    pid = 0
+    if (doFork) :
+        # do the fork
+        pid = os.fork()
+    
+    # figure out if we're the parent or child
+    isParent = not (pid is 0)
+    if (isParent) :
+        return pid
+    else :
+        figure = child_figure_function()
+        LOG.info(log_message)
+        figure.savefig(fullFigOutputNamePath, dpi=fullSizeDPI)
+        if (shouldMakeSmall) :
+            figure.savefig(smallFigOutputNamePath, dpi=thumbSizeDPI)
+    
+    # if we've reached this point and we did fork,
+    # then we're the child process and we should stop now
+    if (doFork) :
+        sys.exit(0) # the child is done now
+    
+    # if we didn't fork, return the 0 pid to indicate that
+    return pid
+
 def plot_and_save_figure_comparison(aData, bData,
                                     variableRunInfo, 
                                     fileAName, fileBName,
@@ -413,7 +446,8 @@ def plot_and_save_figure_comparison(aData, bData,
                                     spaciallyInvalidMaskB,
                                     outputPath, 
                                     makeSmall=False,
-                                    shortCircuitComparisons=False) : 
+                                    shortCircuitComparisons=False,
+                                    doFork=False) : 
     """
     given two files, and information on what to compare, make comparison
     figures and save them to the given output graph.
@@ -450,12 +484,6 @@ def plot_and_save_figure_comparison(aData, bData,
     (spaciallyInvalidMaskA, spaciallyInvalidMaskB) = delta.diff(aData, bData, variableRunInfo['epsilon'],
                                                                 (missing_value, missing_value_b),
                                                                 (spaciallyInvalidMaskA, spaciallyInvalidMaskB))
-    '''
-    rawDiffData, goodMask, troubleMask, (aNotFiniteMask, bNotFiniteMask), \
-    (aMissingMask, bMissingMask), outsideEpsilonMask = delta.diff(aData, bData, variableRunInfo['epsilon'],
-                                                                  (missing_value, missing_value_b),
-                                                                  spaciallyInvalidMaskBoth)
-                                                                  '''
     absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, rather than just which one's bigger/smaller
     
     # some more display info, pull it out for convenience
@@ -473,158 +501,120 @@ def plot_and_save_figure_comparison(aData, bData,
     childPids = []
     
     # the original data figures
+    
+    # the original A data
     LOG.info("\t\tcreating image of " + variableDisplayName + " in file a")
-    pid = os.fork()
-    isParent = not (pid is 0)
-    if (isParent) :
+    pid = _handle_fig_creation_task((lambda : _create_mapped_figure(aData, latitudeAData, longitudeAData,
+                                                                    (variableDisplayName + "\nin File A"),
+                                                                    invalidMask=(~goodInAMask),
+                                                                    dataRanges=dataRanges,
+                                                                    dataRangeNames=dataRangeNames)),
+                                    "\t\tsaving image of " + variableDisplayName + " for file a",
+                                    outputPath + "/" + variableName + ".A.png",
+                                    outputPath + "/" + variableName + ".A.small.png",
+                                    makeSmall, doFork)
+    if not (pid is 0) :
         childPids.append(pid)
         LOG.debug ("Started child process (pid: " + str(pid) + ") to create file a image for " + variableDisplayName)
-    else :
-        figureA = _create_mapped_figure(aData, latitudeAData, longitudeAData,
-                                        (variableDisplayName + "\nin File A"),
-                                        invalidMask=(~goodInAMask),
-                                        dataRanges=dataRanges,
-                                        dataRangeNames=dataRangeNames)
-        LOG.info("\t\tsaving image of " + variableDisplayName + " for file a")
-        figureA.savefig(outputPath + "/" + variableName + ".A.png", dpi=fullSizeDPI)
-        if (makeSmall) :
-            figureA.savefig(outputPath + "/" + variableName + ".A.small.png", dpi=thumbSizeDPI)
-        sys.exit(0) # the child is done now
     
+    # the original B data
     LOG.info("\t\tcreating image of " + variableDisplayName + " in file b")
-    pid = os.fork()
-    isParent = not (pid is 0)
-    if (isParent) :
+    pid = _handle_fig_creation_task((lambda : _create_mapped_figure(bData, latitudeBData, longitudeBData,
+                                                                    (variableDisplayName + "\nin File B"),
+                                                                    invalidMask=(~ goodInBMask),
+                                                                    dataRanges=dataRanges,
+                                                                    dataRangeNames=dataRangeNames)),
+                                    "\t\tsaving image of " + variableDisplayName + " for file b",
+                                    outputPath + "/" + variableName + ".B.png",
+                                    outputPath + "/" + variableName + ".B.small.png",
+                                    makeSmall, doFork)
+    if not (pid is 0) :
         childPids.append(pid)
         LOG.debug ("Started child process (pid: " + str(pid) + ") to create file b image for " + variableDisplayName)
-    else :
-        figureB = _create_mapped_figure(bData, latitudeBData, longitudeBData,
-                                        (variableDisplayName + "\nin File B"),
-                                        invalidMask=(~ goodInBMask),
-                                        dataRanges=dataRanges,
-                                        dataRangeNames=dataRangeNames)
-        LOG.info("\t\tsaving image of " + variableDisplayName + " in file b")
-        figureB.savefig(outputPath + "/" + variableName + ".B.png", dpi=fullSizeDPI)
-        if (makeSmall) :
-            figureB.savefig(outputPath + "/" + variableName + ".B.small.png", dpi=thumbSizeDPI)
-        sys.exit(0) # the child is done now
     
     # make the data comparison figures
     if not shortCircuitComparisons :
         
+        # the distance between the two data sets
         LOG.info("\t\tcreating image of the absolute value of difference in " + variableDisplayName)
-        pid = os.fork()
-        isParent = not (pid is 0)
-        if (isParent) :
+        pid = _handle_fig_creation_task((lambda : _create_mapped_figure(absDiffData,
+                                                                        latitudeCommonData, longitudeCommonData,
+                                                                        ("Absolute value of difference in\n" + variableDisplayName),
+                                                                        invalidMask=(~ goodMask))),
+                                        "\t\tsaving image of the absolute value of difference for " + variableDisplayName,
+                                        outputPath + "/" + variableName + ".AbsDiff.png",
+                                        outputPath + "/" + variableName + ".AbsDiff.small.png",
+                                        makeSmall, doFork)
+        if not (pid is 0) :
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create absolute value of difference image for " + variableDisplayName)
-        else :
-            figureAbsDiff = _create_mapped_figure(absDiffData, latitudeCommonData, longitudeCommonData, 
-                                                  ("Absolute value of difference in\n" + variableDisplayName),
-                                                  invalidMask=(~ goodMask))
-            LOG.info("\t\tsaving image of the absolute value of difference for " + variableDisplayName)
-            figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.png", dpi=fullSizeDPI)
-            if (makeSmall) :
-                figureAbsDiff.savefig(outputPath + "/" + variableName + ".AbsDiff.small.png", dpi=thumbSizeDPI)
-            sys.exit(0) # the child is done now
         
+        # the subtraction of one data set from the other
         LOG.info("\t\tcreating image of the difference in " + variableDisplayName)
-        pid = os.fork()
-        isParent = not (pid is 0)
-        if (isParent) :
+        pid = _handle_fig_creation_task((lambda : _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData,
+                                                                        ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
+                                                                        invalidMask=(~ goodMask))),
+                                        "\t\tsaving image of the difference in " + variableDisplayName,
+                                        outputPath + "/" + variableName + ".Diff.png",
+                                        outputPath + "/" + variableName + ".Diff.small.png",
+                                        makeSmall, doFork)
+        if not (pid is 0) :
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference image for " + variableDisplayName)
-        else :
-            figureDiff = _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData, 
-                                                  ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
-                                                  invalidMask=(~ goodMask))
-            LOG.info("\t\tsaving image of the difference in " + variableDisplayName)
-            figureDiff.savefig(outputPath + "/" + variableName + ".Diff.png", dpi=fullSizeDPI)
-            if (makeSmall) :
-                figureDiff.savefig(outputPath + "/" + variableName + ".Diff.small.png", dpi=thumbSizeDPI)
-            sys.exit(0) # the child is done now
         
-        # this figure is more complex because we want to mark the trouble points on it
+        # mark the trouble points
         LOG.info("\t\tcreating image marking trouble data in " + variableDisplayName)
-        pid = os.fork()
-        isParent = not (pid is 0)
-        if (isParent) :
+        # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
+        # that our plot won't be totally destroyed by missing or non-finite data from B
+        bDataCopy = bData[:]
+        tempMask = goodInAMask & (~goodInBMask) 
+        bDataCopy[tempMask] = aData[tempMask]
+        pid = _handle_fig_creation_task((lambda : _create_mapped_figure(bDataCopy, latitudeCommonData, longitudeCommonData,
+                                                                        ("Areas of trouble data in\n" + variableDisplayName),
+                                                                        (~(goodInAMask | goodInBMask)),
+                                                                        mediumGrayColorMap, troubleMask,
+                                                                        dataRanges=dataRanges,
+                                                                        dataRangeNames=dataRangeNames)),
+                                        "\t\tsaving image marking trouble data in " + variableDisplayName,
+                                        outputPath + "/" + variableName + ".Trouble.png",
+                                        outputPath + "/" + variableName + ".Trouble.small.png",
+                                        makeSmall, doFork)
+        if not (pid is 0) :
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create trouble image for " + variableDisplayName)
-        else :
-            # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
-            # that our plot won't be totally destroyed by missing or non-finite data from B
-            bDataCopy = bData[:]
-            tempMask = goodInAMask & (~goodInBMask) 
-            bDataCopy[tempMask] = aData[tempMask]
-            # create the figure marked with the trouble points on top of B's data in grayscale
-            figureBadDataInDiff = _create_mapped_figure(bDataCopy, latitudeCommonData, longitudeCommonData,
-                                                        ("Areas of trouble data in\n" + variableDisplayName),
-                                                        (~(goodInAMask | goodInBMask)),
-                                                        mediumGrayColorMap, troubleMask,
-                                                        dataRanges=dataRanges,
-                                                        dataRangeNames=dataRangeNames)
-            LOG.info("\t\tsaving image marking trouble data in " + variableDisplayName)
-            figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.png", dpi=fullSizeDPI)
-            if (makeSmall) :
-                figureBadDataInDiff.savefig(outputPath + "/" + variableName + ".Trouble.small.png", dpi=thumbSizeDPI)
-            sys.exit(0) # the child is done now
         
-        # a histogram of the values of fileA - file B so that the distribution of error is visible (hopefully)
+        # a histogram of the values of fileA - file B 
         LOG.info("\t\tcreating histogram of the amount of difference in " + variableDisplayName)
-        pid = os.fork()
-        isParent = not (pid is 0)
-        if (isParent) :
+        numBinsToUse = 50
+        valuesForHist = rawDiffData[goodMask]
+        pid = _handle_fig_creation_task((lambda : _create_histogram(valuesForHist, numBinsToUse,
+                                                                    ("Difference in\n" + variableDisplayName),
+                                                                    ('Value of (Data File B - Data File A) at a Data Point'),
+                                                                    ('Number of Data Points with a Given Difference'),
+                                                                    True)),
+                                        "\t\tsaving histogram of the amount of difference in " + variableDisplayName,
+                                        outputPath + "/" + variableName + ".Hist.png",
+                                        outputPath + "/" + variableName + ".Hist.small.png",
+                                        makeSmall, doFork)
+        if not (pid is 0) :
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference histogram image for " + variableDisplayName)
-        else :
-            numBinsToUse = 50
-            valuesForHist = rawDiffData[goodMask]
-            diffHistogramFigure = _create_histogram(valuesForHist, numBinsToUse,
-                                                    ("Difference in\n" + variableDisplayName),
-                                                    ('Value of (Data File B - Data File A) at a Data Point'),
-                                                    ('Number of Data Points with a Given Difference'),
-                                                    True)
-            LOG.info("\t\tsaving histogram of the amount of difference in " + variableDisplayName)
-            diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.png", dpi=fullSizeDPI)
-            if (makeSmall) :
-                diffHistogramFigure.savefig(outputPath + "/" + variableName + ".Hist.small.png", dpi=thumbSizeDPI)
-            sys.exit(0) # the child is done now
         
-        ''' TODO, is this actually useful?
-        # a histogram of the values of fileA - file B, excluding epsilon mismatched values (to show errors more clearly)
-        LOG.info("\t\tcreating histogram of the amount of difference for imperfect matches")
-        numBinsToUse = 50
-        valuesForHist = rawDiffData[outsideEpsilonMask] # select only the imperfectly matched points
-        imperfectHistogramFigure = None
-        if (valuesForHist.size > 0) :
-            imperfectHistogramFigure = _create_histogram(valuesForHist, numBinsToUse,
-                                                         ("Difference in " + variableDisplayName + "\nExcluding Epsilon Matches"),
-                                                         ('Value of (Data File B - Data File A) at a Data Point'),
-                                                         ('Number of Data Points with a Given Difference'),
-                                                         True)
-            LOG.info("\t\tsaving histogram of the amount of difference for imperfect matches")
-            imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.png", dpi=fullSizeDPI)
-            if (makeSmall):
-                imperfectHistogramFigure.savefig(outputPath + "/" + variableName + ".ImpHist.small.png", dpi=thumbSizeDPI)
-        '''
-        
-        # scatter plot of file a and b comparison
+        # scatter plot of file a vs file b values
         LOG.info("\t\tcreating scatter plot of file a values vs file b values for " + variableDisplayName)
-        pid = os.fork()
-        isParent = not (pid is 0)
-        if (isParent) :
+        
+        pid = _handle_fig_creation_task((lambda : _create_scatter_plot(aData[goodMask], bData[goodMask],
+                                                                       "Value in File A vs Value in File B",
+                                                                       "File A Value", "File B Value",
+                                                                       outsideEpsilonMask[goodMask],
+                                                                       variableRunInfo['epsilon'])),
+                                        "\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName,
+                                        outputPath + "/" + variableName + ".Scatter.png",
+                                        outputPath + "/" + variableName + ".Scatter.small.png",
+                                        makeSmall, doFork)
+        if not (pid is 0) :
             childPids.append(pid)
             LOG.debug ("Started child process (pid: " + str(pid) + ") to create scatter plot image for " + variableDisplayName)
-        else :
-            diffScatterPlot = _create_scatter_plot(aData[goodMask], bData[goodMask],
-                                                   "Value in File A vs Value in File B", "File A Value", "File B Value",
-                                                   outsideEpsilonMask[goodMask], variableRunInfo['epsilon'])
-            LOG.info("\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName)
-            diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.png", dpi=fullSizeDPI)
-            if (makeSmall):
-                diffScatterPlot.savefig(outputPath + "/" + variableName + ".Scatter.small.png", dpi=thumbSizeDPI)
-            sys.exit(0) # the child is done now
     
     # now we need to wait for all of our child processes to terminate before returning
     if (isParent) : # just in case
