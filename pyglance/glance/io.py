@@ -90,7 +90,15 @@ class hdf(SD):
         return self.select(name)
     
     def missing_value(self, name):
-        return getattr(self.select(name),'_FillValue',None)
+        missing_value_attr_name = '_FillValue'
+        variable_object = self.select(name)
+        
+        to_return = None
+        if hasattr(variable_object, missing_value_attr_name) :
+            to_return = getattr(variable_object, missing_value_attr_name, None)
+        SDS.endaccess(variable_object)
+        
+        return to_return
         
 
 class nc(CDF):
@@ -142,7 +150,20 @@ class nc(CDF):
         return self.var(name)
     
     def missing_value(self, name):
-        return getattr(self.var(name),'_FillValue',getattr(self.var(name),'missing_value',None))
+        
+        missing_value_attr_name_1 = '_FillValue'
+        missing_value_attr_name_2 = 'missing_value'
+        variable_object = self.var(name)
+        
+        to_return = None
+        if hasattr(variable_object, missing_value_attr_name_1) \
+           or \
+           hasattr(variable_object, missing_value_attr_name_2) :
+            to_return = getattr(variable_object, missing_value_attr_name_1,
+                                getattr(variable_object, missing_value_attr_name_2, None))
+        
+        return to_return
+
 nc4 = nc
 cdf = nc
 

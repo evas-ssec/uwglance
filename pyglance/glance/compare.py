@@ -138,7 +138,7 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
     if (usingConfigFileFormat) :
         
         # if the user didn't ask for any, try everything
-        if (requestedNames == {}) :
+        if (len(requestedNames) is 0) :
             finalFromCommandLine = _parse_varnames(fileCommonNames, ['.*'],
                                                    defaultValues['epsilon'], defaultValues['missing_value'])
             for name, epsilon, missing in finalFromCommandLine :
@@ -163,20 +163,26 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
             # check each of the names the user asked for to see if it is either in the list of common names
             # or, if the user asked for an alternate name mapping in file B, if the two mapped names are in
             # files A and B respectively
-            for name in requestedNames :
+            for name in requestedNames : # TODO rekey on display name?
+                
+                name_b = name
+                if ('alternate_name_in_B' in requestedNames[name]) :
+                    name_b = requestedNames[name_b]['alternate_name_in_B']
+                
                 if (name in fileCommonNames) | \
                         (requestedNames[name].has_key('alternate_name_in_B') and
-                         (name in nameComparison['uniqueToAVars']) and
-                         (requestedNames[name]['alternate_name_in_B'] in nameComparison['uniqueToBVars'])) :
+                         (name   in nameComparison['uniqueToAVars']) and
+                         (name_b in nameComparison['uniqueToBVars'])) :
                     finalNames[name] = defaultValues.copy()
                     finalNames[name]['variable_name'] = name
                     finalNames[name].update(requestedNames[name])
                     
                     # load the missing value if it was not provided
                     if finalNames[name]['missing_value'] is None :
-                        finalNames[name]['missing_value'] = fileAObject.missing_value(name)
-                    if not('missing_value_alt_in_b' in finalNames[name]) or (finalNames[name]['missing_value_alt_in_b'] is None) :
-                        finalNames[name]['missing_value_alt_in_b'] = fileBObject.missing_value(name)
+                        finalNames[name]['missing_value']          = fileAObject.missing_value(name)
+                    if not('missing_value_alt_in_b' in finalNames[name]) or \
+                        (finalNames[name]['missing_value_alt_in_b'] is None) :
+                        finalNames[name]['missing_value_alt_in_b'] = fileBObject.missing_value(name_b)
     else:
         # format command line input similarly to the stuff from the config file
         print (requestedNames)
@@ -795,7 +801,7 @@ python -m glance
         # if we wouldn't generate anything, just stop now
         if (not runInfo['shouldIncludeImages']) and (not runInfo['shouldIncludeReport']) :
             LOG.warn("User selection of no image generation and no report generation will result in no " +
-                     "content being generated. Aborting report generation function.")
+                     "content being generated. Aborting generation function.")
             return
         
         # get info on who's doing the run and where

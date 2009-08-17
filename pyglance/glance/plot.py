@@ -33,7 +33,7 @@ LOG = logging.getLogger(__name__)
 offsetToRange = 0.0000000000000000001
 
 # the value that will denote "bad" longitudes and latitudes
-badLonLat = 1.0E30
+badLonLat = maps.badLonLat
 
 # a constant for the larger size dpi
 fullSizeDPI = 150 # 200
@@ -401,6 +401,9 @@ def plot_and_save_spacial_trouble(longitude, latitude,
         
         spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=thumbSizeDPI)
     
+    # clear the figure
+    spatialTroubleFig.clf()
+    
     return
     
 def _handle_fig_creation_task(child_figure_function, log_message,
@@ -427,6 +430,7 @@ def _handle_fig_creation_task(child_figure_function, log_message,
         figure.savefig(fullFigOutputNamePath, dpi=fullSizeDPI)
         if (shouldMakeSmall) :
             figure.savefig(smallFigOutputNamePath, dpi=thumbSizeDPI)
+        figure.clf() # clear the figure
     
     # if we've reached this point and we did fork,
     # then we're the child process and we should stop now
