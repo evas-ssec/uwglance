@@ -43,7 +43,7 @@ lat_lon_info ['latitude_alt_name_in_b'] = 'resampled_latitude'  # the alternate 
 # for differening data types (like ints/floats or float32/float64) or to handle slicing out only a subset of the data for analysis
 # note: these two filters will only be applied to the longitude and latitude data in file B
 lat_lon_info['data_filter_function_lon_in_b'] = (insert lambda function here)
-lat_lon_info['data_filter_function_lon_in_b'] = (insert lambda function here)
+lat_lon_info['data_filter_function_lat_in_b'] = (insert lambda function here)
 """
 # this value can be used to control how similar the longitude and latitude must be to be considered matching
 # if all of your longitude and latitude do not match under this epsilon, most of the comparison report will
@@ -74,8 +74,12 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
                  'nonfinite_data_tolerance': None       # the allowed fraction of non-finite data
                                                         # None indicates that variables should not be tested
                                                         # on amount of non-finite data
-                 #'data_filter_function_a': (insert lambda function here),
-                 #'data_filter_function_b': (insert lambda function here)
+                 # the following two functions can be defined in order to filter the variable data,
+                 # for example, these could be used to compensate
+                 # for differening data types (like ints/floats or float32/float64)
+                 # or to handle slicing out only a subset of the data for analysis
+    #            'data_filter_function_a': (insert lambda function here), # note: will only be applied to file A data
+    #            'data_filter_function_b': (insert lambda function here)  # note: will only be applied to file B data
                  }
 
 # a list of all the variables to analyze, all of the details are optional,
@@ -91,11 +95,10 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
 # leave it as an empty dictionary)
 setOfVariables = {}
 
-setOfVariables['imager_prof_retr_abi_total_totals_index'] = {           # this should match the variable name in your files
+setOfVariables['Total Totals'] = {           # the key of your variable entry will be used as the display name for your variable
                                   
-                                  'display_name': 'Total Totals',       # this entry is totally optional, it's used to label
-                                                                        # the report and some of the plots, if ommitted
-                                                                        # the variable name will be used in those places instead
+                                  'variable_name': 'imager_prof_retr_abi_total_totals_index',       
+                                                                        # this should match the variable name in your file
                                                                         
                                   'epsilon': 1.0,                       # the acceptable difference between file A and file B
                                   
@@ -130,16 +133,12 @@ setOfVariables['imager_prof_retr_abi_total_totals_index'] = {           # this s
                                                                         # let you label your ranges (ie, the space between two
                                                                         # boundaries) or your boundaries.
                                   
-                                  
-                                  # the following two functions can be defined in order to filter the variable data,
-                                  # for example, these could be used to compensate
-                                  # for differening data types (like ints/floats or float32/float64)
-                                  # or to handle slicing out only a subset of the data for analysis
+                                  # data filters can be defined/overridden on a variable by variable basis
 #                                  'data_filter_function_a': (insert lambda function here), # note: will only be applied to file A data
 #                                  'data_filter_function_b': (insert lambda function here)  # note: will only be applied to file B data
                                   }
-setOfVariables['imager_prof_retr_abi_total_precipitable_water_high'] = {
-                                  'display_name': 'Total Precipitable Water, High',
+setOfVariables['Total Precipitable Water, High'] = {
+                                  'variable_name': 'imager_prof_retr_abi_total_precipitable_water_high',
                                   'epsilon': 3.0,
                                   
                                   'alternate_name_in_B': 'imager_prof_retr_abi_total_precipitable_water_low',
@@ -149,42 +148,42 @@ setOfVariables['imager_prof_retr_abi_total_precipitable_water_high'] = {
                                                                         # to appear only in file A)
                                   }
 
-setOfVariables['imager_prof_retr_abi_total_precipitable_water'] = {
-                                  'display_name': 'Total Precipitable Water',
+setOfVariables['Total Precipitable Water'] = {
+                                  'variable_name': 'imager_prof_retr_abi_total_precipitable_water',
                                   'epsilon': 3.0
                                   # example:
                                   # because missing, and the two tolerances are not defined here,
                                   # this variable would use the defaultValues for those 
                                   }
-setOfVariables['imager_prof_retr_abi_total_precipitable_water_low'] = {
-                                  'display_name': 'Total Precipitable Water, Low',
+setOfVariables['Total Precipitable Water, Low'] = {
+                                  'variable_name': 'imager_prof_retr_abi_total_precipitable_water_low',
                                   'epsilon': 3.0
                                   }
-setOfVariables['imager_prof_retr_abi_total_precipitable_water_mid'] = {
-                                  'display_name': 'Total Precipitable Water, Mid',
+setOfVariables['Total Precipitable Water, Mid'] = {
+                                  'variable_name': 'imager_prof_retr_abi_total_precipitable_water_mid',
                                   'epsilon': 3.0
                                   }
-setOfVariables['imager_prof_retr_abi_land_surface_temperature'] = {
-                                  'display_name': 'Land Surface Temperature',
+setOfVariables['Land Surface Temperature'] = {
+                                  'variable_name': 'imager_prof_retr_abi_land_surface_temperature',
                                   'epsilon': 5.0
                                   }
-setOfVariables['imager_prof_retr_abi_k_index'] = {
-                                  'display_name': 'K-Index',
+setOfVariables['K-Index'] = {
+                                  'variable_name': 'imager_prof_retr_abi_k_index',
                                   'epsilon': 2.0
                                   }
-setOfVariables['imager_prof_retr_abi_tprof'] = {
-                                  'display_name': 'Temperature Profile',
+setOfVariables['Temperature Profile'] = {
+                                  'variable_name': 'imager_prof_retr_abi_tprof',
                                   'epsilon': 0.1
                                   }
-setOfVariables['imager_prof_retr_abi_cape'] = {
-                                  'display_name': 'CAPE',
+setOfVariables['CAPE'] = {
+                                  'variable_name': 'imager_prof_retr_abi_cape',
                                   'epsilon': 1000
                                   }
-setOfVariables['imager_prof_retr_abi_lifted_index'] = {
-                                  'display_name': 'Lifted Index',
+setOfVariables['Lifted Index'] = {
+                                  'variable_name': 'imager_prof_retr_abi_lifted_index',
                                   'epsilon': 2.0
                                   }
-setOfVariables['imager_prof_retr_abi_showalter_index'] = {
-                                  'display_name': 'Showalter Index',
+setOfVariables['Showalter Index'] = {
+                                  'variable_name': 'imager_prof_retr_abi_showalter_index',
                                   'epsilon': 2.0
                                   }

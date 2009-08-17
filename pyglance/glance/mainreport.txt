@@ -31,7 +31,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                 ${tempFileInfo['displayName']}
             % endif
             <blockquote>
-                file path: ${tempFileInfo['path']} <br>
+                path: ${tempFileInfo['path']} <br>
                 md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
                 last modified: ${tempFileInfo['lastModifiedTime']}
             </blockquote>
@@ -148,15 +148,15 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         ## report on all the variables that were compared and give a basic stat idea of how well they did
         <blockquote>
             <p>
-                ## TODO replace the table with floating boxes in some form
+                ## TODO replace the table with floating boxes at some point
                 <table> 
                     
-                    
-                    % for variableName in sorted(list(variables)) :
+                    % for variableKey in sorted(list(variables)) :
                         <%
-                            tempVariableInfo = variables[variableName]
-                            varDisplayName = variableName
-                            if (tempVariableInfo['variable_run_info'].has_key('display_name')) :
+                            tempVariableInfo = variables[variableKey]
+                            technicalName  = tempVariableInfo['variable_run_info']['variable_name']
+                            varDisplayName = technicalName
+                            if 'display_name' in tempVariableInfo['variable_run_info'] :
                                 varDisplayName = tempVariableInfo['variable_run_info']['display_name']
                             passPercent = tempVariableInfo['pass_epsilon_percent']
                             didPass = tempVariableInfo['variable_run_info']['did_pass']
@@ -172,7 +172,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                                 % endif
                             </td>
                             <td>
-                                Variable: <a href="${variableName | u}.html">${varDisplayName}</a> <br>
+                                Variable: <a href="${technicalName | u}.html">${varDisplayName}</a> <br>
                                 Epsilon used: ${tempVariableInfo['variable_run_info']['epsilon']} <br>
                                 Finite values within one epsilon of difference:
                                 ${report.make_formatted_display_string(passPercent)}%
@@ -207,7 +207,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     % if (len(uniqueToAVars) > 0) or (len(uniqueToBVars) > 0) :
         <h3>Unique Variables</h3>
         
-        % if (len(uniqueToAVars) != 0) :
+        % if (len(uniqueToAVars) > 0) :
             <p>
                 Variables only found in file A:
                 <blockquote>
@@ -218,7 +218,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
             </p>
         % endif
         
-        % if (len(uniqueToBVars) != 0) :
+        % if (len(uniqueToBVars) > 0) :
             <p>
                 Variables only found in file B:
                 <blockquote>

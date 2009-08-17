@@ -163,26 +163,36 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
             # check each of the names the user asked for to see if it is either in the list of common names
             # or, if the user asked for an alternate name mapping in file B, if the two mapped names are in
             # files A and B respectively
-            for name in requestedNames : # TODO rekey on display name?
+            for dispName in requestedNames :
                 
-                name_b = name
-                if ('alternate_name_in_B' in requestedNames[name]) :
-                    name_b = requestedNames[name_b]['alternate_name_in_B']
+                # hang on to info on the current variable
+                currNameInfo = requestedNames[dispName] 
                 
-                if (name in fileCommonNames) | \
-                        (requestedNames[name].has_key('alternate_name_in_B') and
-                         (name   in nameComparison['uniqueToAVars']) and
-                         (name_b in nameComparison['uniqueToBVars'])) :
-                    finalNames[name] = defaultValues.copy()
-                    finalNames[name]['variable_name'] = name
-                    finalNames[name].update(requestedNames[name])
+                # get the variable name 
+                if 'variable_name' in currNameInfo :
+                    name = currNameInfo['variable_name']
+                    name_b = name
                     
-                    # load the missing value if it was not provided
-                    if finalNames[name]['missing_value'] is None :
-                        finalNames[name]['missing_value']          = fileAObject.missing_value(name)
-                    if not('missing_value_alt_in_b' in finalNames[name]) or \
-                        (finalNames[name]['missing_value_alt_in_b'] is None) :
-                        finalNames[name]['missing_value_alt_in_b'] = fileBObject.missing_value(name_b)
+                    if ('alternate_name_in_B' in currNameInfo) :
+                        name_b = currNameInfo['alternate_name_in_B']
+                    
+                    if (name in fileCommonNames) | \
+                            (currNameInfo.has_key('alternate_name_in_B') and
+                             (name   in nameComparison['uniqueToAVars']) and
+                             (name_b in nameComparison['uniqueToBVars'])) :
+                        finalNames[dispName] = defaultValues.copy() 
+                        finalNames[dispName]['display_name'] = dispName
+                        finalNames[dispName].update(currNameInfo)
+                        
+                        # load the missing value if it was not provided
+                        if finalNames[dispName]['missing_value'] is None :
+                            finalNames[dispName]['missing_value']          = fileAObject.missing_value(name)
+                        if not('missing_value_alt_in_b' in finalNames[dispName]) or \
+                           (finalNames[dispName]['missing_value_alt_in_b'] is None) :
+                            finalNames[dispName]['missing_value_alt_in_b'] = fileBObject.missing_value(name_b)
+                else :
+                    LOG.warn('No technical variable name was given for the entry described as "' + dispName + '". ' +
+                             'Skipping this variable.')
     else:
         # format command line input similarly to the stuff from the config file
         print (requestedNames)
@@ -883,30 +893,28 @@ python -m glance
         
         # go through each of the possible variables in our files
         # and make a report section with images for whichever ones we can
-        for name in finalNames:
+        for varKey in finalNames:
             
             # pull out the information for this variable analysis run
-            varRunInfo = finalNames[name].copy()
+            varRunInfo = finalNames[varKey].copy()
             
             # make some local copies of our name info for display and labeling
-            displayName = name
-            if (varRunInfo.has_key('display_name')) :
+            technicalName = varRunInfo['variable_name']
+            displayName   = technicalName
+            if 'display_name' in varRunInfo :
                 displayName = varRunInfo['display_name']
-            explanationName = name
-            if (varRunInfo.has_key('alternate_name_in_B')) :
-                explanationName = explanationName + " / " + varRunInfo['alternate_name_in_B']
-            explanationName = displayName + '(' + explanationName + ')'
-            print('analyzing: ' + explanationName + ')')
+            explanationName = technicalName
             
             # if B has an alternate variable name, figure that out
-            has_alt_B_variable = False
-            b_variable = varRunInfo['variable_name']
-            if (varRunInfo.has_key('alternate_name_in_B')) :
-                has_alt_B_variable = True
+            b_variable = technicalName
+            if 'alternate_name_in_B' in varRunInfo :
                 b_variable = varRunInfo['alternate_name_in_B']
+                explanationName = explanationName + " / " + b_variable
+            explanationName = displayName + ' (' + explanationName + ')'
+            print('analyzing: ' + explanationName + ')')
             
             # get the data for the variable 
-            aData = aFile[varRunInfo['variable_name']]
+            aData = aFile[technicalName]
             bData = bFile[b_variable]
             
             # apply any data filter functions we may have
@@ -923,23 +931,23 @@ python -m glance
                 (bData.shape == longitudeCommon.shape)) :
                 
                 # build a dictionary of information on the variable
-                variableAnalysisInfo[varRunInfo['variable_name']] = {}
-                variableAnalysisInfo[varRunInfo['variable_name']]['data'] = {'A': aData,
-                                                                             'B': bData}
-                variableAnalysisInfo[varRunInfo['variable_name']]['var_stats'] = delta.summarize(aData, bData,
-                                                                                                 varRunInfo['epsilon'],
-                                                                                                 (varRunInfo['missing_value'],
-                                                                                                  varRunInfo['missing_value_alt_in_b']),
-                                                                                                 spaciallyInvalidMaskA, spaciallyInvalidMaskB)
+                variableAnalysisInfo[varKey] = {}
+                variableAnalysisInfo[varKey]['data'] = {'A': aData,
+                                                        'B': bData}
+                variableAnalysisInfo[varKey]['var_stats'] = delta.summarize(aData, bData,
+                                                                            varRunInfo['epsilon'],
+                                                                            (varRunInfo['missing_value'],
+                                                                             varRunInfo['missing_value_alt_in_b']),
+                                                                            spaciallyInvalidMaskA, spaciallyInvalidMaskB)
                 # add a little additional info to our variable run info before we squirrel it away
                 varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now()) 
-                passedFraction = (1.0 - variableAnalysisInfo[name]['var_stats']
+                passedFraction = (1.0 - variableAnalysisInfo[varKey]['var_stats']
                                   ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction'])
                 varRunInfo['did_pass'] = _check_pass_or_fail(varRunInfo,
-                                                             variableAnalysisInfo[name]['var_stats'],
+                                                             variableAnalysisInfo[varKey]['var_stats'],
                                                              defaultValues)
-                variableAnalysisInfo[varRunInfo['variable_name']]['run_info'] = varRunInfo
-                variableAnalysisInfo[varRunInfo['variable_name']]['exp_name'] = explanationName
+                variableAnalysisInfo[varKey]['run_info'] = varRunInfo
+                variableAnalysisInfo[varKey]['exp_name'] = explanationName
                 
             # if we can't compare the variable, we should tell the user 
             else :
@@ -957,12 +965,12 @@ python -m glance
         
         # loop to create the images for all our variables
         if (runInfo['shouldIncludeImages']) :
-            for name in variableAnalysisInfo :
+            for varKey in variableAnalysisInfo :
                 # create the images comparing that variable
-                print("\tcreating figures for: " + variableAnalysisInfo[name]['exp_name'])
-                plot.plot_and_save_figure_comparison(variableAnalysisInfo[name]['data']['A'],
-                                                     variableAnalysisInfo[name]['data']['B'],
-                                                     variableAnalysisInfo[name]['run_info'],
+                print("\tcreating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
+                plot.plot_and_save_figure_comparison(variableAnalysisInfo[varKey]['data']['A'],
+                                                     variableAnalysisInfo[varKey]['data']['B'],
+                                                     variableAnalysisInfo[varKey]['run_info'],
                                                      files['file A']['path'],
                                                      files['file B']['path'],
                                                      latitudeA, longitudeA,
@@ -972,32 +980,33 @@ python -m glance
                                                      spaciallyInvalidMaskB,
                                                      outputPath, True,
                                                      doFork=runInfo['doFork']) 
-                print("\tfinished creating figures for: " + variableAnalysisInfo[name]['exp_name'])
+                print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
         
         # reports are fast, so the parent thread will just do this
         # generate our general report pages once we've looked at all the variables
         if (runInfo['shouldIncludeReport']) :
             
             # this is going to be in the form
-            # [var_name] = {"passEpsilonPercent": percent ok with epsilon, "epsilon": epsilon)
+            # [varKey] = {"passEpsilonPercent": percent ok with epsilon, "epsilon": epsilon)
             variableComparisons = {}
             
             # generate the variable reports
-            for name in variableAnalysisInfo :
+            for varKey in variableAnalysisInfo :
                 
                 # hang on to our good % and other info to describe our comparison
-                passedPercent = (1.0 - variableAnalysisInfo[name]['var_stats']
+                passedPercent = (1.0 - variableAnalysisInfo[varKey]['var_stats']
                                   ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']) * 100.0
-                variableComparisons[name] = {'pass_epsilon_percent': passedPercent,
-                                             'variable_run_info': variableAnalysisInfo[name]['run_info']
-                                             }
+                variableComparisons[varKey] = {'pass_epsilon_percent': passedPercent,
+                                               'variable_run_info': variableAnalysisInfo[varKey]['run_info']
+                                               }
                 
-                print ('\tgenerating report for: ' + variableAnalysisInfo[name]['exp_name']) 
+                print ('\tgenerating report for: ' + variableAnalysisInfo[varKey]['exp_name']) 
                 report.generate_and_save_variable_report(files,
-                                                         variableAnalysisInfo[name]['run_info'], runInfo,
-                                                         variableAnalysisInfo[name]['var_stats'],
+                                                         variableAnalysisInfo[varKey]['run_info'], runInfo,
+                                                         variableAnalysisInfo[varKey]['var_stats'],
                                                          spatialInfo,
-                                                         outputPath, name + ".html")
+                                                         outputPath,
+                                                         variableAnalysisInfo[varKey]['run_info']['variable_name'] + ".html")
             
             print ('generating summary report')
             # get the current time

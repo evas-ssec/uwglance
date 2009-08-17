@@ -37,11 +37,11 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         <% tempFileInfo = files[fileKey] %>
         <p>
             ${fileKey}:
-            % if tempFileInfo.has_key('displayName') :
+            % if 'displayName' in tempFileInfo :
                 ${tempFileInfo['displayName']}
             % endif
             <blockquote>
-                file path: ${tempFileInfo['path']} <br>
+                path: ${tempFileInfo['path']} <br>
                 md5sum for ${fileKey}: ${tempFileInfo['md5sum']} <br>
                 last modified: ${tempFileInfo['lastModifiedTime']}
             </blockquote>
