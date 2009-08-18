@@ -18,7 +18,7 @@ easy_install -d $HOME/Library/Python -vi http://larch.ssec.wisc.edu/eggs/repos g
 from setuptools import setup, find_packages
 
 setup( name="glance", 
-       version="0.2.6.7", 
+       version="0.2.6.8", 
        zip_safe = True,
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
        packages = find_packages('.'),
