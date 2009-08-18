@@ -46,8 +46,6 @@ lat_lon_info['data_filter_function_lon_in_b'] = (insert lambda function here)
 lat_lon_info['data_filter_function_lat_in_b'] = (insert lambda function here)
 """
 # this value can be used to control how similar the longitude and latitude must be to be considered matching
-# if all of your longitude and latitude do not match under this epsilon, most of the comparison report will
-# not be generated, since the data would not correlate spatially
 # Note: this value is only intended to allow you to avoid very small floating point errors that would make glance
 # think that your data is disparate, when really it is very close together. If you put a large epsilon in here
 # the various comparison plots may contain misleading data
@@ -114,7 +112,7 @@ setOfVariables['Total Totals'] = {           # the key of your variable entry wi
                                                                         # on amount of non-finite data
                                                                         # note, this setting overrides the default
                                   
-                                    'display_ranges':         [13.0,   14.0,  15.0,  20.0,  32.0,  40.0,  54.0,  60.0],
+                                  'display_ranges':         [13.0,   14.0,  15.0,  20.0,  32.0,  40.0,  54.0,  60.0],
                                                                         # this array of ranges can be defined in order to control
                                                                         # a custom display of color ranges in any graphs produced
                                                                         # for this variable, ranges will fall between the numbers
@@ -132,10 +130,16 @@ setOfVariables['Total Totals'] = {           # the key of your variable entry wi
                                                                         # TODO In the future this array may have the ability to
                                                                         # let you label your ranges (ie, the space between two
                                                                         # boundaries) or your boundaries.
+                                                                        
+                                  'display_colors': ('m',    'b',   'c',   'r',   'k',   'y',   'g'),
+                                                                        # the colors that should be used to display the ranges
+                                                                        # color definition information can be found at
+                                                                        # http://matplotlib.sourceforge.net/api/colors_api.html
                                   
                                   # data filters can be defined/overridden on a variable by variable basis
 #                                  'data_filter_function_a': (insert lambda function here), # note: will only be applied to file A data
 #                                  'data_filter_function_b': (insert lambda function here)  # note: will only be applied to file B data
+                                  
                                   }
 setOfVariables['Total Precipitable Water, High'] = {
                                   'variable_name': 'imager_prof_retr_abi_total_precipitable_water_high',

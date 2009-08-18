@@ -191,7 +191,7 @@ def _clean_lon_or_lat_with_mask(lon_or_lat_data, invalid_data_mask):
 # set on the existing image
 def _create_mapped_figure(data, latitude, longitude, title,
                           invalidMask=None, colorMap=None, tagData=None,
-                          dataRanges=None, dataRangeNames=None) :
+                          dataRanges=None, dataRangeNames=None, dataRangeColors=None) :
     
     # make a clean version of our lon/lat
     latitudeClean  = _clean_lon_or_lat_with_mask(latitude,  invalidMask)
@@ -222,6 +222,7 @@ def _create_mapped_figure(data, latitude, longitude, title,
             dataRanges[0] = dataRanges[0] - offsetToRange
             dataRanges[len(dataRanges) - 1] = dataRanges[len(dataRanges) - 1] + offsetToRange
         kwargs['levelsToUse'] = dataRanges
+        kwargs['colors'] = dataRangeColors # add in the list of colors (may be None)
     
     # if we've got a color map, pass it to the list of things we want to tell the plotting function
     if not (colorMap is None) :
@@ -496,7 +497,10 @@ def plot_and_save_figure_comparison(aData, bData,
         dataRanges = variableRunInfo['display_ranges']
     dataRangeNames = None
     if ('display_range_names' in variableRunInfo) : 
-        dataRangeNames = variableRunInfo['display_range_names'] 
+        dataRangeNames = variableRunInfo['display_range_names']
+    dataColors = None
+    if ('display_colors' in variableRunInfo) :
+        dataColors = variableRunInfo['display_colors'] 
     
     # from this point on, we will be forking to create child processes so we can parallelize our image and
     # report generation
@@ -512,7 +516,8 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                     (variableDisplayName + "\nin File A"),
                                                                     invalidMask=(~goodInAMask),
                                                                     dataRanges=dataRanges,
-                                                                    dataRangeNames=dataRangeNames)),
+                                                                    dataRangeNames=dataRangeNames,
+                                                                    dataRangeColors=dataColors)),
                                     "\t\tsaving image of " + variableDisplayName + " for file a",
                                     outputPath + "/" + variableName + ".A.png",
                                     outputPath + "/" + variableName + ".A.small.png",
@@ -527,7 +532,8 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                     (variableDisplayName + "\nin File B"),
                                                                     invalidMask=(~ goodInBMask),
                                                                     dataRanges=dataRanges,
-                                                                    dataRangeNames=dataRangeNames)),
+                                                                    dataRangeNames=dataRangeNames,
+                                                                    dataRangeColors=dataColors)),
                                     "\t\tsaving image of " + variableDisplayName + " for file b",
                                     outputPath + "/" + variableName + ".B.png",
                                     outputPath + "/" + variableName + ".B.small.png",
