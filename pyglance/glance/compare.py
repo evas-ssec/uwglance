@@ -22,6 +22,12 @@ import glance.report as report
 
 LOG = logging.getLogger(__name__)
 
+# these are the built in defaults for the settings
+glance_setting_defaults = {'shouldIncludeReport': True,
+                           'shouldIncludeImages': False,
+                           'doFork': False}
+
+# these are the built in longitude/latitude defaults
 glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
                            'latitude':  'pixel_latitude',
                            'lon_lat_epsilon': 0.0,
@@ -31,10 +37,9 @@ glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
                            'data_filter_function_lat_in_b': None
                            }
 
-# these are the built in default settings
+# these are the built in default settings for the variable analysis
 glance_analysis_defaults = {'epsilon': 0.0,
                             'missing_value': None,
-                            'missing_value_alt_in_b': None, 
                             'epsilon_failure_tolerance': 0.0, 
                             'nonfinite_data_tolerance':  0.0 
                             }
@@ -151,10 +156,8 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                 finalNames[name]['epsilon'] = epsilon
                 
                 # load the missing value if it was not provided
-                missing_b = missing
-                if missing is None:
-                    missing   = fileAObject.missing_value(name)
-                    missing_b = fileBObject.missing_value(name)
+                missing, missing_b = _get_missing_values_if_needed((fileAObject, fileBObject), name,
+                                                                   missing_value_A=missing, missing_value_B=missing)
                 finalNames[name]['missing_value'] = missing 
                 finalNames[name]['missing_value_alt_in_b'] = missing_b
                 
@@ -185,11 +188,15 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                         finalNames[dispName].update(currNameInfo)
                         
                         # load the missing value if it was not provided
-                        if finalNames[dispName]['missing_value'] is None :
-                            finalNames[dispName]['missing_value']          = fileAObject.missing_value(name)
-                        if not('missing_value_alt_in_b' in finalNames[dispName]) or \
-                           (finalNames[dispName]['missing_value_alt_in_b'] is None) :
-                            finalNames[dispName]['missing_value_alt_in_b'] = fileBObject.missing_value(name_b)
+                        missing = finalNames[dispName]['missing_value']
+                        if ('missing_value_alt_in_b' in finalNames[dispName]) :
+                            missing_b = finalNames[dispName]['missing_value_alt_in_b']
+                        else :
+                            missing_b = missing
+                        finalNames[dispName]['missing_value'], finalNames[dispName]['missing_value_alt_in_b'] = \
+                                    _get_missing_values_if_needed((fileAObject, fileBObject), name, name_b,
+                                                                  missing, missing_b)
+                        
                 else :
                     LOG.warn('No technical variable name was given for the entry described as "' + dispName + '". ' +
                              'Skipping this variable.')
@@ -208,10 +215,8 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
             finalNames[name]['epsilon'] = epsilon
             
             # load the missing value if it was not provided
-            missing_b = missing
-            if missing is None:
-                missing   = fileAObject.missing_value(name)
-                missing_b = fileBObject.missing_value(name)
+            missing, missing_b = _get_missing_values_if_needed((fileAObject, fileBObject), name,
+                                                               missing_value_A=missing, missing_value_B=missing)
             finalNames[name]['missing_value'] = missing 
             finalNames[name]['missing_value_alt_in_b'] = missing_b
     
@@ -219,6 +224,26 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
     LOG.debug(str(finalNames))
     
     return finalNames, nameComparison
+
+def _get_missing_values_if_needed((fileA, fileB),
+                                  var_name, alt_var_name=None, 
+                                  missing_value_A=None, missing_value_B=None) :
+    """
+    get the missing values for two files based on the variable name(s)
+    if the alternate variable name is passed it will be used for the
+    second file in place of the primary variable name
+    """
+    # if we don't have an alternate variable name, use the existing one
+    if alt_var_name is None :
+        alt_var_name = var_name
+    
+    if missing_value_A is None :
+        missing_value_A = fileA.missing_value(var_name)
+    
+    if missing_value_B is None :
+        missing_value_B = fileB.missing_value(alt_var_name)
+    
+    return missing_value_A, missing_value_B
 
 def _load_config_or_options(optionsSet, originalArgs) :
     """
@@ -228,9 +253,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
     
     # basic defaults for stuff we will need to return
     runInfo = {}
-    runInfo['shouldIncludeReport'] = True
-    runInfo['shouldIncludeImages'] = False
-    runInfo['doFork'] = False # default
+    runInfo.update(glance_setting_defaults) # get the default settings
     runInfo.update(glance_lon_lat_defaults) # get the default lon/lat info
     runInfo['version'] = _get_glance_version_string()
     
@@ -253,7 +276,7 @@ def _load_config_or_options(optionsSet, originalArgs) :
         
         LOG.info ("Using Config File Settings")
         
-        # this will handle relative paths, but not '~'?
+        # this will handle relative paths
         requestedConfigFile = os.path.abspath(os.path.expanduser(requestedConfigFile))
         
         # split out the file base name and the file path
@@ -270,19 +293,19 @@ def _load_config_or_options(optionsSet, originalArgs) :
         glanceRunConfig = imp.load_module(fileBaseName, file(requestedConfigFile, 'U'),
                                           filePath, ('.py' , 'U', 1))
         
+        # this is an exception, since it is not advertised to the user we don't expect it to be in the file
+        # (at least not at the moment, it could be added later and if they did happen to put it in the
+        # config file, it would override this line)
+        runInfo['shouldIncludeReport'] = not optionsSet.imagesOnly 
+        
         # get everything from the config file
         runInfo.update(glanceRunConfig.settings)
         runInfo.update(glanceRunConfig.lat_lon_info) # get info on the lat/lon variables
         
         # get any requested names
         requestedNames = glanceRunConfig.setOfVariables.copy()
-        
         # user selected defaults, if they omit any we'll still be using the program defaults
         defaultsToUse.update(glanceRunConfig.defaultValues)
-        
-        # this is an exception, since it is not advertised to the user we don't expect it to be in the file
-        # (at least not at the moment, it could be added later)
-        runInfo['shouldIncludeReport'] = not optionsSet.imagesOnly 
         
         usedConfigFile = True
     
@@ -306,7 +329,8 @@ def _load_config_or_options(optionsSet, originalArgs) :
         # user selected defaults
         defaultsToUse['epsilon'] = optionsSet.epsilon
         defaultsToUse['missing_value'] = optionsSet.missing
-        # there is no way to set the tolerances from the command line at the moment
+        
+        # note: there is no way to set the tolerances from the command line 
     
     return paths, runInfo, defaultsToUse, requestedNames, usedConfigFile
 
@@ -379,14 +403,6 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
                                                                                        llepsilon,
                                                                                        (None, None),
                                                                                        (ignoreMaskA, ignoreMaskB))
-    '''
-    longitudeDiff, finiteLongitudeMask, _, _, _, lon_not_equal_mask = delta.diff(longitudeA, longitudeB,
-                                                                                     llepsilon,
-                                                                                     ignoreMask=combinedIgnoreMask)
-    latitudeDiff,  finiteLatitudeMask,  _, _, _, lat_not_equal_mask = delta.diff(latitudeA,  latitudeB,
-                                                                                 llepsilon,
-                                                                                 ignoreMask=combinedIgnoreMask)
-    '''
     
     lon_lat_not_equal_mask = lon_not_equal_mask | lat_not_equal_mask
     lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask)
@@ -873,10 +889,13 @@ python -m glance
             sys.exit(1) # things have gone wrong
         # update our existing spatial information
         spatialInfo.update(moreSpatialInfo)
+        
+        """ TODO, this feature is not helpful, but generally hinders your ability to get information you need
         # if we have some points outside epsilon, we still want to make a report to show the user this problem, but
         # we can't trust most of our other comparison images
         if spatialInfo['lon_lat_not_equal_points_count'] > 0 :
             runInfo['short_circuit_diffs'] = True # I could simply run the above test every time, but this is simpler and clearer
+        """
         
         # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
         spaciallyInvalidMask, spatialInfo, longitudeCommon, latitudeCommon = \
@@ -925,20 +944,28 @@ python -m glance
                 bData = varRunInfo['data_filter_function_b'](bData)
                 LOG.debug ("filter function was applied to file B data for variable: " + explanationName)
             
-            # check if this data can be displayed
-            if ((aData.shape == bData.shape) and
-                (aData.shape == longitudeCommon.shape) and
-                (bData.shape == longitudeCommon.shape)) :
+            # check if this data can be displayed but
+            # don't compare lon/lat sizes if we won't be plotting
+            if ((aData.shape == bData.shape) 
+                and 
+                ((('shouldIncludeImages' in varRunInfo) and (not varRunInfo['shouldIncludeImages']))
+                 or
+                 ((aData.shape == longitudeCommon.shape) and (bData.shape == longitudeCommon.shape)) )) :
                 
                 # build a dictionary of information on the variable
                 variableAnalysisInfo[varKey] = {}
                 variableAnalysisInfo[varKey]['data'] = {'A': aData,
                                                         'B': bData}
+                mask_a_to_use = spaciallyInvalidMaskA
+                mask_b_to_use = spaciallyInvalidMaskB
+                if (('shouldIncludeImages' in varRunInfo) and (not varRunInfo['shouldIncludeImages'])) :
+                    mask_a_to_use = None
+                    mask_b_to_use = None
                 variableAnalysisInfo[varKey]['var_stats'] = delta.summarize(aData, bData,
                                                                             varRunInfo['epsilon'],
                                                                             (varRunInfo['missing_value'],
                                                                              varRunInfo['missing_value_alt_in_b']),
-                                                                            spaciallyInvalidMaskA, spaciallyInvalidMaskB)
+                                                                            mask_a_to_use, mask_b_to_use)
                 # add a little additional info to our variable run info before we squirrel it away
                 varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now()) 
                 passedFraction = (1.0 - variableAnalysisInfo[varKey]['var_stats']
@@ -966,21 +993,24 @@ python -m glance
         # loop to create the images for all our variables
         if (runInfo['shouldIncludeImages']) :
             for varKey in variableAnalysisInfo :
-                # create the images comparing that variable
-                print("\tcreating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
-                plot.plot_and_save_figure_comparison(variableAnalysisInfo[varKey]['data']['A'],
-                                                     variableAnalysisInfo[varKey]['data']['B'],
-                                                     variableAnalysisInfo[varKey]['run_info'],
-                                                     files['file A']['path'],
-                                                     files['file B']['path'],
-                                                     latitudeA, longitudeA,
-                                                     latitudeB, longitudeB,
-                                                     latitudeCommon, longitudeCommon,
-                                                     spaciallyInvalidMaskA,
-                                                     spaciallyInvalidMaskB,
-                                                     outputPath, True,
-                                                     doFork=runInfo['doFork']) 
-                print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
+                if (not ('shouldIncludeImages' in variableAnalysisInfo[varKey]['run_info'])) \
+                    or (variableAnalysisInfo[varKey]['run_info']['shouldIncludeImages']) :
+                    
+                    # create the images comparing that variable
+                    print("\tcreating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
+                    plot.plot_and_save_figure_comparison(variableAnalysisInfo[varKey]['data']['A'],
+                                                         variableAnalysisInfo[varKey]['data']['B'],
+                                                         variableAnalysisInfo[varKey]['run_info'],
+                                                         files['file A']['path'],
+                                                         files['file B']['path'],
+                                                         latitudeA, longitudeA,
+                                                         latitudeB, longitudeB,
+                                                         latitudeCommon, longitudeCommon,
+                                                         spaciallyInvalidMaskA,
+                                                         spaciallyInvalidMaskB,
+                                                         outputPath, True,
+                                                         doFork=runInfo['doFork']) 
+                    print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
         
         # reports are fast, so the parent thread will just do this
         # generate our general report pages once we've looked at all the variables

@@ -150,6 +150,9 @@ setOfVariables['Total Precipitable Water, High'] = {
                                                                         # the equivalent variable in file B (if this is
                                                                         # defined, our primary variable name will be expected
                                                                         # to appear only in file A)
+                                  
+                                  'shouldIncludeImages': False          # this variable will not be plotted or compared to
+                                                                        # the longitude and latitude variables
                                   }
 
 setOfVariables['Total Precipitable Water'] = {

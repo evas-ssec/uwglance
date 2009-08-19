@@ -123,8 +123,6 @@ def generate_and_save_summary_report(files,
     # pack up all the data needed to build the summary report
     
     # TODO, more automated defaults
-    if not (runInfo.has_key('shouldIncludeImages')) :
-        runInfo[shouldIncludeImages] = True
     varNameDefaults = { 'uniqueToAVars': [],
                         'uniqueToBVars': [],
                         'sharedVars': []}
