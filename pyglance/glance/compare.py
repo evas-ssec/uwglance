@@ -832,7 +832,7 @@ python -m glance
         
         # get info on who's doing the run and where
         runInfo['machine'] = os.uname()[1] # the name of the machine running the report
-        runInfo['user'] = os.getlogin() # the name of the user running the report
+        runInfo['user'] = os.getenv("LOGNAME") #os.getlogin() # the name of the user running the report
         
         # deal with the input and output files
         outputPath = pathsTemp['out']
