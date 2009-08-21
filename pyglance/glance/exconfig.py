@@ -69,9 +69,16 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
                                                         # None indicates that variables should not be tested
                                                         # on nearness of epsilon comparison
                                                         
-                 'nonfinite_data_tolerance': None       # the allowed fraction of non-finite data
+                 'nonfinite_data_tolerance': None,      # the allowed fraction of non-finite data
                                                         # None indicates that variables should not be tested
                                                         # on amount of non-finite data
+                 
+                 'only_plot_on_fail': True              # only create the variable images if the variable
+                                                        # fails it's tolerance tests
+                                                        # Note: This setting can be overriden if you set the 
+                                                        # perVariable version of "shouldIncludeImages" to false
+                                                        # (then plots will never be created for that variable)
+                 
                  # the following two functions can be defined in order to filter the variable data,
                  # for example, these could be used to compensate
                  # for differening data types (like ints/floats or float32/float64)

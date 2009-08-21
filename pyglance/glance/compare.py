@@ -970,9 +970,13 @@ python -m glance
                 varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now()) 
                 passedFraction = (1.0 - variableAnalysisInfo[varKey]['var_stats']
                                   ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction'])
-                varRunInfo['did_pass'] = _check_pass_or_fail(varRunInfo,
-                                                             variableAnalysisInfo[varKey]['var_stats'],
-                                                             defaultValues)
+                didPass = _check_pass_or_fail(varRunInfo,
+                                              variableAnalysisInfo[varKey]['var_stats'],
+                                              defaultValues)
+                varRunInfo['did_pass'] = didPass
+                if ('only_plot_on_fail' in varRunInfo) and (varRunInfo['only_plot_on_fail']) :
+                    varRunInfo['shouldIncludeImages'] = ((not didPass) and varRunInfo['only_plot_on_fail']
+                        and ((not ('shouldIncludeImages' in varRunInfo)) or varRunInfo['shouldIncludeImages']))
                 variableAnalysisInfo[varKey]['run_info'] = varRunInfo
                 variableAnalysisInfo[varKey]['exp_name'] = explanationName
                 

@@ -21,8 +21,7 @@ from matplotlib.ticker import FormatStrFormatter
 import os, sys, logging
 import numpy as np
 
-import keoni.map.graphics as maps
-
+import glance.graphics as maps
 import glance.delta as delta
 import glance.report as report
 
@@ -72,12 +71,6 @@ def _create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsi
     
     # the scatter plot of the good data 
     axes.plot(dataX, dataY, 'b,', label='within\nepsilon')
-    # TODO, if we eventually want to plot the data with some sort of color, I think we will have to use scatter()
-    '''
-    if len(dataX) > 0 and len(dataY) > 0 :
-        diffData = np.abs(dataX - dataY)
-        axes.scatter(dataX, dataY, c=diffData, vmin=diffData.min(), vmax=diffData.max(), label='within\nepsilon')
-    '''
     
     # plot the bad data
     numTroublePts = 0
@@ -185,21 +178,46 @@ def _clean_lon_or_lat_with_mask(lon_or_lat_data, invalid_data_mask):
     
     return clean_data
 
+# chose a projection based on the bounding axes that will be shown
+def _select_projection(boundingAxes) :
+    
+    # TODO at the moment the default (lcc) is cutting off the field of view,
+    # I think the same problem will occur with all of the conic projections, because
+    # they all allow you to specify the field of view either as corners or as a width/height in
+    # meters, but they do not take the distortion that a conic projection causes into account.
+    # This means that either the corners or the bottom curve of the data area will be clipped off
+    # the edge of the screen. There is also some sort of persistent bug that causes the basemap
+    # to ignore the requested corners for some data sets and shift west and north, cutting off
+    # a pretty considerable amount of data. I've tried various tactics to control the field of
+    # view and can't find any way to get the basemap to show an acceptable area programatically
+    # that will match arbitrary data sets.
+    # For the moment, I am setting this to use a cylindrical projection rather than a conic.
+    # At some point in the future this should be revisited so that glance will be able to handle
+    # a wider range of projections.
+    projToUse = 'mill'
+    
+    # how big is the field of view?
+    longitudeRange  = abs(boundingAxes[1] - boundingAxes[0])
+    latitudeRange   = abs(boundingAxes[3] - boundingAxes[2])
+    # chose the projection based on the range we have to cover
+    if (longitudeRange > 180) :
+        projToUse = 'mill' # use a miller cylindrical projection to show the whole world
+    elif (longitudeRange > 100) or (latitudeRange > 70) :
+        projToUse = 'ortho' # use an orthographic projection to show about half the globe
+    
+    return projToUse
+
 # create a figure including our data mapped onto a map at the lon/lat given
 # the colorMap parameter can be used to control the colors the figure is drawn in
-# if any masks are passed in in the tagData list they will be plotted as an overlays
+# if any masks are passed in the tagData list they will be plotted as an overlays
 # set on the existing image
-def _create_mapped_figure(data, latitude, longitude, title,
+def _create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxes, title,
                           invalidMask=None, colorMap=None, tagData=None,
                           dataRanges=None, dataRangeNames=None, dataRangeColors=None) :
     
     # make a clean version of our lon/lat
     latitudeClean  = _clean_lon_or_lat_with_mask(latitude,  invalidMask)
     longitudeClean = _clean_lon_or_lat_with_mask(longitude, invalidMask)
-    
-    # get the bounding axes 
-    boundingAxes = _get_visible_axes (longitudeClean, latitudeClean, invalidMask)
-    LOG.debug("Visible axes for figure \"" + title + "\" are: " + str(boundingAxes))
     
     # build the plot
     figure = plt.figure()
@@ -222,60 +240,34 @@ def _create_mapped_figure(data, latitude, longitude, title,
             dataRanges[0] = dataRanges[0] - offsetToRange
             dataRanges[len(dataRanges) - 1] = dataRanges[len(dataRanges) - 1] + offsetToRange
         kwargs['levelsToUse'] = dataRanges
-        kwargs['colors'] = dataRangeColors # add in the list of colors (may be None)
+        if dataRangeColors is not None :
+            kwargs['colors'] = dataRangeColors # add in the list of colors (may be None)
     
     # if we've got a color map, pass it to the list of things we want to tell the plotting function
     if not (colorMap is None) :
         kwargs['cmap'] = colorMap
     
-    # set up the projection information
-    longitudeRange  = abs(boundingAxes[1] - boundingAxes[0])
-    latitudeRange   = abs(boundingAxes[3] - boundingAxes[2])
-    # chose the projection based on the range we have to cover
-    if (longitudeRange > 180) :
-        kwargs['projection'] = 'mill' # use a miller cylindrical projection to show the whole world
-    elif (longitudeRange > 100) or (latitudeRange > 70) :
-        kwargs['projection'] = 'ortho' # use an orthographic projection to show half the globe
-    else :
-        # TODO at the moment the default (lcc) is cutting off the field of view,
-        # I think the same problem will occur with all of the conic projections, because
-        # they all allow you to specify the field of view either as corners or as a width/height in
-        # meters, but they do not take the distortion that a conic projection causes into account.
-        # This means that either the corners or the bottom curve of the data area will be clipped off
-        # the edge of the screen. There is also some sort of persistent bug that causes the basemap
-        # to ignore the requested corners for some data sets and shift west and north, cutting off
-        # a pretty considerable amount of data. I've tried various tactics to control the field of
-        # view and can't find any way to get the basemap to show an acceptable area programatically
-        # that will match arbitrary data sets.
-        # For the moment, I am setting this to use a cylindrical projection rather than a conic.
-        # At some point in the future this should be revisited so that glance will be able to handle
-        # a wider range of projections.
-        kwargs['projection'] = 'mill'
-    
     # draw our data placed on a map
-    bMap, x, y = maps.mapshow(longitudeClean, latitudeClean, data, boundingAxes, **kwargs)
+    #bMap, x, y = maps.mapshow(longitudeClean, latitudeClean, data, boundingAxes, **kwargs)
+    maps.draw_basic_features(baseMapInstance, boundingAxes)
+    bMap, x, y = maps.show_lon_lat_data(longitudeClean, latitudeClean, baseMapInstance, data, **kwargs)
     
     # and some informational stuff
     axes.set_title(title)
     # show a generic color bar
+    doLabelRanges = False
     if not (data is None) :
         cbar = colorbar(format='%.3f')
         # if there are specific requested labels, add them
         if not (dataRangeNames is None) :
-            yPosition = None
-            # if we have fewer labels than tick marks, assume they wanted ranges labeled
-            if (len(dataRangeNames) < len(dataRanges)) :
-                # TODO, try to display the range colors in an axis instead of a color bar?
-                '''
-                yPosition=[]
-                tickPositions = cbar.ax.get_yticks()
-                for posNum in range(len(tickPositions) - 1) :
-                    currentPos = tickPositions[posNum]
-                    nextPos = tickPositions[posNum + 1]
-                    yPosition.append(0) #(currentPos + ((nextPos - currentPos) / 2.0))
-                '''
-            else : # we have enough data names to label the tick marks
-                cbar.ax.set_yticklabels(dataRangeNames, y=yPosition)
+            
+            # if we don't have exactly the right number of range names to label the ranges
+            # then label the tick marks
+            if not (len(dataRangeNames) is (len(dataRanges) - 1)) :
+                cbar.ax.set_yticklabels(dataRangeNames)
+            else : # we will want to label the ranges themselves
+                cbar.ax.set_yticklabels(dataRangeNames) # todo, this line is temporary
+                doLabelRanges = True
     
     # if there are "tag" masks, plot them over the existing map
     if not (tagData is None) :
@@ -302,14 +294,13 @@ def _create_mapped_figure(data, latitude, longitude, title,
             # by plotting some colored circles underneath them
             if (percentBad < 0.25) :
                 neededHighlighting = True
-                bMap.plot(newX, newY, 'o', color='#993399', markersize=5)
+                p = bMap.plot(newX, newY, 'o', color='#993399', markersize=5)
             elif (percentBad < 1.0) :
                 neededHighlighting = True
-                bMap.plot(newX, newY, 'o', color='#993399', markersize=3)
+                p = bMap.plot(newX, newY, 'o', color='#993399', markersize=3)
             
             # plot our point on top of the existing figure
-            bMap.plot(newX, newY, '.', color='#00FF00', markersize=1)
-            
+            p = bMap.plot(newX, newY, '.', color='#00FF00', markersize=1)
         
         # display the number of trouble points on the report if we were passed a set of tag data
         # I'm not thrilled with this solution for getting it below the labels drawn by the basemap
@@ -321,6 +312,17 @@ def _create_mapped_figure(data, latitude, longitude, title,
             if neededHighlighting :
                 troublePtString = troublePtString + '\nwith Purple Circles for Visual Clarity'
         plt.xlabel(troublePtString)
+    
+    # if we still need to label the ranges, do it now that our fake axis won't mess the trouble points up
+    if doLabelRanges :
+        """ TODO get this working properly
+        fakeAx = plt.axes ([0.77, 0.05, 0.2, 0.9], frameon=False)
+        fakeAx.xaxis.set_visible(False)
+        fakeAx.yaxis.set_visible(False)
+        
+        testRect = Rectangle((0, 0), 1, 1, fc="r")
+        legendKey = fakeAx.legend([testRect], ["r\n\n\n"], mode="expand", ncol=1, borderaxespad=0.)
+        """
     
     return figure
 
@@ -389,10 +391,15 @@ def plot_and_save_spacial_trouble(longitude, latitude,
     if makeSmall is passed as true a smaller version of the image will also be saved
     """
     
+    # get the bounding axis and make a basemap
+    boundingAxes = _get_visible_axes(longitude, latitude, spaciallyInvalidMask)
+    LOG.debug("Visible axes for lon/lat trouble figure  are: " + str(boundingAxes))
+    baseMapInstance, boundingAxes = maps.create_basemap(longitude, latitude, boundingAxes, _select_projection(boundingAxes))
+    
     # make the figure
     LOG.info("Creating spatial trouble image")
-    spatialTroubleFig = _create_mapped_figure(None, latitude, longitude, title,
-                                              spaciallyInvalidMask, None, spacialTroubleMask)
+    spatialTroubleFig = _create_mapped_figure(None, latitude, longitude, baseMapInstance, boundingAxes,
+                                                    title, spaciallyInvalidMask, None, spacialTroubleMask)
     # save the figure
     LOG.info("Saving spatial trouble image")
     spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=fullSizeDPI) 
@@ -404,6 +411,8 @@ def plot_and_save_spacial_trouble(longitude, latitude,
     
     # clear the figure
     spatialTroubleFig.clf()
+    plt.close(spatialTroubleFig)
+    del(spatialTroubleFig)
     
     return
     
@@ -426,12 +435,15 @@ def _handle_fig_creation_task(child_figure_function, log_message,
     if (isParent) :
         return pid
     else :
-        figure = child_figure_function()
+        figure = child_figure_function() 
         LOG.info(log_message)
         figure.savefig(fullFigOutputNamePath, dpi=fullSizeDPI)
         if (shouldMakeSmall) :
             figure.savefig(smallFigOutputNamePath, dpi=thumbSizeDPI)
-        figure.clf() # clear the figure
+
+        # get rid of the figure 
+        plt.close(figure)
+        del(figure)
     
     # if we've reached this point and we did fork,
     # then we're the child process and we should stop now
@@ -489,7 +501,7 @@ def plot_and_save_figure_comparison(aData, bData,
     (spaciallyInvalidMaskA, spaciallyInvalidMaskB) = delta.diff(aData, bData, variableRunInfo['epsilon'],
                                                                 (missing_value, missing_value_b),
                                                                 (spaciallyInvalidMaskA, spaciallyInvalidMaskB))
-    absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, rather than just which one's bigger/smaller
+    absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
     
     # some more display info, pull it out for convenience
     dataRanges = None
@@ -502,9 +514,21 @@ def plot_and_save_figure_comparison(aData, bData,
     if ('display_colors' in variableRunInfo) :
         dataColors = variableRunInfo['display_colors'] 
     
+    # figure out the bounding axis
+    aAxis = _get_visible_axes(longitudeAData, latitudeAData, ~goodInAMask)
+    bAxis = _get_visible_axes(longitudeBData, latitudeBData, ~goodInBMask)
+    fullAxis = [min(aAxis[0], bAxis[0]), max(aAxis[1], bAxis[1]),
+                min(aAxis[2], bAxis[2]), max(aAxis[3], bAxis[3])]
+    LOG.debug("Visible axes for file A variable data (" + variableDisplayName + ") are: " + str(aAxis))
+    LOG.debug("Visible axes for file B variable data (" + variableDisplayName + ") are: " + str(bAxis))
+    LOG.debug("Visible axes shared for both file's variable data (" + variableDisplayName + ") are: " + str(fullAxis))
+    
+    # create our basemap
+    LOG.info('\t\tloading base map data')
+    baseMapInstance, fullAxis = maps.create_basemap(longitudeCommonData, latitudeCommonData, fullAxis, _select_projection(fullAxis))
+    
     # from this point on, we will be forking to create child processes so we can parallelize our image and
     # report generation
-    
     isParent = True 
     childPids = []
     
@@ -513,6 +537,7 @@ def plot_and_save_figure_comparison(aData, bData,
     # the original A data
     LOG.info("\t\tcreating image of " + variableDisplayName + " in file a")
     pid = _handle_fig_creation_task((lambda : _create_mapped_figure(aData, latitudeAData, longitudeAData,
+                                                                    baseMapInstance, fullAxis,
                                                                     (variableDisplayName + "\nin File A"),
                                                                     invalidMask=(~goodInAMask),
                                                                     dataRanges=dataRanges,
@@ -529,6 +554,7 @@ def plot_and_save_figure_comparison(aData, bData,
     # the original B data
     LOG.info("\t\tcreating image of " + variableDisplayName + " in file b")
     pid = _handle_fig_creation_task((lambda : _create_mapped_figure(bData, latitudeBData, longitudeBData,
+                                                                    baseMapInstance, fullAxis,
                                                                     (variableDisplayName + "\nin File B"),
                                                                     invalidMask=(~ goodInBMask),
                                                                     dataRanges=dataRanges,
@@ -549,6 +575,7 @@ def plot_and_save_figure_comparison(aData, bData,
         LOG.info("\t\tcreating image of the absolute value of difference in " + variableDisplayName)
         pid = _handle_fig_creation_task((lambda : _create_mapped_figure(absDiffData,
                                                                         latitudeCommonData, longitudeCommonData,
+                                                                        baseMapInstance, fullAxis,
                                                                         ("Absolute value of difference in\n" + variableDisplayName),
                                                                         invalidMask=(~ goodMask))),
                                         "\t\tsaving image of the absolute value of difference for " + variableDisplayName,
@@ -562,6 +589,7 @@ def plot_and_save_figure_comparison(aData, bData,
         # the subtraction of one data set from the other
         LOG.info("\t\tcreating image of the difference in " + variableDisplayName)
         pid = _handle_fig_creation_task((lambda : _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData,
+                                                                        baseMapInstance, fullAxis,
                                                                         ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
                                                                         invalidMask=(~ goodMask))),
                                         "\t\tsaving image of the difference in " + variableDisplayName,
@@ -580,6 +608,7 @@ def plot_and_save_figure_comparison(aData, bData,
         tempMask = goodInAMask & (~goodInBMask) 
         bDataCopy[tempMask] = aData[tempMask]
         pid = _handle_fig_creation_task((lambda : _create_mapped_figure(bDataCopy, latitudeCommonData, longitudeCommonData,
+                                                                        baseMapInstance, fullAxis,
                                                                         ("Areas of trouble data in\n" + variableDisplayName),
                                                                         (~(goodInAMask | goodInBMask)),
                                                                         mediumGrayColorMap, troubleMask,
