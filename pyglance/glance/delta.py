@@ -124,6 +124,13 @@ def rms_corr_withnoise(truth, actual, noiz, epsilon=0., (amissing,bmissing)=(Non
              }
 
 def stats(diffData, mask, *etc):
+    
+    # if there are no values after the mask,
+    # we can't do any of these forms of
+    # statistical analysis
+    if sum(mask) is 0 :
+        return { }
+    
     absDiffData = abs(diffData)
     rms = sqrt( sum(diffData[mask] ** 2) / sum(mask) )   
     return {    'rms_diff': rms, 
@@ -281,7 +288,7 @@ def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsi
 # get the min, ignoring the stuff in mask
 def min_with_mask(data, mask) :
     temp = data[~mask]
-    toReturn = nan
+    toReturn = None
     if len(temp) > 0 :
         toReturn = temp[temp.argmin()]
     return toReturn
@@ -289,7 +296,7 @@ def min_with_mask(data, mask) :
 # get the max, ignoring the stuff in mask
 def max_with_mask(data, mask) :
     temp = data[~mask]
-    toReturn = nan
+    toReturn = None
     if len(temp) > 0 :
         toReturn = temp[temp.argmax()]
     return toReturn
