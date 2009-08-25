@@ -448,7 +448,9 @@ def _handle_fig_creation_task(child_figure_function, log_message,
             newSize = (int(originalSize[0] * scaleFactor), int(originalSize[1] * scaleFactor))
             tempImage = tempImage.resize(newSize, Image.ANTIALIAS)
             tempImage.save(smallFigOutputNamePath)
-        
+            
+            #figure.savefig(smallFigOutputNamePath, dpi=thumbSizeDPI)
+
         # get rid of the figure 
         plt.close(figure)
         del(figure)
@@ -530,6 +532,11 @@ def plot_and_save_figure_comparison(aData, bData,
     LOG.debug("Visible axes for file A variable data (" + variableDisplayName + ") are: " + str(aAxis))
     LOG.debug("Visible axes for file B variable data (" + variableDisplayName + ") are: " + str(bAxis))
     LOG.debug("Visible axes shared for both file's variable data (" + variableDisplayName + ") are: " + str(fullAxis))
+    
+    if (fullAxis[0] is None) or (fullAxis[1] is None) or (fullAxis[2] is None) or (fullAxis[3] is None) :
+        LOG.warn("Unable to display figures for variable (" + variableDisplayName + ") because of inability to identify" +
+                 " usable bounding longitude and latitude range on the earth. Bounding range that was identified: str(fullAxis)")
+        return # TODO, the figures need to be disabled from the report and possibly a warning on the report?
     
     # create our basemap
     LOG.info('\t\tloading base map data')
