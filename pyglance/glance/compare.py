@@ -992,28 +992,6 @@ python -m glance
         isParent = True 
         childPids = []
         
-        # loop to create the images for all our variables
-        if (runInfo['shouldIncludeImages']) :
-            for varKey in variableAnalysisInfo :
-                if (not ('shouldIncludeImages' in variableAnalysisInfo[varKey]['run_info'])) \
-                    or (variableAnalysisInfo[varKey]['run_info']['shouldIncludeImages']) :
-                    
-                    # create the images comparing that variable
-                    print("\tcreating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
-                    plot.plot_and_save_figure_comparison(variableAnalysisInfo[varKey]['data']['A'],
-                                                         variableAnalysisInfo[varKey]['data']['B'],
-                                                         variableAnalysisInfo[varKey]['run_info'],
-                                                         files['file A']['path'],
-                                                         files['file B']['path'],
-                                                         latitudeA, longitudeA,
-                                                         latitudeB, longitudeB,
-                                                         latitudeCommon, longitudeCommon,
-                                                         spaciallyInvalidMaskA,
-                                                         spaciallyInvalidMaskB,
-                                                         outputPath, True,
-                                                         doFork=runInfo['doFork']) 
-                    print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
-        
         # reports are fast, so the parent thread will just do this
         # generate our general report pages once we've looked at all the variables
         if (runInfo['shouldIncludeReport']) :
@@ -1053,6 +1031,28 @@ python -m glance
             # make the glossary
             print ('generating glossary')
             report.generate_and_save_doc_page(delta.STATISTICS_DOC, outputPath)
+        
+        # loop to create the images for all our variables
+        if (runInfo['shouldIncludeImages']) :
+            for varKey in variableAnalysisInfo :
+                if (not ('shouldIncludeImages' in variableAnalysisInfo[varKey]['run_info'])) \
+                    or (variableAnalysisInfo[varKey]['run_info']['shouldIncludeImages']) :
+                    
+                    # create the images comparing that variable
+                    print("\tcreating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
+                    plot.plot_and_save_figure_comparison(variableAnalysisInfo[varKey]['data']['A'],
+                                                         variableAnalysisInfo[varKey]['data']['B'],
+                                                         variableAnalysisInfo[varKey]['run_info'],
+                                                         files['file A']['path'],
+                                                         files['file B']['path'],
+                                                         latitudeA, longitudeA,
+                                                         latitudeB, longitudeB,
+                                                         latitudeCommon, longitudeCommon,
+                                                         spaciallyInvalidMaskA,
+                                                         spaciallyInvalidMaskB,
+                                                         outputPath, True,
+                                                         doFork=runInfo['doFork']) 
+                    print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
         
         # if we're the parent, wait for any children to catch up
         if isParent:

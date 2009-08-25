@@ -82,11 +82,13 @@ class hdf(SD):
         
         # get information about where the data is the missing value
         missing_val = self.missing_value(name)
-        missing_mask = (raw_data_copy == missing_val)
+        missing_mask = np.zeros(raw_data_copy.shape, dtype=np.bool)
+        missing_mask[raw_data_copy == missing_val] = True
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
+        #scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
+        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
         
         return scaled_data_copy 
     
@@ -146,11 +148,13 @@ class nc(CDF):
         
         # get information about where the data is the missing value
         missing_val = self.missing_value(name)
-        missing_mask = (raw_data_copy == missing_val)
+        missing_mask = np.zeros(raw_data_copy.shape, dtype=np.bool)
+        missing_mask[raw_data_copy == missing_val] = True
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
+        #scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
+        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
         
         return scaled_data_copy 
     
@@ -222,11 +226,13 @@ class h5(object):
         
         # get information about where the data is the missing value
         missing_val = self.missing_value(name)
-        missing_mask = (raw_data_copy == missing_val)
+        missing_mask = np.zeros(raw_data_copy.shape, dtype=np.bool)
+        missing_mask[raw_data_copy == missing_val] = True
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
+        #scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
+        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
         
         return scaled_data_copy
     
