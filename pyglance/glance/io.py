@@ -80,9 +80,13 @@ class hdf(SD):
             LOG.warn ('Scaling method of \"' + str(scaling_method) + '\" will be ignored in favor of hdf standard method. '
                       + 'This may cause problems with data consistency')
         
+        # get information about where the data is the missing value
+        missing_val = self.missing_value(name)
+        missing_mask = (raw_data_copy == missing_value)
+        
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        scaled_data_copy = (scaled_data_copy - add_offset) * scale_factor #TODO, type truncation issues?
+        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
         
         return scaled_data_copy 
     
@@ -140,9 +144,13 @@ class nc(CDF):
         if (scale_factor == 1.0) and (add_offset == 0.0) :
             return raw_data_copy
         
+        # get information about where the data is the missing value
+        missing_val = self.missing_value(name)
+        missing_mask = (raw_data_copy == missing_value)
+        
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        scaled_data_copy = (scaled_data_copy - add_offset) * scale_factor #TODO, type truncation issues?
+        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
         
         return scaled_data_copy 
     
@@ -212,9 +220,13 @@ class h5(object):
         if (scale_factor == 1.0) and (add_offset == 0.0) :
             return raw_data_copy
         
+        # get information about where the data is the missing value
+        missing_val = self.missing_value(name)
+        missing_mask = (raw_data_copy == missing_value)
+        
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        scaled_data_copy = (scaled_data_copy - add_offset) * scale_factor #TODO, type truncation issues?
+        scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
         
         return scaled_data_copy
     

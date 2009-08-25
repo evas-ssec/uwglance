@@ -179,7 +179,7 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                     if ('alternate_name_in_B' in currNameInfo) :
                         name_b = currNameInfo['alternate_name_in_B']
                     
-                    if (name in fileCommonNames) | \
+                    if (name in fileCommonNames) or \
                             (currNameInfo.has_key('alternate_name_in_B') and
                              (name   in nameComparison['uniqueToAVars']) and
                              (name_b in nameComparison['uniqueToBVars'])) :

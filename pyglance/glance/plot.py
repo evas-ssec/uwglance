@@ -18,6 +18,8 @@ from matplotlib import cm
 import matplotlib.colors as colors
 from matplotlib.ticker import FormatStrFormatter
 
+from PIL import Image
+
 import os, sys, logging
 import numpy as np
 
@@ -439,8 +441,14 @@ def _handle_fig_creation_task(child_figure_function, log_message,
         LOG.info(log_message)
         figure.savefig(fullFigOutputNamePath, dpi=fullSizeDPI)
         if (shouldMakeSmall) :
-            figure.savefig(smallFigOutputNamePath, dpi=thumbSizeDPI)
-
+            
+            tempImage = Image.open(fullFigOutputNamePath)
+            scaleFactor = float(thumbSizeDPI) / float(fullSizeDPI)
+            originalSize = tempImage.size
+            newSize = (int(originalSize[0] * scaleFactor), int(originalSize[1] * scaleFactor))
+            tempImage = tempImage.resize(newSize, Image.ANTIALIAS)
+            tempImage.save(smallFigOutputNamePath)
+        
         # get rid of the figure 
         plt.close(figure)
         del(figure)
