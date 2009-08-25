@@ -275,10 +275,17 @@ def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsi
     # we actually want the total number of _finite_ values rather than all the data
     total_num_finite_values = sum(data_is_finite_mask)
     
+    # no dividing by 0!
+    fraction_too_different = 1.0
+    fraction_perfect = 0.0
+    if total_num_finite_values > 0 :
+        fraction_too_different = num_finite_values_too_different / float(total_num_finite_values)
+        fraction_perfect = num_perfect / float(total_num_finite_values)
+    
     comparison = {  'diff_outside_epsilon_count': num_finite_values_too_different,
-                    'diff_outside_epsilon_fraction': num_finite_values_too_different / float(total_num_finite_values),
+                    'diff_outside_epsilon_fraction': fraction_too_different,
                     'perfect_match_count': num_perfect,
-                    'perfect_match_fraction': num_perfect / float(total_num_finite_values),
+                    'perfect_match_fraction': fraction_perfect,
                     'correlation': r_corr
                     }
     comparison.update(additional_statistics)
