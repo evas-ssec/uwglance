@@ -128,7 +128,7 @@ def stats(diffData, mask, *etc):
     # if there are no values after the mask,
     # we can't do any of these forms of
     # statistical analysis
-    if sum(mask) is 0 :
+    if sum(mask) <= 0 :
         return { }
     
     absDiffData = abs(diffData)
