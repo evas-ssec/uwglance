@@ -535,7 +535,7 @@ def plot_and_save_figure_comparison(aData, bData,
     
     if (fullAxis[0] is None) or (fullAxis[1] is None) or (fullAxis[2] is None) or (fullAxis[3] is None) :
         LOG.warn("Unable to display figures for variable (" + variableDisplayName + ") because of inability to identify" +
-                 " usable bounding longitude and latitude range on the earth. Bounding range that was identified: str(fullAxis)")
+                 " usable bounding longitude and latitude range on the earth. Bounding range that was identified:" + str(fullAxis))
         return # TODO, the figures need to be disabled from the report and possibly a warning on the report?
     
     # create our basemap
