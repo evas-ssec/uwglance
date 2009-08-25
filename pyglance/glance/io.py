@@ -82,7 +82,7 @@ class hdf(SD):
         
         # get information about where the data is the missing value
         missing_val = self.missing_value(name)
-        missing_mask = (raw_data_copy == missing_value)
+        missing_mask = (raw_data_copy == missing_val)
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
@@ -146,7 +146,7 @@ class nc(CDF):
         
         # get information about where the data is the missing value
         missing_val = self.missing_value(name)
-        missing_mask = (raw_data_copy == missing_value)
+        missing_mask = (raw_data_copy == missing_val)
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
@@ -222,7 +222,7 @@ class h5(object):
         
         # get information about where the data is the missing value
         missing_val = self.missing_value(name)
-        missing_mask = (raw_data_copy == missing_value)
+        missing_mask = (raw_data_copy == missing_val)
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
