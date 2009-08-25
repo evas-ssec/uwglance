@@ -69,7 +69,8 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
                                                         # None indicates that variables should not be tested
                                                         # on nearness of epsilon comparison
                                                         
-                 'nonfinite_data_tolerance': None,      # the allowed fraction of non-finite data
+                 'nonfinite_data_tolerance': None,      # the allowed fraction of non-finite data that
+                                                        # that differs between the two files
                                                         # None indicates that variables should not be tested
                                                         # on amount of non-finite data
                  
