@@ -280,11 +280,19 @@ def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsi
 
 # get the min, ignoring the stuff in mask
 def min_with_mask(data, mask) :
-    return data[~mask][data[~mask].argmin()]
-    
+    temp = data[~mask]
+    toReturn = nan
+    if len(temp) > 0 :
+        toReturn = temp[temp.argmin()]
+    return toReturn
+
 # get the max, ignoring the stuff in mask
 def max_with_mask(data, mask) :
-    return data[~mask][data[~mask].argmax()]
+    temp = data[~mask]
+    toReturn = nan
+    if len(temp) > 0 :
+        toReturn = temp[temp.argmax()]
+    return toReturn
 
 def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), ignoreInAMask=None, ignoreInBMask=None):
     """return dictionary of statistics dictionaries
