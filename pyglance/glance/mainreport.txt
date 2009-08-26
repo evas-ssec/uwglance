@@ -153,12 +153,16 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                     
                     % for variableKey in sorted(list(variables)) :
                         <%
+                            # get some information about the variable, for convenience
                             tempVariableInfo = variables[variableKey]
+                            
                             technicalName  = tempVariableInfo['variable_run_info']['variable_name']
                             varDisplayName = technicalName
                             if 'display_name' in tempVariableInfo['variable_run_info'] :
                                 varDisplayName = tempVariableInfo['variable_run_info']['display_name']
-                            passPercent = tempVariableInfo['pass_epsilon_percent']
+                            
+                            passPercent          = tempVariableInfo['pass_epsilon_percent']
+                            finiteSimilarPercent = tempVariableInfo['finite_similar_percent']
                             didPass = tempVariableInfo['variable_run_info']['did_pass']
                         %>
                         <tr>
@@ -175,7 +179,9 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                                 Variable: <a href="${technicalName | u}.html">${varDisplayName}</a> <br>
                                 Epsilon used: ${tempVariableInfo['variable_run_info']['epsilon']} <br>
                                 Finite values within one epsilon of difference:
-                                ${report.make_formatted_display_string(passPercent)}%
+                                ${report.make_formatted_display_string(passPercent, '%.6g')}%<br>
+                                Data that matched in finite-ness between the files:
+                                ${report.make_formatted_display_string(finiteSimilarPercent, '%.6g')}%
                             </td>
                         </tr>
                     % endfor

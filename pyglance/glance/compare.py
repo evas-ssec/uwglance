@@ -549,8 +549,7 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     
     # check to see if it failed on nonfinite data
     if not (nonfiniteTolerance is None) :
-        non_finite_pts = variableStats['Finite Data Statistics']['finite_in_only_one_count']
-        non_finite_diff_fraction = float(non_finite_pts) / float(variableStats['General Statistics']['num_data_points'])
+        non_finite_diff_fraction = variableStats['Finite Data Statistics']['finite_in_only_one_fraction']
         passedNonFinite = non_finite_diff_fraction <= nonfiniteTolerance
         
         # combine the two test results
@@ -1006,7 +1005,10 @@ python -m glance
                 # hang on to our good % and other info to describe our comparison
                 passedPercent = (1.0 - variableAnalysisInfo[varKey]['var_stats']
                                   ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']) * 100.0
+                nonFiniteDiffPercent = (1.0 - variableAnalysisInfo[varKey]['var_stats'] \
+                                                           ['Finite Data Statistics']['finite_in_only_one_fraction']) * 100.0
                 variableComparisons[varKey] = {'pass_epsilon_percent': passedPercent,
+                                               'finite_similar_percent': nonFiniteDiffPercent,
                                                'variable_run_info': variableAnalysisInfo[varKey]['run_info']
                                                }
                 

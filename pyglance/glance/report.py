@@ -37,15 +37,17 @@ def _make_and_save_page (fullFilePath, templateFileNameToUse, **kwargs) :
     
     return
 
-def make_formatted_display_string(displayData) :
+def make_formatted_display_string(displayData, customDisplayFormat=None) :
     '''
     given a piece of data return a display string
     '''
     displayString = ''
+    formatStr = customDisplayFormat
     
     # check to see if there is a format string to use
     if type(displayData) in formattingSettings :
-        formatStr = formattingSettings[type(displayData)]
+        if formatStr is None :
+            formatStr = formattingSettings[type(displayData)]
         displayString = formatStr % displayData
     else :
         displayString = str(displayData)
