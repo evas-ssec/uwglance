@@ -971,9 +971,14 @@ python -m glance
                                               variableAnalysisInfo[varKey]['var_stats'],
                                               defaultValues)
                 varRunInfo['did_pass'] = didPass
-                if ('only_plot_on_fail' in varRunInfo) and (varRunInfo['only_plot_on_fail']) :
-                    varRunInfo['shouldIncludeImages'] = ((not didPass) and varRunInfo['only_plot_on_fail']
-                        and ((not ('shouldIncludeImages' in varRunInfo)) or varRunInfo['shouldIncludeImages']))
+                # based on the settings the user gave and whether the variable passsed or failed,
+                # should we include images for this variable?
+                currentIncludeImages = runInfo['shouldIncludeImages']
+                if ('shouldIncludeImages' in varRunInfo) :
+                    currentIncludeImages = varRunInfo['shouldIncludeImages']
+                if ('only_plot_on_fail' in varRunInfo) :
+                    varRunInfo['shouldIncludeImages'] = currentIncludeImages and (not (varRunInfo['only_plot_on_fail'] and didPass))
+                # set the rest of our info
                 variableAnalysisInfo[varKey]['run_info'] = varRunInfo
                 variableAnalysisInfo[varKey]['exp_name'] = explanationName
                 
