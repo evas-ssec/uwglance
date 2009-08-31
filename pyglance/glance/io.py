@@ -41,7 +41,7 @@ class hdf(SD):
         # defaults
         scale_factor = 1.0
         add_offset = 0.0
-        data_type = np.float32 # TODO temporary
+        data_type = None 
         scaling_method = None
         
         # get the variable object and use it to
@@ -54,10 +54,12 @@ class hdf(SD):
         except HDF4Error:
             # load just the scale factor and add offset
             temp_attributes = variable_object.attributes()
-            if ('scale_factor' in temp_attributes) :
-                scale_factor = temp_attributes['scale_factor']
             if ('add_offset' in temp_attributes) :
                 add_offset = temp_attributes['add_offset']
+                data_type = np.dtype(type(add_offset))
+            if ('scale_factor' in temp_attributes) :
+                scale_factor = temp_attributes['scale_factor']
+                data_type = np.dtype(type(scale_factor))
             if ('scaling_method' in temp_attributes) :
                 scaling_method = temp_attributes['scaling_method']
         SDS.endaccess(variable_object)
@@ -79,6 +81,9 @@ class hdf(SD):
         if not ((scaling_method is None) or (int(scaling_method) <= 1)) :
             LOG.warn ('Scaling method of \"' + str(scaling_method) + '\" will be ignored in favor of hdf standard method. '
                       + 'This may cause problems with data consistency')
+        
+        # if we don't have a data type something strange has gone wrong
+        assert(not (data_type is None))
         
         # get information about where the data is the missing value
         missing_val = self.missing_value(name)

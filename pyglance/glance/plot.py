@@ -492,6 +492,10 @@ def plot_and_save_figure_comparison(aData, bData,
                                                           # for descriptive purposes if it is not defined
                             }
     """
+    
+    # TODO Temporary for testing
+    testOverrideForMemoryThroughFork = False
+    
     # if we weren't given a variable display name,
     # just use the standard variable name instead
     variableName = variableRunInfo['variable_name']
@@ -561,10 +565,13 @@ def plot_and_save_figure_comparison(aData, bData,
                                     "\t\tsaving image of " + variableDisplayName + " for file a",
                                     outputPath + "/" + variableName + ".A.png",
                                     outputPath + "/" + variableName + ".A.small.png",
-                                    makeSmall, doFork)
+                                    makeSmall, doFork or testOverrideForMemoryThroughFork)
     if not (pid is 0) :
-        childPids.append(pid)
-        LOG.debug ("Started child process (pid: " + str(pid) + ") to create file a image for " + variableDisplayName)
+        if doFork :
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create file a image for " + variableDisplayName)
+        else :
+            os.waitpid(pid, 0)
     
     # the original B data
     LOG.info("\t\tcreating image of " + variableDisplayName + " in file b")
@@ -578,10 +585,13 @@ def plot_and_save_figure_comparison(aData, bData,
                                     "\t\tsaving image of " + variableDisplayName + " for file b",
                                     outputPath + "/" + variableName + ".B.png",
                                     outputPath + "/" + variableName + ".B.small.png",
-                                    makeSmall, doFork)
+                                    makeSmall, doFork or testOverrideForMemoryThroughFork)
     if not (pid is 0) :
-        childPids.append(pid)
-        LOG.debug ("Started child process (pid: " + str(pid) + ") to create file b image for " + variableDisplayName)
+        if doFork:
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create file b image for " + variableDisplayName)
+        else :
+            os.waitpid(pid, 0)
     
     # make the data comparison figures
     if not shortCircuitComparisons :
@@ -596,10 +606,14 @@ def plot_and_save_figure_comparison(aData, bData,
                                         "\t\tsaving image of the absolute value of difference for " + variableDisplayName,
                                         outputPath + "/" + variableName + ".AbsDiff.png",
                                         outputPath + "/" + variableName + ".AbsDiff.small.png",
-                                        makeSmall, doFork)
+                                        makeSmall, doFork or testOverrideForMemoryThroughFork)
         if not (pid is 0) :
-            childPids.append(pid)
-            LOG.debug ("Started child process (pid: " + str(pid) + ") to create absolute value of difference image for " + variableDisplayName)
+            if doFork :
+                childPids.append(pid)
+                LOG.debug ("Started child process (pid: " + str(pid)
+                           + ") to create absolute value of difference image for " + variableDisplayName)
+            else :
+                os.waitpid(pid, 0)
         
         # the subtraction of one data set from the other
         LOG.info("\t\tcreating image of the difference in " + variableDisplayName)
@@ -610,10 +624,13 @@ def plot_and_save_figure_comparison(aData, bData,
                                         "\t\tsaving image of the difference in " + variableDisplayName,
                                         outputPath + "/" + variableName + ".Diff.png",
                                         outputPath + "/" + variableName + ".Diff.small.png",
-                                        makeSmall, doFork)
+                                        makeSmall, doFork or testOverrideForMemoryThroughFork)
         if not (pid is 0) :
-            childPids.append(pid)
-            LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference image for " + variableDisplayName)
+            if doFork :
+                childPids.append(pid)
+                LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference image for " + variableDisplayName)
+            else :
+                os.waitpid(pid, 0)
         
         # mark the trouble points
         LOG.info("\t\tcreating image marking trouble data in " + variableDisplayName)
@@ -632,10 +649,13 @@ def plot_and_save_figure_comparison(aData, bData,
                                         "\t\tsaving image marking trouble data in " + variableDisplayName,
                                         outputPath + "/" + variableName + ".Trouble.png",
                                         outputPath + "/" + variableName + ".Trouble.small.png",
-                                        makeSmall, doFork)
+                                        makeSmall, doFork or testOverrideForMemoryThroughFork)
         if not (pid is 0) :
-            childPids.append(pid)
-            LOG.debug ("Started child process (pid: " + str(pid) + ") to create trouble image for " + variableDisplayName)
+            if doFork :
+                childPids.append(pid)
+                LOG.debug ("Started child process (pid: " + str(pid) + ") to create trouble image for " + variableDisplayName)
+            else :
+                os.waitpid(pid, 0)
         
         # a histogram of the values of fileA - file B 
         LOG.info("\t\tcreating histogram of the amount of difference in " + variableDisplayName)
@@ -649,10 +669,14 @@ def plot_and_save_figure_comparison(aData, bData,
                                         "\t\tsaving histogram of the amount of difference in " + variableDisplayName,
                                         outputPath + "/" + variableName + ".Hist.png",
                                         outputPath + "/" + variableName + ".Hist.small.png",
-                                        makeSmall, doFork)
+                                        makeSmall, doFork or testOverrideForMemoryThroughFork)
         if not (pid is 0) :
-            childPids.append(pid)
-            LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference histogram image for " + variableDisplayName)
+            if doFork :
+                childPids.append(pid)
+                LOG.debug ("Started child process (pid: " + str(pid)
+                           + ") to create difference histogram image for " + variableDisplayName)
+            else :
+                os.waitpid(pid, 0)
         
         # scatter plot of file a vs file b values
         LOG.info("\t\tcreating scatter plot of file a values vs file b values for " + variableDisplayName)
@@ -665,10 +689,13 @@ def plot_and_save_figure_comparison(aData, bData,
                                         "\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName,
                                         outputPath + "/" + variableName + ".Scatter.png",
                                         outputPath + "/" + variableName + ".Scatter.small.png",
-                                        makeSmall, doFork)
+                                        makeSmall, doFork or testOverrideForMemoryThroughFork)
         if not (pid is 0) :
-            childPids.append(pid)
-            LOG.debug ("Started child process (pid: " + str(pid) + ") to create scatter plot image for " + variableDisplayName)
+            if doFork :
+                childPids.append(pid)
+                LOG.debug ("Started child process (pid: " + str(pid) + ") to create scatter plot image for " + variableDisplayName)
+            else :
+                os.waitpid(pid, 0)
     
     # now we need to wait for all of our child processes to terminate before returning
     if (isParent) : # just in case
