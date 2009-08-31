@@ -37,7 +37,7 @@ def diff(aData, bData, epsilon=0.,
     """
     shape = aData.shape
     assert(bData.shape==shape)
-    assert(aData.dtype==bData.dtype)
+    assert(can_cast(aData.dtype, bData.dtype) or can_cast(bData.dtype, aData.dtype))
     
     # if the ignore masks do not exist, set them to include none of the data
     if (ignore_mask_a is None) :
@@ -61,8 +61,14 @@ def diff(aData, bData, epsilon=0.,
     valid_in_b_mask = ~(b_not_finite_mask | b_missing_mask | ignore_mask_b)
     valid_in_both = valid_in_a_mask & valid_in_b_mask
     
+    # figure out our shared data type
+    sharedType = aData.dtype
+    if (aData.dtype is not bData.dtype) :
+        sharedType = common_type(aData, bData)
+    LOG.debug('Shared data type that will be used for diff comparison: ' + str(sharedType))
+    
     # construct our diff'ed array
-    raw_diff = empty_like(aData)
+    raw_diff = zeros(shape, dtype=sharedType) #empty_like(aData)
     raw_diff[~valid_in_both] = nan # throw away invalid data
     raw_diff[valid_in_both] = bData[valid_in_both] - aData[valid_in_both]
     
