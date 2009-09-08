@@ -126,5 +126,30 @@ def select_slice_from_3D_last (data, slice_index) :
     
     return data[:, :, slice_index]
 
+def rotate_indexes_right (data) :
+    """
+    move the order of the indexes in the array to the right in order, taking the last one
+    and putting it in the first index spot
+    note: at the moment this filter only works with 3 dimentional data sets
+    """
+    
+    # figure out the shapes we have/need
+    old_shape = data.shape
+    #print ('old shape: ' + str(old_shape))
+    new_shape = old_shape[-1:] + old_shape[:-1]
+    #print ('new shape: ' + str(new_shape))
+    
+    # set up our new data
+    data_new = np.empty_like(data)
+    data_new = data_new.reshape(new_shape)
+    
+    # move the old data into the new data shape
+    for index1 in arange(old_shape[0]) :
+        for index2 in arange(old_shape[1]) :
+            for index3 in arange(old_shape[2]) :
+                data_new[index3, index1, index2] = data[index1, index2, index3]
+    
+    return data_new
+
 if __name__=='__main__':
     sys.exit(main())

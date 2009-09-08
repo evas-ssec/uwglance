@@ -232,7 +232,7 @@ def _get_finite_data_stats(a_is_finite_mask, b_is_finite_mask, common_ignore_mas
 
 def _get_general_data_stats(a, b,
                             a_missing_value, b_missing_value,
-                            epsilon, trouble_mask,
+                            epsilon, 
                             spatial_ignore_in_a_mask, spatial_ignore_in_b_mask,
                             bad_in_a, bad_in_b
                             ) :
@@ -241,13 +241,12 @@ def _get_general_data_stats(a, b,
     about them.
     the return value will be a dictionary of statistics
     """
-    # figure out how much trouble we had
-    num_trouble = sum(trouble_mask)
+    # figure out how much spatial trouble we had
     num_ignored_in_a = sum(spatial_ignore_in_a_mask)
     num_ignored_in_b = sum(spatial_ignore_in_b_mask)
     
-    # make the assumption that a and b are the same size/shape as their trouble mask
-    total_num_values = trouble_mask.size
+    # get the number of data points
+    total_num_values = a.size
     
     general_stats = {'a_missing_value': a_missing_value,
                      'b_missing_value': b_missing_value,
@@ -257,16 +256,15 @@ def _get_general_data_stats(a, b,
                      'min_a': min_with_mask(a, bad_in_a),
                      'min_b': min_with_mask(b, bad_in_b),
                      'num_data_points': total_num_values,
-                     'shape': trouble_mask.shape,
+                     'shape': a.shape,
                      'spatially_invalid_pts_ignored_in_a': num_ignored_in_a,
-                     'spatially_invalid_pts_ignored_in_b': num_ignored_in_b,
-                     'trouble_points_count': num_trouble,
-                     'trouble_points_fraction': float(num_trouble) / float(total_num_values)
+                     'spatially_invalid_pts_ignored_in_b': num_ignored_in_b
                      }
     
     return general_stats
 
-def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsilon_mask,
+def _get_numerical_data_stats(a, b, diff_data,  data_is_finite_mask,
+                              outside_epsilon_mask, trouble_mask,
                               additional_statistics={}) : 
     """
     Get a list of numerical comparison related statistics about a and b,
@@ -277,6 +275,7 @@ def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsi
     num_finite_values_too_different = sum(outside_epsilon_mask)
     num_perfect = _get_num_perfect(a, b, ~data_is_finite_mask)
     r_corr = corr(a, b, data_is_finite_mask)
+    num_trouble = sum(trouble_mask)
     
     # we actually want the total number of _finite_ values rather than all the data
     total_num_finite_values = sum(data_is_finite_mask)
@@ -288,11 +287,13 @@ def _get_numerical_data_stats(a, b, diff_data, data_is_finite_mask, outside_epsi
         fraction_too_different = num_finite_values_too_different / float(total_num_finite_values)
         fraction_perfect = num_perfect / float(total_num_finite_values)
     
-    comparison = {  'diff_outside_epsilon_count': num_finite_values_too_different,
+    comparison = {  'correlation': r_corr,
+                    'diff_outside_epsilon_count': num_finite_values_too_different,
                     'diff_outside_epsilon_fraction': fraction_too_different,
                     'perfect_match_count': num_perfect,
                     'perfect_match_fraction': fraction_perfect,
-                    'correlation': r_corr
+                     'trouble_points_count': num_trouble, 
+                     'trouble_points_fraction': float(num_trouble) / float(a.size)
                     }
     comparison.update(additional_statistics)
     
@@ -331,10 +332,10 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
                                                                                        (ignoreInAMask, ignoreInBMask))
                                                                                        '''
     
-    general_stats = _get_general_data_stats(a, b, a_missing_value, b_missing_value, epsilon, trouble,
+    general_stats = _get_general_data_stats(a, b, a_missing_value, b_missing_value, epsilon, 
                                             ignoreInAMask, ignoreInBMask, ~finite_a_mask, ~finite_b_mask) 
     additional_statistics = stats(*nfo) # grab some additional comparison statistics 
-    comparison_stats = _get_numerical_data_stats(a, b, diffData, finite_mask, outside_epsilon, additional_statistics) 
+    comparison_stats = _get_numerical_data_stats(a, b, diffData, finite_mask, outside_epsilon, trouble, additional_statistics) 
     nan_stats = _get_nan_stats(anfin, bnfin)
     missing_stats = _get_missing_value_stats(amis, bmis)
     finite_stats = _get_finite_data_stats(finite_a_mask, finite_b_mask, (ignoreInAMask | ignoreInBMask)) 
@@ -365,10 +366,6 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                                                             ' ignored for the purposes of data analysis and presentation',
                     'spatially_invalid_pts_ignored_in_b': 'number of points with invalid latitude/longitude information in B that were' +
                                                             ' ignored for the purposes of data analysis and presentation',
-                    'trouble_points_count': 'number of points that are nonfinite or missing in either input data set (A or B),' +
-                                            ' or are unacceptable when compared (according to the current epsilon value)',
-                    'trouble_points_fraction': 'fraction of points that are nonfinite or missing in either input data set (A or B),' +
-                                               ' or are unacceptable when compared (according to the current epsilon value)',
                     
                     # finite data stats descriptions
                     'a_finite_count': "number of finite values in A",
@@ -409,6 +406,10 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'perfect_match_fraction': "fraction of finite values perfectly matching between A and B (out of common_finite_count)",
                     'rms_diff': "root mean square (RMS) difference of finite values",
                     'std_diff': "standard deviation of difference of finite values",
+                    'trouble_points_count': 'number of points that differ in finite/missing status between the input data sets A and B,' +
+                                            ' or are unacceptable when compared according to the current epsilon value',
+                    'trouble_points_fraction': 'fraction of points that differ in finite/missing status between the input data sets A and B,' +
+                                            ' or are unacceptable when compared according to the current epsilon value',
                     
                     # note: the statistics described below may no longer be generated?
                     'mean_percent_change': "Percent change from A to B for finite values, averaged",
