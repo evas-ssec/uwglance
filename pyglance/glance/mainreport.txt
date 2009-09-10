@@ -155,15 +155,16 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                         <%
                             # get some information about the variable, for convenience
                             tempVariableInfo = variables[variableKey]
+                            tempVarRunInfo   = tempVariableInfo['variable_run_info']
                             
-                            technicalName  = tempVariableInfo['variable_run_info']['variable_name']
+                            technicalName  = tempVarRunInfo['variable_name']
                             varDisplayName = technicalName
-                            if 'display_name' in tempVariableInfo['variable_run_info'] :
-                                varDisplayName = tempVariableInfo['variable_run_info']['display_name']
+                            if 'display_name' in tempVarRunInfo :
+                                varDisplayName = tempVarRunInfo['display_name']
                             
                             passPercent          = tempVariableInfo['pass_epsilon_percent']
                             finiteSimilarPercent = tempVariableInfo['finite_similar_percent']
-                            didPass = tempVariableInfo['variable_run_info']['did_pass']
+                            didPass              = tempVarRunInfo['did_pass']
                         %>
                         <tr>
                             <td>
@@ -176,8 +177,8 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                                 % endif
                             </td>
                             <td>
-                                Variable: <a href="${technicalName | u}.html">${varDisplayName}</a> <br>
-                                Epsilon used: ${tempVariableInfo['variable_run_info']['epsilon']} <br>
+                                Variable: <a href="${tempVarRunInfo['variable_report_path_escaped']}">${varDisplayName}</a> <br>
+                                Epsilon used: ${tempVarRunInfo['epsilon']} <br>
                                 Finite values within one epsilon of difference:
                                 ${report.make_formatted_display_string(passPercent, '%.6g')}%<br>
                                 Data that matched in finite-ness between the files:

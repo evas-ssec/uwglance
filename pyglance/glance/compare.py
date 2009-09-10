@@ -20,6 +20,8 @@ import glance.delta as delta
 import glance.plot as plot
 import glance.report as report
 
+from urllib import quote
+
 LOG = logging.getLogger(__name__)
 
 # these are the built in defaults for the settings
@@ -921,6 +923,17 @@ python -m glance
                 displayName = varRunInfo['display_name']
             explanationName = technicalName
             
+            # check to see if there is a directory to put information about this variable in,
+            # if not then create it
+            variableDir = outputPath + "/" + displayName
+            varRunInfo['variable_dir'] = variableDir
+            varRunInfo['variable_report_path_escaped'] = quote(displayName + "/" + technicalName + '.html')
+            LOG.debug ("Directory selected for variable information: " + varRunInfo['variable_report_path_escaped'])
+            if not (os.path.isdir(variableDir)) :
+                LOG.debug("Variable directory (" + variableDir + ") does not exist.")
+                LOG.debug("Creating variable directory.")
+                os.makedirs(variableDir)
+            
             # if B has an alternate variable name, figure that out
             b_variable = technicalName
             if 'alternate_name_in_B' in varRunInfo :
@@ -1022,7 +1035,7 @@ python -m glance
                                                          variableAnalysisInfo[varKey]['run_info'], runInfo,
                                                          variableAnalysisInfo[varKey]['var_stats'],
                                                          spatialInfo,
-                                                         outputPath,
+                                                         variableAnalysisInfo[varKey]['run_info']['variable_dir'],
                                                          variableAnalysisInfo[varKey]['run_info']['variable_name'] + ".html")
             
             print ('generating summary report')
@@ -1057,7 +1070,8 @@ python -m glance
                                                          latitudeCommon, longitudeCommon,
                                                          spaciallyInvalidMaskA,
                                                          spaciallyInvalidMaskB,
-                                                         outputPath, True,
+                                                         variableAnalysisInfo[varKey]['run_info']['variable_dir'],
+                                                         True,
                                                          doFork=runInfo['doFork']) 
                     print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
         
