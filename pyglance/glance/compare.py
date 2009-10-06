@@ -334,6 +334,12 @@ def _load_config_or_options(optionsSet, originalArgs) :
         
         # note: there is no way to set the tolerances from the command line 
     
+    # if we can't use a longitude / latitude
+    # we also don't want to make images!
+    # TODO, make this actually control the comparison logic and report
+    if ("shouldIgnoreLonLat" in runInfo) and (runInfo["shouldIgnoreLonLat"]) :
+        runInfo["shouldIncludeImages"] = False
+    
     return paths, runInfo, defaultsToUse, requestedNames, usedConfigFile
 
 def _get_and_analyze_lon_lat (fileObject,
@@ -927,7 +933,7 @@ python -m glance
             # if not then create it
             variableDir = outputPath + "/" + displayName
             varRunInfo['variable_dir'] = variableDir
-            varRunInfo['variable_report_path_escaped'] = quote(displayName + "/" + technicalName + '.html')
+            varRunInfo['variable_report_path_escaped'] = quote("./" + displayName + "/" + os.path.split(technicalName)[1] + '.html')
             LOG.debug ("Directory selected for variable information: " + varRunInfo['variable_report_path_escaped'])
             if not (os.path.isdir(variableDir)) :
                 LOG.debug("Variable directory (" + variableDir + ") does not exist.")
@@ -1036,7 +1042,7 @@ python -m glance
                                                          variableAnalysisInfo[varKey]['var_stats'],
                                                          spatialInfo,
                                                          variableAnalysisInfo[varKey]['run_info']['variable_dir'],
-                                                         variableAnalysisInfo[varKey]['run_info']['variable_name'] + ".html")
+                                                         (os.path.split(variableAnalysisInfo[varKey]['run_info']['variable_name'])[1]) + ".html")
             
             print ('generating summary report')
             # get the current time

@@ -218,11 +218,10 @@ class h5(object):
         variable_object = self.get_variable_object(name)
         raw_data_copy = variable_object[:]
         # load the scale factor and add offset
-        temp_attributes = variable_object.attributes()
-        if ('scale_factor' in temp_attributes) :
-            scale_factor = temp_attributes['scale_factor']
-        if ('add_offset' in temp_attributes) :
-            add_offset = temp_attributes['add_offset']
+        if ('scale_factor' in variable_object.attrs) :
+            scale_factor = variable_object.attrs['scale_factor']
+        if ('add_offset' in variable_object.attrs) :
+            add_offset = variable_object.attrs['add_offset']
         # todo, does cdf have an equivalent of endaccess to close the variable?
         
         # don't do lots of work if we don't need to scale things
