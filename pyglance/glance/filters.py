@@ -144,12 +144,22 @@ def rotate_indexes_right (data) :
     data_new = data_new.reshape(new_shape)
     
     # move the old data into the new data shape
-    for index1 in arange(old_shape[0]) :
-        for index2 in arange(old_shape[1]) :
-            for index3 in arange(old_shape[2]) :
+    for index1 in range(old_shape[0]) :
+        for index2 in range(old_shape[1]) :
+            for index3 in range(old_shape[2]) :
                 data_new[index3, index1, index2] = data[index1, index2, index3]
     
     return data_new
+
+def set_to_value_between_bounds(data, value_to_set_to, bottom_bound_exclusive, top_bound_exclusive) :
+    """
+    Wherever the data is non-finite or outside the given bounds, set it to the given value.
+    """
+    
+    mask = (data < bottom_bound_exclusive) | (data > top_bound_exclusive) | (~ np.isfinite(data))
+    data[mask] = value_to_set_to
+    
+    return data
 
 if __name__=='__main__':
     sys.exit(main())

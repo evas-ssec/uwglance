@@ -15,6 +15,11 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 settings = {}
 # whether or not images should be generated and shown in the report
 settings['shouldIncludeImages'] = True
+# whether or not separate threads should be spawned to create each image
+# for the purpose of controlling python's memory usage.
+# this feature should not be used in Mac OSX owing to a bug in multithreading
+# but at appears to work well in other Unix systems
+settings['useThreadsToControlMemory'] = False
 # should we create multiple processes to make more than one image at a time?
 # turning on this option can cause glance to use a very large amount of system
 # resources (if your data set is particularly large, your machine may not have

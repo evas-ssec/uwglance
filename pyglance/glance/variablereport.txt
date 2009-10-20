@@ -114,8 +114,13 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         </p>
     % endif
     
-    <% shouldIncludeImages = runInfo['shouldIncludeImages'] %>
-    % if shouldIncludeImages :
+    <%
+        shouldIncludeImages = runInfo['shouldIncludeImages']
+        plot_original = True
+        if 'do_plot_originals' in runInfo :
+            plot_original = runInfo['do_plot_originals']
+    %>
+    % if shouldIncludeImages and plot_original :
         <h3>Original Data</h3>
         <p>
             <a href="./${variableName}.A.png"><img src="./${variableName}.A.small.png"></a>
@@ -180,11 +185,25 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     
     % if shouldIncludeImages and (not hideComparisonImages) :
     <p>
-        <a href="./${variableName}.AbsDiff.png"><img src="./${variableName}.AbsDiff.small.png"></a>
-        <a href="./${variableName}.Diff.png"><img src="./${variableName}.Diff.small.png"></a>
-        <a href="./${variableName}.Trouble.png"><img src="./${variableName}.Trouble.small.png"></a>
-        <a href="./${variableName}.Hist.png"><img src="./${variableName}.Hist.small.png"></a>
-        <a href="./${variableName}.Scatter.png"><img src="./${variableName}.Scatter.small.png"></a>
+        % if (not ('do_plot_abs_diff' in runInfo)) or (runInfo['do_plot_abs_diff']) :
+            <a href="./${variableName}.AbsDiff.png"><img src="./${variableName}.AbsDiff.small.png"></a>
+        % endif
+        
+        % if (not ('do_plot_sub_diff' in runInfo)) or (runInfo['do_plot_sub_diff']) :
+            <a href="./${variableName}.Diff.png"><img src="./${variableName}.Diff.small.png"></a>
+        % endif
+        
+        % if (not ('do_plot_trouble' in runInfo)) or (runInfo['do_plot_trouble']) :
+            <a href="./${variableName}.Trouble.png"><img src="./${variableName}.Trouble.small.png"></a>
+        % endif
+        
+        % if (not ('do_plot_histogram' in runInfo)) or (runInfo['do_plot_histogram']) :
+            <a href="./${variableName}.Hist.png"><img src="./${variableName}.Hist.small.png"></a>
+        % endif
+        
+        % if (not ('do_plot_scatter' in runInfo)) or (runInfo['do_plot_scatter']) :
+            <a href="./${variableName}.Scatter.png"><img src="./${variableName}.Scatter.small.png"></a>
+        % endif
     </p>
     % endif
     
