@@ -177,7 +177,25 @@ setOfVariables['Total Precipitable Water'] = {
                                   }
 setOfVariables['Total Precipitable Water, Low'] = {
                                   'variable_name': 'imager_prof_retr_abi_total_precipitable_water_low',
-                                  'epsilon': 3.0
+                                  'epsilon': 3.0,
+                                  
+                                  # the following settings allow you to control plotting on an individual plot basis
+                                  # if these valuse are not defined or set to True, the associated plots will be plotted
+                                  # or not according to the other settings for the variable
+                                  # if any of these are set to false, the associated plot will not be plotted
+                                  
+                                  # should the two original images be plotted?
+                                  'do_plot_originals': True,
+                                  # should the absolute value of the difference between the two data sets be plotted?
+                                  'do_plot_abs_diff':  True,
+                                  # should the (subtractive) difference between the two data sets be plotted?
+                                  'do_plot_sub_diff':  True,
+                                  # should the scatter plot be plotted?
+                                  'do_plot_scatter':   True,
+                                  # should the histogram be plotted?
+                                  'do_plot_histogram': True,
+                                  # should the trouble plot be plotted?
+                                  'do_plot_trouble':   True
                                   }
 setOfVariables['Total Precipitable Water, Mid'] = {
                                   'variable_name': 'imager_prof_retr_abi_total_precipitable_water_mid',
