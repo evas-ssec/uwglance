@@ -654,7 +654,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                            defaultValues,
                                            requestedNames, usedConfigFile)
     
-    # get and analyze our longitude and latitude data
+    # figure out the names to be used for the longitude and latitude variables
     spatialInfo = {}
     b_longitude = runInfo['longitude']
     b_latitude  = runInfo['latitude']
@@ -662,11 +662,25 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         b_longitude = runInfo['longitude_alt_name_in_b']
     if ( 'latitude_alt_name_in_b' in runInfo):
         b_latitude  = runInfo['latitude_alt_name_in_b']
+        
+    # if we need to load our lon/lat from different files, open those files
+    file_for_a_lon_lat = aFile
+    file_for_b_lon_lat = bFile
+    if ('a_lon_lat_from_alt_file' in runInfo) :
+        temp_file_name = runInfo['a_lon_lat_from_alt_file']
+        LOG.info("Loading alternate file (" + temp_file_name + ") for file a longitude/latitude.")
+        file_for_a_lon_lat, _ = _setup_file(temp_file_name, "\t")
+    if ('b_lon_lat_from_alt_file' in runInfo) :
+        temp_file_name = runInfo['b_lon_lat_from_alt_file']
+        LOG.info("Loading alternate file (" + temp_file_name + ") for file b longitude/latitude.")
+        file_for_b_lon_lat, _ = _setup_file(temp_file_name, "\t")
+    
+    # load our longitude and latitude and do some analysis on them
     longitudeA, latitudeA, spaciallyInvalidMaskA, spatialInfo['file A'] = \
-        _get_and_analyze_lon_lat (aFile, runInfo['latitude'], runInfo['longitude'],
+        _get_and_analyze_lon_lat (file_for_a_lon_lat, runInfo['latitude'], runInfo['longitude'],
                                   runInfo['data_filter_function_lat_in_a'], runInfo['data_filter_function_lon_in_a'])
     longitudeB, latitudeB, spaciallyInvalidMaskB, spatialInfo['file B'] = \
-        _get_and_analyze_lon_lat (bFile, b_latitude, b_longitude,
+        _get_and_analyze_lon_lat (file_for_b_lon_lat, b_latitude, b_longitude,
                                   runInfo['data_filter_function_lat_in_b'], runInfo['data_filter_function_lon_in_b'])
     
     # test the "valid" values in our lon/lat

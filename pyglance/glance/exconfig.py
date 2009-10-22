@@ -50,6 +50,15 @@ lat_lon_info ['latitude_alt_name_in_b'] = 'resampled_latitude'  # the alternate 
 lat_lon_info['data_filter_function_lon_in_b'] = (insert lambda function here)
 lat_lon_info['data_filter_function_lat_in_b'] = (insert lambda function here)
 """
+
+"""
+# if you wish to load the longitude and latitude from a file, use these values to specify what file
+# the other longitude and latitude values specifying formatting functions, variable names, etc. will be
+# used on the specified file.
+lat_lon_info['a_lon_lat_from_alt_file'] = '/path/to/alternate/file/for/lonlat/to/use/in/a'
+lat_lon_info['b_lon_lat_from_alt_file'] = '/path/to/alternate/file/for/lonlat/to/use/in/b'
+"""
+
 # this value can be used to control how similar the longitude and latitude must be to be considered matching
 # Note: this value is only intended to allow you to avoid very small floating point errors that would make glance
 # think that your data is disparate, when really it is very close together. If you put a large epsilon in here
