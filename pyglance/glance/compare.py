@@ -382,9 +382,9 @@ def _get_and_analyze_lon_lat (fileObject,
         longitudeData = longitudeDataFilterFn(longitudeData)
         LOG.debug ('longitude size after application of filter: ' + str(longitudeData.shape))
     
-    # build a mask of our spacially invalid data
-    invalidLatitude = (latitudeData < -90) | (latitudeData > 90)
-    invalidLongitude = (longitudeData < -180)   | (longitudeData > 360)
+    # build a mask of our spacially invalid data TODO, load actual valid range attributes?
+    invalidLatitude = (latitudeData < -90) | (latitudeData > 90) | ~isfinite(latitudeData)
+    invalidLongitude = (longitudeData < -180)   | (longitudeData > 360) | ~isfinite(longitudeData)
     spaciallyInvalidMask = invalidLatitude | invalidLongitude
     
     # analyze our spacially invalid data
@@ -444,20 +444,24 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
                  + "distorted or spacially nonsensical.")
         # if we are making images, make two showing the invalid lons/lats
         if (doMakeImages) :
-            plot.plot_and_save_spacial_trouble(longitudeA, latitudeA,
-                                               lon_lat_not_equal_mask,
-                                               ignoreMaskA,
-                                               "A", "Lon./Lat. Points Mismatched between A and B\n" +
-                                               "(Shown in A)",
-                                               "LonLatMismatch",
-                                               outputPath, True)
-            plot.plot_and_save_spacial_trouble(longitudeB, latitudeB,
-                                               lon_lat_not_equal_mask,
-                                               ignoreMaskB,
-                                               "B", "Lon./Lat. Points Mismatched between A and B\n" +
-                                               "(Shown in B)",
-                                               "LonLatMismatch",
-                                               outputPath, True)
+            
+            if (len(longitudeA[~ignoreMaskA]) > 0) and (len(latitudeA[~ignoreMaskA]) > 0) :
+                plot.plot_and_save_spacial_trouble(longitudeA, latitudeA,
+                                                   lon_lat_not_equal_mask,
+                                                   ignoreMaskA,
+                                                   "A", "Lon./Lat. Points Mismatched between A and B\n" +
+                                                   "(Shown in A)",
+                                                   "LonLatMismatch",
+                                                   outputPath, True)
+            
+            if (len(longitudeB[~ignoreMaskB]) > 0) and (len(latitudeB[~ignoreMaskB]) > 0) :
+                plot.plot_and_save_spacial_trouble(longitudeB, latitudeB,
+                                                   lon_lat_not_equal_mask,
+                                                   ignoreMaskB,
+                                                   "B", "Lon./Lat. Points Mismatched between A and B\n" +
+                                                   "(Shown in B)",
+                                                   "LonLatMismatch",
+                                                   outputPath, True)
     
     # setup our return data
     returnInfo = {}
@@ -505,14 +509,17 @@ def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_in
         latitude_common [valid_only_in_mask_b] = latitude_b [valid_only_in_mask_b]
         
         # plot the points that are only valid one file and not the other
-        if (spatial_info['file A']['numInvPts'] > 0) and (do_include_images) :
+        if ((spatial_info['file A']['numInvPts'] > 0) and (do_include_images) and
+            (len(longitude_a[~invalid_in_a_mask]) > 0) and (len(latitude_a[~invalid_in_a_mask]) > 0)) :
             plot.plot_and_save_spacial_trouble(longitude_a, latitude_a,
                                                valid_only_in_mask_a,
                                                invalid_in_a_mask,
                                                "A", "Points only valid in\nFile A\'s longitude & latitude",
                                                "SpatialMismatch",
                                                output_path, True)
-        if (spatial_info['file B']['numInvPts'] > 0) and (do_include_images) :
+        if ((spatial_info['file B']['numInvPts'] > 0) and (do_include_images) and
+            (len(longitude_b[~invalid_in_b_mask]) > 0) and (len(latitude_b[~invalid_in_b_mask]) > 0)
+            ) :
             plot.plot_and_save_spacial_trouble(longitude_b, latitude_b,
                                                valid_only_in_mask_b,
                                                invalid_in_b_mask,
