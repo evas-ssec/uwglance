@@ -7,7 +7,7 @@ distribution:
 python setup.py develop --install-dir=$HOME/Library/Python
 python setup.py sdist
 python setup.py bdist_egg
-(cd dist; rsync -Cuav * larch.ssec.wisc.edu:/home/httpd/html/eggs/repos/glance/)
+(cd dist; rsync -Cuav * larch.ssec.wisc.edu:/var/apache/larch/htdocs/eggs/repos/glance)
 
 use: 
 python setup.py install --install-dir=$HOME/Library/Python
