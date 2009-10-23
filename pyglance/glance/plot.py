@@ -220,6 +220,33 @@ def _select_projection(boundingAxes) :
     
     return projToUse
 
+# todo, the use off the offset here is covering a problem with
+# contourf hiding data exactly at the end of the range and should
+# be removed if a better solution can be found
+def _make_range(data_a, invalid_a_mask, num_intervals, offset_to_range=0.0, data_b=None, invalid_b_mask=None) :
+    """
+    get an array with numbers representing the bounds of a set of ranges
+    that covers all the data present in data_a
+    (these may be used for plotting the data)
+    if an offset is passed, the outtermost range will be expanded by that much
+    if the b data is passed, a total range that encompasses both sets of
+    data will be used
+    """
+    minVal = delta.min_with_mask(data_a, invalid_a_mask)
+    maxVal = delta.max_with_mask(data_a, invalid_a_mask)
+    
+    # if we have a second set of data, include it in the min/max calculations
+    if (data_b is not None) :
+        minVal = min(delta.min_with_mask(data_b, invalid_b_mask), minVal)
+        maxVal = max(delta.max_with_mask(data_b, invalid_b_mask), maxVal)
+    
+    
+    minVal = minVal - offset_to_range
+    maxVal = maxVal + offset_to_range
+    
+    return np.linspace(minVal, maxVal, num_intervals)
+    
+
 # create a figure including our data mapped onto a map at the lon/lat given
 # the colorMap parameter can be used to control the colors the figure is drawn in
 # if any masks are passed in the tagData list they will be plotted as an overlays
@@ -243,12 +270,7 @@ def _create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAx
     # this is controllable with the "dataRanges" parameter for discrete data display
     if not (data is None) :
         if dataRanges is None :
-            # todo, the use off the offset here is covering a problem with
-            # contourf hiding data exactly at the end of the range and should
-            # be removed if a better solution can be found
-            minVal = delta.min_with_mask(data, invalidMask) - offsetToRange
-            maxVal = delta.max_with_mask(data, invalidMask) + offsetToRange
-            dataRanges = np.linspace(minVal, maxVal, 50)
+            dataRanges = _make_range(data, invalidMask, 50, offset_to_range=offsetToRange)
         else: # make sure the user range will not discard data TODO, find a better way to handle this
             dataRanges[0] = dataRanges[0] - offsetToRange
             dataRanges[len(dataRanges) - 1] = dataRanges[len(dataRanges) - 1] + offsetToRange
@@ -492,7 +514,8 @@ def plot_and_save_figure_comparison(aData, bData,
                                     makeSmall=False,
                                     shortCircuitComparisons=False,
                                     doFork=False,
-                                    shouldClearMemoryWithThreads=False) : 
+                                    shouldClearMemoryWithThreads=False,
+                                    shouldUseSharedRangeForOriginal=False) : 
     """
     given two files, and information on what to compare, make comparison
     figures and save them to the given output graph.
@@ -568,6 +591,12 @@ def plot_and_save_figure_comparison(aData, bData,
     
     # the original data figures
     
+    # figure out the shared range for A and B's data, by default don't share a range
+    shared_range = None
+    if (shouldUseSharedRangeForOriginal) :
+        shared_range = _make_range(aData, ~goodInAMask, 50, offset_to_range=offsetToRange,
+                                   data_b=bData, invalid_b_mask=~goodInBMask)
+    
     # only plot the two original data plots if they haven't been turned off
     if (not ('do_plot_originals' in variableRunInfo)) or variableRunInfo['do_plot_originals'] :
     
@@ -577,7 +606,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                         baseMapInstance, fullAxis,
                                                                         (variableDisplayName + "\nin File A"),
                                                                         invalidMask=(~goodInAMask),
-                                                                        dataRanges=dataRanges,
+                                                                        dataRanges=dataRanges or shared_range,
                                                                         dataRangeNames=dataRangeNames,
                                                                         dataRangeColors=dataColors)),
                                         "\t\tsaving image of " + variableDisplayName + " for file a",
@@ -597,7 +626,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                         baseMapInstance, fullAxis,
                                                                         (variableDisplayName + "\nin File B"),
                                                                         invalidMask=(~ goodInBMask),
-                                                                        dataRanges=dataRanges,
+                                                                        dataRanges=dataRanges or shared_range,
                                                                         dataRangeNames=dataRangeNames,
                                                                         dataRangeColors=dataColors)),
                                         "\t\tsaving image of " + variableDisplayName + " for file b",

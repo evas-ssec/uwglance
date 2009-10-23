@@ -29,7 +29,8 @@ LOG = logging.getLogger(__name__)
 glance_setting_defaults = {'shouldIncludeReport':       True,
                            'shouldIncludeImages':       False,
                            'doFork':                    False,
-                           'useThreadsToControlMemory': False}
+                           'useThreadsToControlMemory': False,
+                           'useSharedRangeForOriginal': False}
 
 # these are the built in longitude/latitude defaults
 glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
@@ -891,7 +892,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                      variableAnalysisInfo[varKey]['run_info']['variable_dir'],
                                                      True,
                                                      doFork=runInfo['doFork'],
-                                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory']) 
+                                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
+                                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal']) 
                 print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
     
     # if we're the parent, wait for any children to catch up

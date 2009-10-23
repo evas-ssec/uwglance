@@ -25,7 +25,11 @@ settings['useThreadsToControlMemory'] = False
 # resources (if your data set is particularly large, your machine may not have
 # enough), but will speed up image generation in cases where your data set is
 # relatively small or your machine is very powerful
-settings['doFork'] = True
+settings['doFork'] = False
+# should the two original data sets for a variable be plotted in the same range?
+# by default each data set will be plotted in it's own range, if you set this
+# value to True, then the maximum of the two ranges will be used to plot both
+settings['useSharedRangeForOriginal'] = False
 
 # the names of the latitude and longitude variables that will be used
 lat_lon_info = {}
