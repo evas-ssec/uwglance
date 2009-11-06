@@ -48,6 +48,15 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         </p>
     % endfor
     
+    ## display info on the config file that was used, if one was
+    % if ('config_file_name' in runInfo) and (runInfo['config_file_name'] is not None) :
+        <p>
+            A configuration file was used to control the production report.<br>
+            Please see <a href="${runInfo['config_file_name']}">this copy of the configuration file</a>
+            for details.
+        </p>
+    % endif
+    
     ## display the latitude and longitude variable names
     <p>
         % if ('latitude_alt_name_in_b' in runInfo) :
@@ -114,17 +123,12 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         </p>
     % endif
     
-    <%
-        shouldIncludeImages = runInfo['shouldIncludeImages']
-        plot_original = True
-        if 'do_plot_originals' in runInfo :
-            plot_original = runInfo['do_plot_originals']
-    %>
-    % if shouldIncludeImages and plot_original :
+    % if (len(imageNames['original']) > 0) :
         <h3>Original Data</h3>
         <p>
-            <a href="./${variableName}.A.png"><img src="./${variableName}.A.small.png"></a>
-            <a href="./${variableName}.B.png"><img src="./${variableName}.B.small.png"></a>
+            % for image in imageNames['original']:
+                <a href="./${image}"><img src="small.${image}"></a>
+            % endfor
         </p>
     % endif
     
@@ -183,28 +187,12 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     % endfor
     </dl>
     
-    % if shouldIncludeImages and (not hideComparisonImages) :
-    <p>
-        % if (not ('do_plot_abs_diff' in runInfo)) or (runInfo['do_plot_abs_diff']) :
-            <a href="./${variableName}.AbsDiff.png"><img src="./${variableName}.AbsDiff.small.png"></a>
-        % endif
-        
-        % if (not ('do_plot_sub_diff' in runInfo)) or (runInfo['do_plot_sub_diff']) :
-            <a href="./${variableName}.Diff.png"><img src="./${variableName}.Diff.small.png"></a>
-        % endif
-        
-        % if (not ('do_plot_trouble' in runInfo)) or (runInfo['do_plot_trouble']) :
-            <a href="./${variableName}.Trouble.png"><img src="./${variableName}.Trouble.small.png"></a>
-        % endif
-        
-        % if (not ('do_plot_histogram' in runInfo)) or (runInfo['do_plot_histogram']) :
-            <a href="./${variableName}.Hist.png"><img src="./${variableName}.Hist.small.png"></a>
-        % endif
-        
-        % if (not ('do_plot_scatter' in runInfo)) or (runInfo['do_plot_scatter']) :
-            <a href="./${variableName}.Scatter.png"><img src="./${variableName}.Scatter.small.png"></a>
-        % endif
-    </p>
+    % if (len(imageNames['compared']) > 0) and (not hideComparisonImages) :
+        <p>
+            % for image in imageNames['compared'] :
+                <a href="./${image}"><img src="./small.${image}"></a>
+            % endfor
+        </p>
     % endif
     
 </body>

@@ -458,7 +458,7 @@ def plot_and_save_spacial_trouble(longitude, latitude,
     return
     
 def _handle_fig_creation_task(child_figure_function, log_message,
-                              fullFigOutputNamePath, smallFigOutputNamePath,
+                              outputPath, fullFigName,
                               shouldMakeSmall, doFork) :
     """
     fork to do something.
@@ -478,18 +478,16 @@ def _handle_fig_creation_task(child_figure_function, log_message,
     else :
         figure = child_figure_function() 
         LOG.info(log_message)
-        figure.savefig(fullFigOutputNamePath, dpi=fullSizeDPI)
+        figure.savefig(os.path.join(outputPath, fullFigName), dpi=fullSizeDPI)
         if (shouldMakeSmall) :
             
-            tempImage = Image.open(fullFigOutputNamePath)
+            tempImage = Image.open(os.path.join(outputPath, fullFigName))
             scaleFactor = float(thumbSizeDPI) / float(fullSizeDPI)
             originalSize = tempImage.size
             newSize = (int(originalSize[0] * scaleFactor), int(originalSize[1] * scaleFactor))
             tempImage = tempImage.resize(newSize, Image.ANTIALIAS)
-            tempImage.save(smallFigOutputNamePath)
-            
-            #figure.savefig(smallFigOutputNamePath, dpi=thumbSizeDPI)
-
+            tempImage.save(os.path.join(outputPath, 'small.' + fullFigName))
+        
         # get rid of the figure 
         plt.close(figure)
         del(figure)
@@ -532,7 +530,14 @@ def plot_and_save_figure_comparison(aData, bData,
                             'display_name': displayName   # this entry is optional; the variable_name should be used
                                                           # for descriptive purposes if it is not defined
                             }
+    
+    returns a list of "original" data images and a list of "compared" data images
+    these are only the image names, not the full path to the images
     """
+    
+    # lists to hold information on the images we make
+    original_images = [ ]
+    compared_images = [ ]
     
     # if we weren't given a variable display name,
     # just use the standard variable name instead
@@ -610,8 +615,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                         dataRangeNames=dataRangeNames,
                                                                         dataRangeColors=dataColors)),
                                         "\t\tsaving image of " + variableDisplayName + " for file a",
-                                        outputPath + "/" + variableName + ".A.png",
-                                        outputPath + "/" + variableName + ".A.small.png",
+                                        outputPath, variableName + ".A.png",
                                         makeSmall, doFork or shouldClearMemoryWithThreads)
         if not (pid is 0) :
             if doFork :
@@ -619,6 +623,7 @@ def plot_and_save_figure_comparison(aData, bData,
                 LOG.debug ("Started child process (pid: " + str(pid) + ") to create file a image for " + variableDisplayName)
             else :
                 os.waitpid(pid, 0)
+        original_images.append(variableName + ".A.png")
         
         # the original B data
         LOG.info("\t\tcreating image of " + variableDisplayName + " in file b")
@@ -630,8 +635,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                         dataRangeNames=dataRangeNames,
                                                                         dataRangeColors=dataColors)),
                                         "\t\tsaving image of " + variableDisplayName + " for file b",
-                                        outputPath + "/" + variableName + ".B.png",
-                                        outputPath + "/" + variableName + ".B.small.png",
+                                        outputPath, variableName + ".B.png",
                                         makeSmall, doFork or shouldClearMemoryWithThreads)
         if not (pid is 0) :
             if doFork:
@@ -639,6 +643,7 @@ def plot_and_save_figure_comparison(aData, bData,
                 LOG.debug ("Started child process (pid: " + str(pid) + ") to create file b image for " + variableDisplayName)
             else :
                 os.waitpid(pid, 0)
+        original_images.append(variableName + ".B.png")
     # this is the end of the if to plot the original data 
     
     # make the data comparison figures
@@ -655,8 +660,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                             ("Absolute value of difference in\n" + variableDisplayName),
                                                                             invalidMask=(~ goodMask))),
                                             "\t\tsaving image of the absolute value of difference for " + variableDisplayName,
-                                            outputPath + "/" + variableName + ".AbsDiff.png",
-                                            outputPath + "/" + variableName + ".AbsDiff.small.png",
+                                            outputPath, variableName + ".AbsDiff.png",
                                             makeSmall, doFork or shouldClearMemoryWithThreads)
             if not (pid is 0) :
                 if doFork :
@@ -665,6 +669,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                + ") to create absolute value of difference image for " + variableDisplayName)
                 else :
                     os.waitpid(pid, 0)
+            compared_images.append(variableName + ".AbsDiff.png")
         
         # only plot the difference plot if it hasn't been turned off
         if (not ('do_plot_sub_diff' in variableRunInfo)) or (variableRunInfo['do_plot_sub_diff']) :
@@ -676,8 +681,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                             ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
                                                                             invalidMask=(~ goodMask))),
                                             "\t\tsaving image of the difference in " + variableDisplayName,
-                                            outputPath + "/" + variableName + ".Diff.png",
-                                            outputPath + "/" + variableName + ".Diff.small.png",
+                                            outputPath, variableName + ".Diff.png",
                                             makeSmall, doFork or shouldClearMemoryWithThreads)
             if not (pid is 0) :
                 if doFork :
@@ -685,6 +689,7 @@ def plot_and_save_figure_comparison(aData, bData,
                     LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference image for " + variableDisplayName)
                 else :
                     os.waitpid(pid, 0)
+            compared_images.append(variableName + ".Diff.png")
         
         # only plot the trouble plot if it hasn't been turned off
         if (not ('do_plot_trouble' in variableRunInfo)) or (variableRunInfo['do_plot_trouble']) :
@@ -704,8 +709,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                             dataRanges=dataRanges,
                                                                             dataRangeNames=dataRangeNames)),
                                             "\t\tsaving image marking trouble data in " + variableDisplayName,
-                                            outputPath + "/" + variableName + ".Trouble.png",
-                                            outputPath + "/" + variableName + ".Trouble.small.png",
+                                            outputPath, variableName + ".Trouble.png",
                                             makeSmall, doFork or shouldClearMemoryWithThreads)
             if not (pid is 0) :
                 if doFork :
@@ -713,6 +717,7 @@ def plot_and_save_figure_comparison(aData, bData,
                     LOG.debug ("Started child process (pid: " + str(pid) + ") to create trouble image for " + variableDisplayName)
                 else :
                     os.waitpid(pid, 0)
+            compared_images.append(variableName + ".Trouble.png")
         
         # only plot the histogram if it hasn't been turned off
         if (not ('do_plot_histogram' in variableRunInfo)) or (variableRunInfo['do_plot_histogram']) :
@@ -727,8 +732,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                         ('Number of Data Points with a Given Difference'),
                                                                         True)),
                                             "\t\tsaving histogram of the amount of difference in " + variableDisplayName,
-                                            outputPath + "/" + variableName + ".Hist.png",
-                                            outputPath + "/" + variableName + ".Hist.small.png",
+                                            outputPath, variableName + ".Hist.png",
                                             makeSmall, doFork or shouldClearMemoryWithThreads)
             if not (pid is 0) :
                 if doFork :
@@ -737,6 +741,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                + ") to create difference histogram image for " + variableDisplayName)
                 else :
                     os.waitpid(pid, 0)
+            compared_images.append(variableName + ".Hist.png")
         
         # only plot the scatter plot if it hasn't been turned off
         if (not ('do_plot_scatter' in variableRunInfo)) or (variableRunInfo['do_plot_scatter']) :
@@ -749,8 +754,7 @@ def plot_and_save_figure_comparison(aData, bData,
                                                                            outsideEpsilonMask[goodMask],
                                                                            variableRunInfo['epsilon'])),
                                             "\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName,
-                                            outputPath + "/" + variableName + ".Scatter.png",
-                                            outputPath + "/" + variableName + ".Scatter.small.png",
+                                            outputPath, variableName + ".Scatter.png",
                                             makeSmall, doFork or shouldClearMemoryWithThreads)
             if not (pid is 0) :
                 if doFork :
@@ -758,6 +762,7 @@ def plot_and_save_figure_comparison(aData, bData,
                     LOG.debug ("Started child process (pid: " + str(pid) + ") to create scatter plot image for " + variableDisplayName)
                 else :
                     os.waitpid(pid, 0)
+            compared_images.append(variableName + ".Scatter.png")
     
     # now we need to wait for all of our child processes to terminate before returning
     if (isParent) : # just in case
@@ -767,7 +772,7 @@ def plot_and_save_figure_comparison(aData, bData,
             os.waitpid(pid, 0)
         print("... creation and saving of images for " + variableDisplayName + " completed")
     
-    return
+    return original_images, compared_images
 
 if __name__=='__main__':
     import doctest

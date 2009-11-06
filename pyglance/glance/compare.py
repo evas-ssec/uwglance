@@ -184,10 +184,10 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                     if ('alternate_name_in_B' in currNameInfo) :
                         name_b = currNameInfo['alternate_name_in_B']
                     
-                    if (name in fileCommonNames) or \
-                            (currNameInfo.has_key('alternate_name_in_B') and
-                             (name   in nameComparison['uniqueToAVars']) and
-                             (name_b in nameComparison['uniqueToBVars'])) :
+                    if ( (name in fileCommonNames) and (not currNameInfo.has_key('alternate_name_in_B')) ) or \
+                            ( (currNameInfo.has_key('alternate_name_in_B') and
+                              ((name   in nameComparison['uniqueToAVars']) or (name   in fileCommonNames))  and
+                              ((name_b in nameComparison['uniqueToBVars']) or (name_b in fileCommonNames))) ) :
                         finalNames[dispName] = defaultValues.copy() 
                         finalNames[dispName]['display_name'] = dispName
                         finalNames[dispName].update(currNameInfo)
@@ -262,7 +262,6 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     runInfo = {}
     runInfo.update(glance_setting_defaults) # get the default settings
     runInfo.update(glance_lon_lat_defaults) # get the default lon/lat info
-    runInfo['version'] = _get_glance_version_string()
     
     # by default, we don't have any particular variables to analyze
     desiredVariables = {}
@@ -530,6 +529,80 @@ def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_in
     
     return invalid_in_common_mask, spatial_info, longitude_common, latitude_common
 
+def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output_path, should_make_images=False) :
+    """
+    Manage loading and comparing longitude and latitude information for two files
+    
+    Note: if the error message is returned as anything but None, something uncrecoverable
+    occured while trying to get the lon/lat info. TODO, replace this with a proper thrown exception
+    """
+    
+    # a place to save some general stats about our lon/lat data
+    spatialInfo = {}
+    # a place to put possible error messages TODO remove this in favor of an exception
+    error_msg = None
+    
+    # figure out the names to be used for the longitude and latitude variables
+    a_longitude_name = lon_lat_settings['longitude']
+    a_latitude_name =  lon_lat_settings['latitude']
+    b_longitude_name = a_longitude_name
+    b_latitude_name =  a_latitude_name
+    
+    # if we have alternate b names, use those for b instead
+    if ('longitude_alt_name_in_b' in lon_lat_settings) :
+        b_longitude_name = lon_lat_settings['longitude_alt_name_in_b']
+    if ( 'latitude_alt_name_in_b' in lon_lat_settings):
+        b_latitude_name  = lon_lat_settings['latitude_alt_name_in_b']
+        
+    # if we need to load our lon/lat from different files, open those files
+    
+    # for the a file, do we have an alternate?
+    file_for_a_lon_lat = a_file_object
+    if ('a_lon_lat_from_alt_file' in lon_lat_settings) :
+        LOG.info("Loading alternate file (" + lon_lat_settings['a_lon_lat_from_alt_file'] + ") for file a longitude/latitude.")
+        file_for_a_lon_lat, _ = _setup_file(lon_lat_settings['a_lon_lat_from_alt_file'], "\t")
+    
+    # for the b file, do we have an alternate?
+    file_for_b_lon_lat = b_file_object
+    if ('b_lon_lat_from_alt_file' in lon_lat_settings) :
+        LOG.info("Loading alternate file (" + lon_lat_settings['b_lon_lat_from_alt_file'] + ") for file b longitude/latitude.")
+        file_for_b_lon_lat, _ = _setup_file(lon_lat_settings['b_lon_lat_from_alt_file'], "\t")
+    
+    # load our longitude and latitude and do some analysis on them
+    longitude_a, latitude_a, spaciallyInvalidMaskA, spatialInfo['file A'] = \
+        _get_and_analyze_lon_lat (file_for_a_lon_lat, a_latitude_name, a_longitude_name, 
+                                  lon_lat_settings['data_filter_function_lat_in_a'], lon_lat_settings['data_filter_function_lon_in_a'])
+    longitude_b, latitude_b, spaciallyInvalidMaskB, spatialInfo['file B'] = \
+        _get_and_analyze_lon_lat (file_for_b_lon_lat, b_latitude_name, b_longitude_name,
+                                  lon_lat_settings['data_filter_function_lat_in_b'], lon_lat_settings['data_filter_function_lon_in_b'])
+    
+    # test the "valid" values in our lon/lat
+    moreSpatialInfo = _check_lon_lat_equality(longitude_a, latitude_a, longitude_b, latitude_b,
+                                              spaciallyInvalidMaskA, spaciallyInvalidMaskB,
+                                              lon_lat_settings['lon_lat_epsilon'],
+                                              should_make_images, output_path)
+    # if we got the worst type of error result from the comparison this data is too dissimilar to continue
+    if moreSpatialInfo is None :
+        error_msg = ("Unable to reconcile sizes of longitude and latitude for variables "
+                 + str(lon_lat_settings['longitude']) + str(longitude_a.shape) + "/"
+                 + str(lon_lat_settings['latitude'])  + str(latitude_a.shape) + " in file A and variables "
+                 + str(b_longitude_name) + str(longitude_b.shape) + "/"
+                 + str(b_latitude_name)  + str(latitude_b.shape) + " in file B. Aborting attempt to compare files.")
+        return None, None, None, None, error_msg # things have gone wrong
+    # update our existing spatial information
+    spatialInfo.update(moreSpatialInfo)
+    
+    # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
+    spaciallyInvalidMask, spatialInfo, longitude_common, latitude_common = \
+                            _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
+                                                        longitude_a, longitude_b, latitude_a, latitude_b,
+                                                        should_make_images, output_path)
+    
+    return {"lon": longitude_a,      "lat": latitude_a,      "inv_mask": spaciallyInvalidMaskA}, \
+           {"lon": longitude_b,      "lat": latitude_b,      "inv_mask": spaciallyInvalidMaskB}, \
+           {"lon": longitude_common, "lat": latitude_common, "inv_mask": spaciallyInvalidMask}, \
+           spatialInfo, error_msg
+
 def _open_and_process_files (args, numFilesExpected):
     """
     open files listed in the args and get information about the variables in them
@@ -559,6 +632,8 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     """
     Check whether the variable passed analysis, failed analysis, or
     did not need to be quantitatively tested
+    
+    also returns information about the fractions of failure
     """
     didPass = None
     
@@ -581,11 +656,13 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     # test to see if we passed or failed
     
     # check for our epsilon tolerance
+    failed_fraction = 0.0
     if not (epsilonTolerance is None) :
         failed_fraction = variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']
         didPass = failed_fraction <= epsilonTolerance
     
     # check to see if it failed on nonfinite data
+    non_finite_diff_fraction = 0.0
     if not (nonfiniteTolerance is None) :
         non_finite_diff_fraction = variableStats['Finite Data Statistics']['finite_in_only_one_fraction']
         passedNonFinite = non_finite_diff_fraction <= nonfiniteTolerance
@@ -596,12 +673,55 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
         else :
             didPass = didPass and passedNonFinite
     
-    return didPass
+    return didPass, failed_fraction, non_finite_diff_fraction
+
+def _get_run_identification_info( ) :
+    """
+    get info about what user/machine/version of glance is being used
+    """
+    info_to_return = { }
+    
+    # get info on who's doing the run and where
+    info_to_return['machine'] = os.uname()[1]      # the name of the machine running the report
+    info_to_return['user'] = os.getenv("LOGNAME")  #os.getlogin() # the name of the user running the report
+    info_to_return['version'] = _get_glance_version_string()
+    
+    return info_to_return
 
 def _get_glance_version_string() :
     version_num = pkg_resources.require('glance')[0].version
     
     return "glance, version " + str(version_num) 
+
+def _get_name_info_for_variable(original_display_name, variable_run_info) :
+    """
+    based on the variable run info, figure out the various names for
+    the variable and return them
+    
+    the various names are:
+    
+    technical_name -            the name the variable is listed under in the file
+    b_variable_technical_name - the name the variable is listed under in the b file (may be the same as technical_name)
+    explanation_name -          the more verbose name that will be shown to the user to identify the variable
+    original_display_name -     the display name given by the user to describe the variable
+    """
+    
+    # figure out the various name related info
+    technical_name = variable_run_info['variable_name']
+    explanation_name = technical_name # for now, will add to this later
+    
+    # if B has an alternate variable name, figure that out
+    b_variable_technical_name = technical_name
+    if 'alternate_name_in_B' in variable_run_info :
+        b_variable_technical_name = variable_run_info['alternate_name_in_B']
+        # put both names in our explanation
+        explanation_name = explanation_name + " / " + b_variable_technical_name
+    
+    # show both the display and current explanation names if they differ
+    if not (original_display_name == explanation_name) :
+        explanation_name = original_display_name + ' (' + explanation_name + ')'
+    
+    return technical_name, b_variable_technical_name, explanation_name
 
 def reportGen_library_call (a_path, b_path, var_list=[ ],
                             options_set={ },
@@ -615,7 +735,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     command line input, or call it as a library function... be sure to fill
     out the options
     TODO at the moment the options are very brittle and need to be fully filled
-    or this method will fail badly
+    or this method will fail badly (note: the addition of some glance defaults
+    has minimized the problem, but you still need to be careful when dealing with
+    optional boolean values. this needs more work.)
     """
     
     # load the user settings from either the command line or a user defined config file
@@ -634,16 +756,14 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                  "content being generated. Aborting generation function.")
         return
     
-    # get info on who's doing the run and where
-    runInfo['machine'] = os.uname()[1] # the name of the machine running the report
-    runInfo['user'] = os.getenv("LOGNAME") #os.getlogin() # the name of the user running the report
+    # hang onto info to identify who/what/when/where/etc. the report is being run by/for 
+    runInfo.update(_get_run_identification_info( ))
     
     # deal with the input and output files
-    outputPath = pathsTemp['out']
-    if not (os.path.isdir(outputPath)) :
-        LOG.info("Specified output directory (" + outputPath + ") does not exist.")
+    if not (os.path.isdir(pathsTemp['out'])) :
+        LOG.info("Specified output directory (" + pathsTemp['out'] + ") does not exist.")
         LOG.info("Creating output directory.")
-        os.makedirs(outputPath)
+        os.makedirs(pathsTemp['out'])
     # open the files
     files = {}
     LOG.info("Processing File A:")
@@ -662,110 +782,49 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                            defaultValues,
                                            requestedNames, usedConfigFile)
     
-    # figure out the names to be used for the longitude and latitude variables
-    spatialInfo = {}
-    b_longitude = runInfo['longitude']
-    b_latitude  = runInfo['latitude']
-    if ('longitude_alt_name_in_b' in runInfo) :
-        b_longitude = runInfo['longitude_alt_name_in_b']
-    if ( 'latitude_alt_name_in_b' in runInfo):
-        b_latitude  = runInfo['latitude_alt_name_in_b']
-        
-    # if we need to load our lon/lat from different files, open those files
-    file_for_a_lon_lat = aFile
-    file_for_b_lon_lat = bFile
-    if ('a_lon_lat_from_alt_file' in runInfo) :
-        temp_file_name = runInfo['a_lon_lat_from_alt_file']
-        LOG.info("Loading alternate file (" + temp_file_name + ") for file a longitude/latitude.")
-        file_for_a_lon_lat, _ = _setup_file(temp_file_name, "\t")
-    if ('b_lon_lat_from_alt_file' in runInfo) :
-        temp_file_name = runInfo['b_lon_lat_from_alt_file']
-        LOG.info("Loading alternate file (" + temp_file_name + ") for file b longitude/latitude.")
-        file_for_b_lon_lat, _ = _setup_file(temp_file_name, "\t")
+    # if there is longitude and latitude info, handle the longitude and latitude
+    #if 'lon_lat' in runInfo : TODO, how can we handle cases where lon/lat is meaningless?
     
-    # load our longitude and latitude and do some analysis on them
-    longitudeA, latitudeA, spaciallyInvalidMaskA, spatialInfo['file A'] = \
-        _get_and_analyze_lon_lat (file_for_a_lon_lat, runInfo['latitude'], runInfo['longitude'],
-                                  runInfo['data_filter_function_lat_in_a'], runInfo['data_filter_function_lon_in_a'])
-    longitudeB, latitudeB, spaciallyInvalidMaskB, spatialInfo['file B'] = \
-        _get_and_analyze_lon_lat (file_for_b_lon_lat, b_latitude, b_longitude,
-                                  runInfo['data_filter_function_lat_in_b'], runInfo['data_filter_function_lon_in_b'])
+    print("output dir: " + str(pathsTemp['out']))
     
-    # test the "valid" values in our lon/lat
-    moreSpatialInfo = _check_lon_lat_equality(longitudeA, latitudeA, longitudeB, latitudeB,
-                                              spaciallyInvalidMaskA, spaciallyInvalidMaskB,
-                                              runInfo['lon_lat_epsilon'], runInfo['shouldIncludeImages'],
-                                              outputPath)
-    # if we got the worst type of error result from the comparison we need to stop now, because the data is too
-    # dissimilar to be used
-    if moreSpatialInfo is None :
-        LOG.warn("Unable to reconcile sizes of longitude and latitude for variables "
-                 + str(runInfo['longitude']) + str(longitudeA.shape) + "/"
-                 + str(runInfo['latitude'])  + str(latitudeA.shape) + " in file A and variables "
-                 + str(b_longitude) + str(longitudeB.shape) + "/"
-                 + str(b_latitude)  + str(latitudeB.shape) + " in file B. Aborting attempt to compare files.")
-        sys.exit(1) # things have gone wrong
-    # update our existing spatial information
-    spatialInfo.update(moreSpatialInfo)
+    # return for lon_lat_data variables will be in the form
+    #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
+    a_lon_lat_data, b_lon_lat_data, common_lon_lat_data, \
+            spatialInfo, fatalErrorMsg = _handle_lon_lat_info (runInfo, #runInfo['lon_lat'],
+                                                               aFile, bFile,
+                                                               pathsTemp['out'],
+                                                               should_make_images = runInfo["shouldIncludeImages"]
+                                                               )
     
-    """ TODO, this feature is not helpful, but generally hinders your ability to get information you need
-    # if we have some points outside epsilon, we still want to make a report to show the user this problem, but
-    # we can't trust most of our other comparison images
-    if spatialInfo['lon_lat_not_equal_points_count'] > 0 :
-        runInfo['short_circuit_diffs'] = True # I could simply run the above test every time, but this is simpler and clearer
-    """
+    if fatalErrorMsg is not None :
+        LOG.warn(fatalErrorMsg)
+        sys.exit(1)
     
-    # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
-    spaciallyInvalidMask, spatialInfo, longitudeCommon, latitudeCommon = \
-                            _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
-                                                        longitudeA, longitudeB, latitudeA, latitudeB,
-                                                        runInfo['shouldIncludeImages'], outputPath)
-    
-    # set some things up to hold info for our reports
-    
-    # this will hold our variable report information in the form
-    # [var_name] = {"var_stats": dictionary of statistics info, "run_info": information specific to that variable run,
-    #               "data": {"A": data from file A, "B": data from file B}}
-    variableAnalysisInfo = {}
+    # this will hold information for the summary report
+    # it will be in the form
+    # [displayName] = {"passEpsilonPercent":     percent ok with epsilon,
+    #                  "finite_similar_percent": percent with the same finiteness, 
+    #                  "epsilon":                epsilon value used}
+    variableComparisons = {}
     
     # go through each of the possible variables in our files
     # and make a report section with images for whichever ones we can
-    for varKey in finalNames:
+    for displayName in finalNames:
         
         # pull out the information for this variable analysis run
-        varRunInfo = finalNames[varKey].copy()
+        varRunInfo = finalNames[displayName].copy()
         
-        # make some local copies of our name info for display and labeling
-        technicalName = varRunInfo['variable_name']
-        displayName   = technicalName
-        if 'display_name' in varRunInfo :
-            displayName = varRunInfo['display_name']
-        explanationName = technicalName
+        # get the various names
+        technical_name, b_variable_technical_name, \
+                explanationName = _get_name_info_for_variable(displayName, varRunInfo)
         
-        # check to see if there is a directory to put information about this variable in,
-        # if not then create it
-        variableDir = outputPath + "/" + displayName
-        varRunInfo['variable_dir'] = variableDir
-        varRunInfo['variable_report_path_escaped'] = quote(displayName + "/" + technicalName + '.html')
-        LOG.debug ("Directory selected for variable information: " + varRunInfo['variable_report_path_escaped'])
-        if not (os.path.isdir(variableDir)) :
-            LOG.debug("Variable directory (" + variableDir + ") does not exist.")
-            LOG.debug("Creating variable directory.")
-            os.makedirs(variableDir)
-        
-        # if B has an alternate variable name, figure that out
-        b_variable = technicalName
-        if 'alternate_name_in_B' in varRunInfo :
-            b_variable = varRunInfo['alternate_name_in_B']
-            explanationName = explanationName + " / " + b_variable
-        explanationName = displayName + ' (' + explanationName + ')'
         print('analyzing: ' + explanationName + ')')
         
         # get the data for the variable 
-        aData = aFile[technicalName]
-        bData = bFile[b_variable]
+        aData = aFile[technical_name]
+        bData = bFile[b_variable_technical_name]
         
-        # apply any data filter functions we may have
+        # apply data filter functions if needed
         if ('data_filter_function_a' in varRunInfo) :
             aData = varRunInfo['data_filter_function_a'](aData)
             LOG.debug ("filter function was applied to file A data for variable: " + explanationName)
@@ -773,137 +832,134 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             bData = varRunInfo['data_filter_function_b'](bData)
             LOG.debug ("filter function was applied to file B data for variable: " + explanationName)
         
+        # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
+        # TODO, this test may change depending on how plugable plotting functions are implemented
+        include_images_for_this_variable = ((not('shouldIncludeImages' in varRunInfo)) or (varRunInfo['shouldIncludeImages']))
+        do_not_test_with_lon_lat = (('shouldIncludeImages' in varRunInfo) and (not varRunInfo['shouldIncludeImages']))
+        
         # check if this data can be displayed but
         # don't compare lon/lat sizes if we won't be plotting
-        if ((aData.shape == bData.shape) 
-            and 
-            ((('shouldIncludeImages' in varRunInfo) and (not varRunInfo['shouldIncludeImages']))
-             or
-             ((aData.shape == longitudeCommon.shape) and (bData.shape == longitudeCommon.shape)) )) :
+        if ( (aData.shape == bData.shape) 
+             and 
+             ( do_not_test_with_lon_lat
+              or
+              ((aData.shape == common_lon_lat_data['lon'].shape) and (bData.shape == common_lon_lat_data['lon'].shape)) ) ) :
             
-            # build a dictionary of information on the variable
-            variableAnalysisInfo[varKey] = {}
-            variableAnalysisInfo[varKey]['data'] = {'A': aData,
-                                                    'B': bData}
-            mask_a_to_use = spaciallyInvalidMaskA
-            mask_b_to_use = spaciallyInvalidMaskB
-            if (('shouldIncludeImages' in varRunInfo) and (not varRunInfo['shouldIncludeImages'])) :
+            # check to see if there is a directory to put information about this variable in,
+            # if not then create it
+            variableDir = os.path.join(pathsTemp['out'], displayName)
+            varRunInfo['variable_dir'] = variableDir
+            varRunInfo['variable_report_path_escaped'] = quote(os.path.join(displayName, 'index.html'))
+            LOG.debug ("Directory selected for variable information: " + varRunInfo['variable_report_path_escaped'])
+            if not (os.path.isdir(variableDir)) :
+                LOG.debug("Variable directory (" + variableDir + ") does not exist.")
+                LOG.debug("Creating variable directory.")
+                os.makedirs(variableDir)
+            
+            # figure out the masks we want, and then do our statistical analysis
+            mask_a_to_use = a_lon_lat_data['inv_mask']
+            mask_b_to_use = b_lon_lat_data['inv_mask']
+            if do_not_test_with_lon_lat :
                 mask_a_to_use = None
                 mask_b_to_use = None
-            variableAnalysisInfo[varKey]['var_stats'] = delta.summarize(aData, bData,
-                                                                        varRunInfo['epsilon'],
-                                                                        (varRunInfo['missing_value'],
-                                                                         varRunInfo['missing_value_alt_in_b']),
-                                                                        mask_a_to_use, mask_b_to_use)
-            # add a little additional info to our variable run info before we squirrel it away
-            varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now()) 
-            passedFraction = (1.0 - variableAnalysisInfo[varKey]['var_stats']
-                              ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction'])
-            didPass = _check_pass_or_fail(varRunInfo,
-                                          variableAnalysisInfo[varKey]['var_stats'],
-                                          defaultValues)
-            varRunInfo['did_pass'] = didPass
-            # based on the settings the user gave and whether the variable passsed or failed,
-            # should we include images for this variable?
-            currentIncludeImages = runInfo['shouldIncludeImages']
-            if ('shouldIncludeImages' in varRunInfo) :
-                currentIncludeImages = varRunInfo['shouldIncludeImages']
-            if ('only_plot_on_fail' in varRunInfo) :
-                varRunInfo['shouldIncludeImages'] = currentIncludeImages and (not (varRunInfo['only_plot_on_fail'] and didPass))
-            # set the rest of our info
-            variableAnalysisInfo[varKey]['run_info'] = varRunInfo
-            variableAnalysisInfo[varKey]['exp_name'] = explanationName
+            variable_stats = delta.summarize(aData, bData,
+                                             varRunInfo['epsilon'],
+                                             (varRunInfo['missing_value'],
+                                             varRunInfo['missing_value_alt_in_b']),
+                                             mask_a_to_use, mask_b_to_use)
             
+            # add a little additional info to our variable run info before we squirrel it away
+            varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
+            didPass, epsilon_failed_fraction, non_finite_fail_fraction = _check_pass_or_fail(varRunInfo,
+                                                                                     variable_stats,
+                                                                                     defaultValues)
+            varRunInfo['did_pass'] = didPass
+            
+            # based on the settings and whether the variable passsed or failed,
+            # should we include images for this variable?
+            if ('only_plot_on_fail' in varRunInfo) and varRunInfo['only_plot_on_fail'] :
+                include_images_for_this_variable = include_images_for_this_variable and didPass
+                varRunInfo['shouldIncludeImages'] = include_images_for_this_variable
+            
+            # to hold the names of any images created
+            image_names = {
+                            'original': [ ],
+                            'compared': [ ]
+                            }
+            
+            # create the images for this variable
+            if (include_images_for_this_variable) :
+                
+                # create the images comparing the variable
+                print("\tcreating figures for: " + explanationName)
+                image_names['original'], image_names['compared'] = \
+                    plot.plot_and_save_figure_comparison(aData,
+                                                         bData,
+                                                         varRunInfo,
+                                                         files['file A']['path'],
+                                                         files['file B']['path'],
+                                                         # TODO, pass this in a more efficient way?
+                                                         a_lon_lat_data['lat'],      a_lon_lat_data['lon'],
+                                                         b_lon_lat_data['lat'],      b_lon_lat_data['lon'],
+                                                         common_lon_lat_data['lat'], common_lon_lat_data['lon'],
+                                                         a_lon_lat_data['inv_mask'],
+                                                         b_lon_lat_data['inv_mask'],
+                                                         varRunInfo['variable_dir'],
+                                                         True,
+                                                         doFork=runInfo['doFork'],
+                                                         shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
+                                                         shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal']) 
+                print("\tfinished creating figures for: " + explanationName)
+            
+            # create the report page for this variable
+            if (runInfo['shouldIncludeReport']) :
+                
+                # hang on to our good % and other info to describe our comparison
+                epsilonPassedPercent = (1.0 -  epsilon_failed_fraction) * 100.0
+                finitePassedPercent  = (1.0 - non_finite_fail_fraction) * 100.0 
+                variableComparisons[displayName] = {'pass_epsilon_percent':   epsilonPassedPercent,
+                                                    'finite_similar_percent': finitePassedPercent,
+                                                    'variable_run_info':      varRunInfo
+                                                    }
+                
+                print ('\tgenerating report for: ' + explanationName) 
+                report.generate_and_save_variable_report(files,
+                                                         varRunInfo, runInfo,
+                                                         variable_stats,
+                                                         spatialInfo,
+                                                         image_names,
+                                                         varRunInfo['variable_dir'], "index.html")
+        
         # if we can't compare the variable, we should tell the user 
         else :
             LOG.warn(explanationName + ' ' + 
                      'could not be compared. This may be because the data for this variable does not match in shape ' +
-                     'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: ' + str(bData.shape) +
-                     ') or the data may not match the shape of the selected longitude ' + str(longitudeCommon.shape) + ' and ' +
-                     'latitude ' + str(latitudeCommon.shape) + ' variables.')
+                     'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
+                     + str(bData.shape) + ') or the data may not match the shape of the selected longitude '
+                     + str(common_lon_lat_data['lon'].shape) + ' and ' +
+                     'latitude ' + str(common_lon_lat_data['lat'].shape) + ' variables.')
+        
+    # the end of the loop to examine all the variables
     
-    # from this point on, we will be forking to create child processes so we can parallelize our image and
-    # report generation
-    
-    isParent = True 
-    childPids = []
-    
-    # reports are fast, so the parent thread will just do this
-    # generate our general report pages once we've looked at all the variables
+    # generate our general report pages once we've analyzed all the variables
     if (runInfo['shouldIncludeReport']) :
         
-        # this is going to be in the form
-        # [varKey] = {"passEpsilonPercent": percent ok with epsilon, "epsilon": epsilon)
-        variableComparisons = {}
-        
-        # generate the variable reports
-        for varKey in variableAnalysisInfo :
-            
-            # hang on to our good % and other info to describe our comparison
-            passedPercent = (1.0 - variableAnalysisInfo[varKey]['var_stats']
-                              ['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']) * 100.0
-            nonFiniteDiffPercent = (1.0 - variableAnalysisInfo[varKey]['var_stats'] \
-                                                       ['Finite Data Statistics']['finite_in_only_one_fraction']) * 100.0
-            variableComparisons[varKey] = {'pass_epsilon_percent': passedPercent,
-                                           'finite_similar_percent': nonFiniteDiffPercent,
-                                           'variable_run_info': variableAnalysisInfo[varKey]['run_info']
-                                           }
-            
-            print ('\tgenerating report for: ' + variableAnalysisInfo[varKey]['exp_name']) 
-            report.generate_and_save_variable_report(files,
-                                                     variableAnalysisInfo[varKey]['run_info'], runInfo,
-                                                     variableAnalysisInfo[varKey]['var_stats'],
-                                                     spatialInfo,
-                                                     variableAnalysisInfo[varKey]['run_info']['variable_dir'],
-                                                     variableAnalysisInfo[varKey]['run_info']['variable_name'] + ".html")
-        
-        print ('generating summary report')
         # get the current time
         runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
-        # generate the report summary page
+        
+        # make the main summary report
+        print ('generating summary report')
         report.generate_and_save_summary_report(files,
-                                                outputPath, 'index.html',
+                                                pathsTemp['out'], 'index.html',
                                                 runInfo,
                                                 variableComparisons, 
                                                 spatialInfo,
                                                 nameStats)
+        
         # make the glossary
         print ('generating glossary')
-        report.generate_and_save_doc_page(delta.STATISTICS_DOC, outputPath)
+        report.generate_and_save_doc_page(delta.STATISTICS_DOC, pathsTemp['out'])
     
-    # loop to create the images for all our variables
-    if (runInfo['shouldIncludeImages']) :
-        for varKey in variableAnalysisInfo :
-            if (not ('shouldIncludeImages' in variableAnalysisInfo[varKey]['run_info'])) \
-                or (variableAnalysisInfo[varKey]['run_info']['shouldIncludeImages']) :
-                
-                # create the images comparing that variable
-                print("\tcreating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
-                plot.plot_and_save_figure_comparison(variableAnalysisInfo[varKey]['data']['A'],
-                                                     variableAnalysisInfo[varKey]['data']['B'],
-                                                     variableAnalysisInfo[varKey]['run_info'],
-                                                     files['file A']['path'],
-                                                     files['file B']['path'],
-                                                     latitudeA, longitudeA,
-                                                     latitudeB, longitudeB,
-                                                     latitudeCommon, longitudeCommon,
-                                                     spaciallyInvalidMaskA,
-                                                     spaciallyInvalidMaskB,
-                                                     variableAnalysisInfo[varKey]['run_info']['variable_dir'],
-                                                     True,
-                                                     doFork=runInfo['doFork'],
-                                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
-                                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal']) 
-                print("\tfinished creating figures for: " + variableAnalysisInfo[varKey]['exp_name'])
-    
-    # if we're the parent, wait for any children to catch up
-    if isParent:
-        if len(childPids) > 0 :
-            print ("waiting for completion of figure generation...")
-        for pid in childPids:
-            os.waitpid(pid, 0)
-    
-    print("... report and figure generation complete")
     return
 
 def stats_library_call(afn, bfn, var_list=[ ],
@@ -1052,6 +1108,7 @@ python -m glance
         a = io.open(afn)
         LOG.info("opening %s" % bfn)
         b = io.open(bfn)
+        
         # shape is [scanline, field, detector, wnum]
         vname = '/All_Data/CrIS-SDR_All/' + args[2]
         det_idx = int(args[3])

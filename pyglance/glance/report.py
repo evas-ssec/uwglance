@@ -169,6 +169,7 @@ def generate_and_save_variable_report(files,
                                       generalRunInfo,  # contains run information not related to the variable
                                       statGroups,
                                       spatial,
+                                      imageNames,
                                       outputPath, reportFileName
                                       ) :
     """
@@ -228,6 +229,15 @@ def generate_and_save_variable_report(files,
                                 # if the 'num_lon_lat_not_equal_points' key is defined it means there are mismatching
                                 # longitude/latitude pairs in the data that was compared!
         }
+    
+    imageNames is a dictionary in the form
+        imageNames = {
+                      'original' : [list, of, file-names, of, original, images],
+                      'compared' : [list, of, file-names, of, compared, images]
+        }
+    note: the assumption will be made that smaller versions of these images exist
+    in the form small.filename 
+    
     any of the first level of keys in spatial are optional,
     although it is assumed that if you include an entry for 'file A' or 'file B' it
     will have both of the expected keys in its dictionary (ie. both numInvPts and perInvPts)
@@ -244,7 +254,8 @@ def generate_and_save_variable_report(files,
     kwargs = { 'runInfo': runInfo,
                'files' : files,
                'statGroups': statGroups,
-               'spatial': spatial
+               'spatial': spatial,
+               'imageNames': imageNames
                }
     
     _make_and_save_page((outputPath + "/" + reportFileName), 'variablereport.txt', **kwargs)
