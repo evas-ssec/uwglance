@@ -7,7 +7,7 @@ Created by Eva Schiffer August 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-import numpy as np
+import numpy      as np
 
 def trim_off_of_top (data, num_elements_to_trim) :
     """
@@ -160,6 +160,100 @@ def set_to_value_between_bounds(data, value_to_set_to, bottom_bound_exclusive, t
     data[mask] = value_to_set_to
     
     return data
+
+def collapse_to_index(data, index, collapsing_function=np.mean,
+                      missing_value=None, ignore_below_exclusive=None, ignore_above_exclusive=None) :
+    """
+    collapse the data given along the selected index, using the collapsing_function
+    """
+    
+    # figure the order to put the index we want first
+    new_index_order = range(len(data.shape))
+    del(new_index_order[index])
+    new_index_order = [index] + new_index_order
+    
+    # copy our data and put the index we won't collapse first
+    new_data = data.copy()
+    new_data = new_data.transpose(new_index_order)
+    
+    # find any bad points that we don't want to collapse
+    bad_mask = np.zeros(new_data.shape, dtype=bool)
+    if missing_value is not None :
+        bad_mask[new_data == missing_value] = True
+    if ignore_above_exclusive is not None :
+        bad_mask[new_data > ignore_above_exclusive] = True
+    if ignore_below_exclusive is not None :
+        bad_mask[new_data < ignore_below_exclusive] = True
+    
+    # collapse any non bad data
+    final_num_pts = new_data.shape[0]
+    collapsed_data = np.zeros((final_num_pts), dtype=new_data.dtype)
+    for index_1_val in range(final_num_pts) :
+        values_to_use = new_data[index_1_val][~(bad_mask[index_1_val])]
+        if len(values_to_use) > 0 :
+            collapsed_data[index_1_val] = collapsing_function(values_to_use)
+        else:
+            collapsed_data[index_1_val] = missing_value
+    
+    return collapsed_data
+
+def organize_ipopp_data_into_image(original_ipopp_data, wave_number=None, missing_value=None,
+                                   propagate_partial_missing_values=False) :
+    """
+    organize the ipopp data spatially into an 'image' of sorts
+    this basically consists of:
+    
+                      -> the 30 fields of regard
+                  ---------------
+                  |             |   |
+                  |             |   V
+                  |             |  the 4 scan lines
+                  |             |
+                  ---------------
+                  
+                  for each field of regard/scan line
+                  _______
+                  |_|_|_|
+                  |_|_|_|
+                  |_|_|_|
+                  
+                  block of the 9 detectors (TODO order?
+                  for the moment assuming increasing linear by line then field of regard)
+                  
+                  for each detector point, if the wave_number was given
+                  in the parameters, that specific interferogram data pt will be used
+                  if no wave_number was given, the mean of the 717 pts will be used
+    """
+    
+    new_data_image = np.zeros((4 * 3, 30 * 3), dtype=original_ipopp_data.dtype)
+    
+    # loop to the place in the old array to get each data point
+    for scan_line in range(4) :
+        for field_of_regard in range(30) :
+            
+            for detector in range(9) :
+                      
+                # figure out the value we're moving
+                data_pt = None
+                data_array = original_ipopp_data[scan_line][field_of_regard][detector]
+                if (wave_number is not None):
+                    data_pt = data_array[wave_number]
+                else:
+                    if (propagate_partial_missing_values
+                        and
+                        sum(data_array == missing_value) > 0) :
+                        
+                        data_pt = missing_value
+                    else:
+                        # remember to remove any remaining missing values
+                        data_pt = np.mean(data_array[~(data_array == missing_value)])
+                
+                # figure out where to put the value and put it there
+                index1 = scan_line * 3       + (detector / 3)
+                index2 = field_of_regard * 3 + (detector % 3)
+                new_data_image[index1][index2] = data_pt
+    
+    return new_data_image
 
 if __name__=='__main__':
     sys.exit(main())

@@ -30,7 +30,8 @@ glance_setting_defaults = {'shouldIncludeReport':       True,
                            'shouldIncludeImages':       False,
                            'doFork':                    False,
                            'useThreadsToControlMemory': False,
-                           'useSharedRangeForOriginal': False}
+                           'useSharedRangeForOriginal': False,
+                           'noLonLatVars':              False}
 
 # these are the built in longitude/latitude defaults
 glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
@@ -261,10 +262,11 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     # basic defaults for stuff we will need to return
     runInfo = {}
     runInfo.update(glance_setting_defaults) # get the default settings
-    runInfo.update(glance_lon_lat_defaults) # get the default lon/lat info
+    if ('noLonLatVars' not in optionsSet) or (not optionsSet['noLonLatVars']):
+        runInfo.update(glance_lon_lat_defaults) # get the default lon/lat info
     
     # by default, we don't have any particular variables to analyze
-    desiredVariables = {}
+    desiredVariables = { }
     # use the built in default values, to start with
     defaultsToUse = glance_analysis_defaults.copy()
     
@@ -304,10 +306,12 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
         # (at least not at the moment, it could be added later and if they did happen to put it in the
         # config file, it would override this line)
         runInfo['shouldIncludeReport'] = not optionsSet['imagesOnly']
+        runInfo['noLonLatVars'] = optionsSet['noLonLatVars']
         
         # get everything from the config file
         runInfo.update(glanceRunConfig.settings)
-        runInfo.update(glanceRunConfig.lat_lon_info) # get info on the lat/lon variables
+        if ('noLonLatVars' not in runInfo) or (not runInfo['noLonLatVars']) :
+            runInfo.update(glanceRunConfig.lat_lon_info) # get info on the lat/lon variables
         
         # get any requested names
         requestedNames = glanceRunConfig.setOfVariables.copy()
@@ -315,7 +319,7 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
         defaultsToUse.update(glanceRunConfig.defaultValues)
         
         usedConfigFile = True
-    
+        
     # if we didn't get the info from the config file for some reason
     # (the user didn't want to, we couldn't, etc...) get it from the command line options
     if not usedConfigFile:
@@ -326,9 +330,13 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
         runInfo['shouldIncludeReport'] = not optionsSet['imagesOnly']
         runInfo['shouldIncludeImages'] = not optionsSet['htmlOnly']
         runInfo['doFork'] = optionsSet['doFork']
-        runInfo['latitude'] = optionsSet['latitudeVar'] or runInfo['latitude']
-        runInfo['longitude'] = optionsSet['longitudeVar'] or runInfo['longitude']
-        runInfo['lon_lat_epsilon'] = optionsSet['lonlatepsilon']
+        
+        # only record these if we are using lon/lat
+        runInfo['noLonLatVars']       = optionsSet['noLonLatVars']
+        if not runInfo['noLonLatVars'] :
+            runInfo['latitude']        = optionsSet['latitudeVar']  or runInfo['latitude']
+            runInfo['longitude']       = optionsSet['longitudeVar'] or runInfo['longitude']
+            runInfo['lon_lat_epsilon'] = optionsSet['lonlatepsilon']
         
         # get any requested names from the command line
         requestedNames = requestedVars or ['.*'] 
@@ -337,13 +345,7 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
         defaultsToUse['epsilon'] = optionsSet['epsilon']
         defaultsToUse['missing_value'] = optionsSet['missing']
         
-        # note: there is no way to set the tolerances from the command line 
-    
-    # if we can't use a longitude / latitude
-    # we also don't want to make images!
-    # TODO, make this actually control the comparison logic and report
-    if ("shouldIgnoreLonLat" in runInfo) and (runInfo["shouldIgnoreLonLat"]) :
-        runInfo["shouldIncludeImages"] = False
+        # note: there is no way to set the tolerances from the command line
     
     return paths, runInfo, defaultsToUse, requestedNames, usedConfigFile
 
@@ -354,7 +356,7 @@ def _get_and_analyze_lon_lat (fileObject,
     get the longitude and latitude data from the given file, assuming they are in the given variable names
     and analyze them to identify spacially invalid data (ie. data that would fall off the earth)
     """
-    # get the data from the file
+    # get the data from the file TODO, handle these exits out in the calling method?
     LOG.info ('longitude name: ' + longitudeVariableName)
     try :
         longitudeData = array(fileObject[longitudeVariableName], dtype=float)
@@ -390,8 +392,10 @@ def _get_and_analyze_lon_lat (fileObject,
     # analyze our spacially invalid data
     percentageOfSpaciallyInvalidPts, numberOfSpaciallyInvalidPts = _get_percentage_from_mask(spaciallyInvalidMask)
     
-    return longitudeData, latitudeData, spaciallyInvalidMask, {'totNumInvPts': numberOfSpaciallyInvalidPts,
-                                                               'perInvPts': percentageOfSpaciallyInvalidPts}
+    return longitudeData, latitudeData, spaciallyInvalidMask, {
+                                                               'totNumInvPts': numberOfSpaciallyInvalidPts,
+                                                               'perInvPts':    percentageOfSpaciallyInvalidPts
+                                                               }
 
 def _get_percentage_from_mask(dataMask) :
     """
@@ -536,11 +540,17 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
     Note: if the error message is returned as anything but None, something uncrecoverable
     occured while trying to get the lon/lat info. TODO, replace this with a proper thrown exception
     """
-    
     # a place to save some general stats about our lon/lat data
-    spatialInfo = {}
+    spatialInfo = { }
     # a place to put possible error messages TODO remove this in favor of an exception
     error_msg = None
+    
+    # if there is no lon/lat specified, stop now
+    if ('longitude' not in lon_lat_settings) or ('latitude' not in lon_lat_settings) :
+        return { }, spatialInfo, error_msg
+    
+    # if we should not be comparing against the logitude and latitude, stop now
+    print ('lon_lat_settings: ' + str(lon_lat_settings))
     
     # figure out the names to be used for the longitude and latitude variables
     a_longitude_name = lon_lat_settings['longitude']
@@ -588,7 +598,7 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
                  + str(lon_lat_settings['latitude'])  + str(latitude_a.shape) + " in file A and variables "
                  + str(b_longitude_name) + str(longitude_b.shape) + "/"
                  + str(b_latitude_name)  + str(latitude_b.shape) + " in file B. Aborting attempt to compare files.")
-        return None, None, None, None, error_msg # things have gone wrong
+        return { }, { }, error_msg # things have gone wrong
     # update our existing spatial information
     spatialInfo.update(moreSpatialInfo)
     
@@ -598,9 +608,9 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
                                                         longitude_a, longitude_b, latitude_a, latitude_b,
                                                         should_make_images, output_path)
     
-    return {"lon": longitude_a,      "lat": latitude_a,      "inv_mask": spaciallyInvalidMaskA}, \
-           {"lon": longitude_b,      "lat": latitude_b,      "inv_mask": spaciallyInvalidMaskB}, \
-           {"lon": longitude_common, "lat": latitude_common, "inv_mask": spaciallyInvalidMask}, \
+    return {'a':      {"lon": longitude_a,      "lat": latitude_a,      "inv_mask": spaciallyInvalidMaskA},
+            'b':      {"lon": longitude_b,      "lat": latitude_b,      "inv_mask": spaciallyInvalidMaskB},
+            'common': {"lon": longitude_common, "lat": latitude_common, "inv_mask": spaciallyInvalidMask}   }, \
            spatialInfo, error_msg
 
 def _open_and_process_files (args, numFilesExpected):
@@ -787,18 +797,21 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     
     print("output dir: " + str(pathsTemp['out']))
     
-    # return for lon_lat_data variables will be in the form
+    # return for lon_lat_data variables will be in the form 
     #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
-    a_lon_lat_data, b_lon_lat_data, common_lon_lat_data, \
-            spatialInfo, fatalErrorMsg = _handle_lon_lat_info (runInfo, #runInfo['lon_lat'],
-                                                               aFile, bFile,
-                                                               pathsTemp['out'],
-                                                               should_make_images = runInfo["shouldIncludeImages"]
-                                                               )
-    
+    # or { } if there is no lon/lat info
+    lon_lat_data, spatialInfo, fatalErrorMsg = _handle_lon_lat_info (runInfo, 
+                                                                     aFile, bFile,
+                                                                     pathsTemp['out'],
+                                                                     should_make_images = runInfo["shouldIncludeImages"])
     if fatalErrorMsg is not None :
         LOG.warn(fatalErrorMsg)
         sys.exit(1)
+    
+    # if there is an approved lon/lat shape, hang on to that for future checks
+    good_shape_from_lon_lat = None
+    if len(lon_lat_data.keys()) > 0:
+        good_shape_from_lon_lat = lon_lat_data['common']['lon'].shape
     
     # this will hold information for the summary report
     # it will be in the form
@@ -833,9 +846,13 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             LOG.debug ("filter function was applied to file B data for variable: " + explanationName)
         
         # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
-        # TODO, this test may change depending on how plugable plotting functions are implemented
-        include_images_for_this_variable = ((not('shouldIncludeImages' in varRunInfo)) or (varRunInfo['shouldIncludeImages']))
-        do_not_test_with_lon_lat = (('shouldIncludeImages' in varRunInfo) and (not varRunInfo['shouldIncludeImages']))
+        include_images_for_this_variable = ((not('shouldIncludeImages' in runInfo)) or (runInfo['shouldIncludeImages']))
+        if 'shouldIncludeImages' in varRunInfo :
+            include_images_for_this_variable = varRunInfo['shouldIncludeImages']
+        do_not_test_with_lon_lat = (not include_images_for_this_variable) or (len(lon_lat_data.keys()) <= 0)
+        
+        LOG.debug ("do_not_test_with_lon_lat = " + str(do_not_test_with_lon_lat))
+        LOG.debug ("include_images_for_this_variable = " + str(include_images_for_this_variable))
         
         # check if this data can be displayed but
         # don't compare lon/lat sizes if we won't be plotting
@@ -843,7 +860,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
              and 
              ( do_not_test_with_lon_lat
               or
-              ((aData.shape == common_lon_lat_data['lon'].shape) and (bData.shape == common_lon_lat_data['lon'].shape)) ) ) :
+              ((aData.shape == good_shape_from_lon_lat) and (bData.shape == good_shape_from_lon_lat)) ) ) :
             
             # check to see if there is a directory to put information about this variable in,
             # if not then create it
@@ -857,11 +874,11 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 os.makedirs(variableDir)
             
             # figure out the masks we want, and then do our statistical analysis
-            mask_a_to_use = a_lon_lat_data['inv_mask']
-            mask_b_to_use = b_lon_lat_data['inv_mask']
-            if do_not_test_with_lon_lat :
-                mask_a_to_use = None
-                mask_b_to_use = None
+            mask_a_to_use = None
+            mask_b_to_use = None
+            if not do_not_test_with_lon_lat :
+                mask_a_to_use = lon_lat_data['a']['inv_mask']
+                mask_b_to_use = lon_lat_data['b']['inv_mask']
             variable_stats = delta.summarize(aData, bData,
                                              varRunInfo['epsilon'],
                                              (varRunInfo['missing_value'],
@@ -888,27 +905,82 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                             }
             
             # create the images for this variable
+            # TODO, will need to handle averaged/sliced 3D data at some point
             if (include_images_for_this_variable) :
                 
-                # create the images comparing the variable
-                print("\tcreating figures for: " + explanationName)
-                image_names['original'], image_names['compared'] = \
-                    plot.plot_and_save_figure_comparison(aData,
-                                                         bData,
-                                                         varRunInfo,
-                                                         files['file A']['path'],
-                                                         files['file B']['path'],
-                                                         # TODO, pass this in a more efficient way?
-                                                         a_lon_lat_data['lat'],      a_lon_lat_data['lon'],
-                                                         b_lon_lat_data['lat'],      b_lon_lat_data['lon'],
-                                                         common_lon_lat_data['lat'], common_lon_lat_data['lon'],
-                                                         a_lon_lat_data['inv_mask'],
-                                                         b_lon_lat_data['inv_mask'],
-                                                         varRunInfo['variable_dir'],
-                                                         True,
-                                                         doFork=runInfo['doFork'],
-                                                         shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
-                                                         shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal']) 
+                # if we only have 1D data, we will want a line plot
+                if (len(aData.shape) is 1) :
+                    image_names['original'], image_names['compared'] = \
+                        plot.plot_and_save_comparison_figures \
+                                    (aData, bData,
+                                     plot.make_line_plot_plotting_functions,
+                                     varRunInfo['variable_dir'],
+                                     displayName,
+                                     varRunInfo['epsilon'],
+                                     varRunInfo['missing_value'],
+                                     missingValueAltInB = varRunInfo['missingValueAltInB'] if 'missingValueAltInB' in varRunInfo else None,
+                                     makeSmall=True,
+                                     doFork=runInfo['doFork'],
+                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
+                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
+                                     doPlotOriginal = varRunInfo['do_plot_originals'] if 'do_plot_originals' in varRunInfo else True,
+                                     doPlotAbsDiff  = varRunInfo['do_plot_abs_diff']  if 'do_plot_abs_diff'  in varRunInfo else True,
+                                     doPlotSubDiff  = varRunInfo['do_plot_sub_diff']  if 'do_plot_sub_diff'  in varRunInfo else True,
+                                     doPlotTrouble  = varRunInfo['do_plot_trouble']   if 'do_plot_trouble'   in varRunInfo else True,
+                                     doPlotHistogram= varRunInfo['do_plot_histogram'] if 'do_plot_histogram' in varRunInfo else True,
+                                     doPlotScatter  = varRunInfo['do_plot_scatter']   if 'do_plot_scatter'   in varRunInfo else True)
+                    
+                elif (len(aData.shape) is 2) :
+                    
+                    # create 2D images comparing the variable
+                    print("\tcreating figures for: " + explanationName)
+                    if do_not_test_with_lon_lat :
+                        # plot our non lon/lat info
+                        image_names['original'], image_names['compared'] = \
+                            plot.plot_and_save_comparison_figures \
+                                    (aData, bData,
+                                     plot.make_pure_data_plotting_functions,
+                                     varRunInfo['variable_dir'],
+                                     displayName,
+                                     varRunInfo['epsilon'],
+                                     varRunInfo['missing_value'],
+                                     missingValueAltInB = varRunInfo['missingValueAltInB'] if 'missingValueAltInB' in varRunInfo else None,
+                                     makeSmall=True,
+                                     doFork=runInfo['doFork'],
+                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
+                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
+                                     doPlotOriginal = varRunInfo['do_plot_originals'] if 'do_plot_originals' in varRunInfo else True,
+                                     doPlotAbsDiff  = varRunInfo['do_plot_abs_diff']  if 'do_plot_abs_diff'  in varRunInfo else True,
+                                     doPlotSubDiff  = varRunInfo['do_plot_sub_diff']  if 'do_plot_sub_diff'  in varRunInfo else True,
+                                     doPlotTrouble  = varRunInfo['do_plot_trouble']   if 'do_plot_trouble'   in varRunInfo else True,
+                                     doPlotHistogram= varRunInfo['do_plot_histogram'] if 'do_plot_histogram' in varRunInfo else True,
+                                     doPlotScatter  = varRunInfo['do_plot_scatter']   if 'do_plot_scatter'   in varRunInfo else True)
+                    else :
+                        # plot our lon/lat related info
+                        image_names['original'], image_names['compared'] = \
+                            plot.plot_and_save_comparison_figures \
+                                    (aData, bData,
+                                     plot.make_geolocated_plotting_functions,
+                                     varRunInfo['variable_dir'],
+                                     displayName,
+                                     varRunInfo['epsilon'],
+                                     varRunInfo['missing_value'],
+                                     missingValueAltInB = varRunInfo['missingValueAltInB'] if 'missingValueAltInB' in varRunInfo else None,
+                                     lonLatDataDict=lon_lat_data,
+                                     dataRanges     = varRunInfo['display_ranges']      if 'display_ranges'      in varRunInfo else None,
+                                     dataRangeNames = varRunInfo['display_range_names'] if 'display_range_names' in varRunInfo else None,
+                                     dataColors     = varRunInfo['display_colors']      if 'display_colors'      in varRunInfo else None,
+                                     makeSmall=True,
+                                     doFork=runInfo['doFork'],
+                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
+                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
+                                     doPlotOriginal = varRunInfo['do_plot_originals'] if 'do_plot_originals' in varRunInfo else True,
+                                     doPlotAbsDiff  = varRunInfo['do_plot_abs_diff']  if 'do_plot_abs_diff'  in varRunInfo else True,
+                                     doPlotSubDiff  = varRunInfo['do_plot_sub_diff']  if 'do_plot_sub_diff'  in varRunInfo else True,
+                                     doPlotTrouble  = varRunInfo['do_plot_trouble']   if 'do_plot_trouble'   in varRunInfo else True,
+                                     doPlotHistogram= varRunInfo['do_plot_histogram'] if 'do_plot_histogram' in varRunInfo else True,
+                                     doPlotScatter  = varRunInfo['do_plot_scatter']   if 'do_plot_scatter'   in varRunInfo else True)
+                
                 print("\tfinished creating figures for: " + explanationName)
             
             # create the report page for this variable
@@ -932,12 +1004,16 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         
         # if we can't compare the variable, we should tell the user 
         else :
-            LOG.warn(explanationName + ' ' + 
+            message = (explanationName + ' ' + 
                      'could not be compared. This may be because the data for this variable does not match in shape ' +
                      'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
-                     + str(bData.shape) + ') or the data may not match the shape of the selected longitude '
-                     + str(common_lon_lat_data['lon'].shape) + ' and ' +
-                     'latitude ' + str(common_lon_lat_data['lat'].shape) + ' variables.')
+                     + str(bData.shape) + ')')
+            if do_not_test_with_lon_lat :
+                message = message + '.'
+            else :
+                message = (message + ' or the data may not match the shape of the selected longitude ' +
+                     str(good_shape_from_lon_lat) + ' and ' + 'latitude ' + str(good_shape_from_lon_lat) + ' variables.')
+            LOG.warn(message)
         
     # the end of the loop to examine all the variables
     
@@ -1067,6 +1143,8 @@ python -m glance
                       action="store_true", default=False, help="view the glance version")
     parser.add_option('-f', '--fork', dest='doFork',
                       action="store_true", default=False, help="start multiple processes to create images in parallel")
+    parser.add_option('-d', '--nolonlat', dest='noLonLatVars',
+                      action="store_true", default=False, help="do not try to find or analyze logitude and latitude")
     
                     
     options, args = parser.parse_args()
@@ -1250,6 +1328,7 @@ python -m glance
         tempOptions['imagesOnly']    = options.imagesOnly
         tempOptions['htmlOnly']      = options.htmlOnly
         tempOptions['doFork']        = options.doFork
+        tempOptions['noLonLatVars']  = options.noLonLatVars
         tempOptions['latitudeVar']   = options.latitudeVar
         tempOptions['longitudeVar']  = options.longitudeVar
         tempOptions['lonlatepsilon'] = options.lonlatepsilon

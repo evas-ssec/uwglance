@@ -22,6 +22,7 @@ from PIL import Image
 
 import os, sys, logging
 import numpy as np
+from numpy import ma 
 
 import glance.graphics as maps
 import glance.delta as delta
@@ -131,6 +132,9 @@ def _create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
     # make the figure
     figure = plt.figure()
     axes = figure.add_subplot(111)
+    
+    if (data is None) or (len(data) <= 0) :
+        return figure
     
     # the histogram of the data
     n, bins, patches = plt.hist(data, bins)
@@ -367,6 +371,152 @@ def _create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAx
     
     return figure
 
+def _create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colorMap=None) :
+    """
+    create a simple figure showing the data given masked by the invalid mask
+    any tagData passed in will be interpreted as trouble points on the image and plotted as a
+    filled contour overlay in green on the image
+    if a colorMap is given it will be used to plot the data,
+    if not the default colorMap for imshow will be used
+    """
+    
+    cleanData = ma.array(data, mask=invalidMask)
+    
+    # build the plot
+    figure = plt.figure()
+    axes = figure.add_subplot(111)
+    
+    # build extra info to go to the map plotting function
+    kwargs = { } 
+    
+    # if we've got a color map, pass it to the list of things we want to tell the plotting function
+    if not (colorMap is None) :
+        kwargs['cmap'] = colorMap
+    
+    if (data is not None) and (sum(invalidMask) < invalidMask.size) :
+        # draw our data
+        im = imshow(cleanData, **kwargs)
+        # make a color bar
+        cbar = colorbar(format='%.3f')
+    
+    # and some informational stuff
+    axes.set_title(figureTitle)
+    
+    # if there are "tag" masks, plot them over the existing map
+    if not (tagData is None) :
+        
+        numTroublePoints = sum(tagData)
+        
+        # if we have trouble points, we need to show them
+        if numTroublePoints > 0:
+            
+            # figure out how many bad points there are
+            totalNumPoints = tagData.size # the number of points
+            percentBad = (float(numTroublePoints) / float(totalNumPoints)) * 100.0
+            LOG.debug('\t\tnumber of trouble points: ' + str(numTroublePoints))
+            LOG.debug('\t\tpercent of trouble points: ' + str(percentBad))
+            
+            
+            new_kwargs = {}
+            new_kwargs['cmap'] = greenColorMap
+            cleanTagData = ma.array(tagData, mask=~tagData)
+            p = contourf(cleanTagData, **new_kwargs)
+        
+        # display the number of trouble points on the report if we were passed a set of tag data
+        troublePtString = '\n\nShowing ' + str(numTroublePoints) + ' Trouble Points'
+        # if our plot is more complex, add clarification
+        if numTroublePoints > 0 :
+            troublePtString = troublePtString + ' in Green'
+        plt.xlabel(troublePtString)
+    
+    return figure
+
+def _create_line_plot_figure(dataList, figureTitle, tagData=None) :
+    """
+    create a basic line plot of the data vs. it's index, ignoring any invalid data
+    if tagData is given, under-label those points with green circles
+    
+    Each entry in the dataList should be a tupple containing:
+            (data, invalidMask, colorString, labelName)
+    
+    The color string describes a color for plotting in matplotlib.
+    The label names will be used for the legend, which will be shown if there is
+    more than one set of data plotted or if there is tag data plotted. Invalid
+    masks, colors, and label names may be given as None, in which case no data
+    will be masked and a default label of "data#" (where # is an arbitrary
+    unique counter) will be used.
+    """
+    
+    # build the plot
+    figure = plt.figure()
+    axes = figure.add_subplot(111)
+    
+    # plot each of the data sets
+    dataSetLabelNumber = 1
+    minTagPts = -1
+    maxTagPts = -1
+    for dataSet, invalidMask, colorString, labelName in dataList :
+        
+        # if we don't have these, set them to defaults
+        if invalidMask is None :
+            invalidMask = zeros(dataSet.shape, dtype=bool)
+        if labelName is None :
+            labelName = 'data' + str(dataSetLabelNumber)
+            dataSetLabelNumber = dataSetLabelNumber + 1
+        if colorString is None:
+            colorString = ''
+        
+        if (dataSet is not None) and (sum(invalidMask) < invalidMask.size) :
+            
+            # if we don't have a real min yet, set it based on the size
+            if minTagPts < 0 :
+                minTagPts = dataSet.size + 1
+            
+            indexData = ma.array(range(dataSet.size), mask=invalidMask)
+            cleanData = ma.array(dataSet,             mask=invalidMask)
+            
+            # plot the tag data and gather information about it
+            if tagData is not None :
+                
+                numTroublePoints = sum(tagData)
+                LOG.debug('\t\tnumber of trouble points: ' + str(numTroublePoints))
+                if numTroublePoints < minTagPts:
+                    minTagPts = numTroublePoints
+                if numTroublePoints > maxTagPts :
+                    maxTagPts = numTroublePoints
+                
+                # if we have trouble points, we need to show them
+                if numTroublePoints > 0:
+                    
+                    cleanTagData = ma.array(dataSet, mask=~tagData | invalidMask)
+                    axes.plot(indexData, cleanTagData, 'yo', label='trouble point')
+            
+            axes.plot(indexData, cleanData, '-' + colorString, label=labelName)
+    
+    # display the number of trouble points on the report if we were passed
+    # a set of tag data and we were able to compare it to some actual data
+    if ((tagData is not None) and (minTagPts >= 0) and (maxTagPts >=0)) :
+        
+        troublePtString = '\nMarking '
+        
+        if (minTagPts == maxTagPts) :
+            troublePtString = troublePtString + str(minTagPts) + ' Trouble Points with Yellow Circles'
+        else :
+            troublePtString = (troublePtString + 'between ' + str(minTagPts) + ' and ' + str(maxTagPts) + ' Trouble Points'
+                               + '\non the various data sets (using Yellow Circles)')
+        
+        plt.xlabel(troublePtString)
+    
+    if (len(dataList) > 1) or (tagData is not None) :
+        # make a key to explain our plot
+        # as long as things have been plotted with proper labels they should show up here
+        axes.legend(loc=0, markerscale=3.0) # Note: at the moment markerscale doesn't seem to work
+    
+    # and some informational stuff
+    axes.set_title(figureTitle)
+    
+    return figure
+
 # figure out the bounding axes for the display given a set of
 # longitude and latitude and possible a mask of invalid values
 # that we should ignore in them
@@ -500,76 +650,57 @@ def _handle_fig_creation_task(child_figure_function, log_message,
     # if we didn't fork, return the 0 pid to indicate that
     return pid
 
-def plot_and_save_figure_comparison(aData, bData,
-                                    variableRunInfo, 
-                                    fileAName, fileBName,
-                                    latitudeAData, longitudeAData,
-                                    latitudeBData, longitudeBData,
-                                    latitudeCommonData, longitudeCommonData,
-                                    spaciallyInvalidMaskA,
-                                    spaciallyInvalidMaskB,
-                                    outputPath, 
-                                    makeSmall=False,
-                                    shortCircuitComparisons=False,
-                                    doFork=False,
-                                    shouldClearMemoryWithThreads=False,
-                                    shouldUseSharedRangeForOriginal=False) : 
+def _log_spawn_and_wait_if_needed (imageDescription, childPids, imageList,
+                                   taskFunction, taskOutputPath, taskFigName,
+                                   doMakeThumb=True, doFork=False, shouldClearMemoryWithThreads=False) :
     """
-    given two files, and information on what to compare, make comparison
-    figures and save them to the given output graph.
-    Four figures will be generated, one for each file, a comparison image
-    that represents the amount of difference in that variable between the
-    two files, and an image highlighting the trouble spots where the
-    difference exceeds epsilon or there are missing or nan values in one
-    or both of the files
-    
-    variableRunInfo is a dictionary in the form
-        variableRunInfo = { 'variable_name': variableName,
-                            'epsilon': epsilon,
-                            'missing_value': missingDataValue,
-                            'display_name': displayName   # this entry is optional; the variable_name should be used
-                                                          # for descriptive purposes if it is not defined
-                            }
-    
-    returns a list of "original" data images and a list of "compared" data images
-    these are only the image names, not the full path to the images
+    create a figure generation task, spawning a process as needed
+    save the childPid to the list of pids if the process will remain outstanding after this method ends
+    the name of the figure that was generated will be added to the image list
     """
+    LOG.info("creating image of "+ imageDescription)
     
-    # lists to hold information on the images we make
-    original_images = [ ]
-    compared_images = [ ]
+    # start the actual task
+    pid = _handle_fig_creation_task(taskFunction,
+                                    "saving image of " + imageDescription,
+                                    taskOutputPath, taskFigName,
+                                    doMakeThumb, doFork or shouldClearMemoryWithThreads)
     
-    # if we weren't given a variable display name,
-    # just use the standard variable name instead
-    variableName = variableRunInfo['variable_name']
-    variableDisplayName = variableName
-    if 'display_name' in variableRunInfo :
-        variableDisplayName = variableRunInfo['display_name']
+    # wait based on the state of the pid we received and why we would have forked
+    childPid = None
+    if not (pid is 0) :
+        if doFork :
+            childPids.append(pid)
+            LOG.debug ("Started child process (pid: " + str(pid) + ") to create image of " + imageDescription)
+        else :
+            os.waitpid(pid, 0)
+    imageList.append(taskFigName)
     
-    # figure out what missing values we should be using
-    missing_value = variableRunInfo['missing_value']
-    missing_value_b = missing_value
-    if ('missing_value_alt_in_b' in variableRunInfo) :
-        missing_value_b = variableRunInfo['missing_value_alt_in_b']
+    return
+
+def make_geolocated_plotting_functions(aData, bData,
+                                       absDiffData, rawDiffData,
+                                       variableDisplayName,
+                                       epsilon,
+                                       goodInAMask, goodInBMask, goodMask,
+                                       troubleMask, outsideEpsilonMask,
+                                       
+                                       # parameters that are only needed for geolocated data
+                                       lonLatDataDict,
+                                       shouldUseSharedRangeForOriginal,
+                                       dataRanges, dataRangeNames, dataColors) :
     
-    # compare the two data sets to get our difference data and trouble info
-    rawDiffData, goodMask, (goodInAMask, goodInBMask), troubleMask, outsideEpsilonMask, \
-    (aNotFiniteMask, bNotFiniteMask), (aMissingMask, bMissingMask), \
-    (spaciallyInvalidMaskA, spaciallyInvalidMaskB) = delta.diff(aData, bData, variableRunInfo['epsilon'],
-                                                                (missing_value, missing_value_b),
-                                                                (spaciallyInvalidMaskA, spaciallyInvalidMaskB))
-    absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+    functionsToReturn = { }
     
-    # some more display info, pull it out for convenience
-    dataRanges = None
-    if ('display_ranges' in variableRunInfo) :
-        dataRanges = variableRunInfo['display_ranges']
-    dataRangeNames = None
-    if ('display_range_names' in variableRunInfo) : 
-        dataRangeNames = variableRunInfo['display_range_names']
-    dataColors = None
-    if ('display_colors' in variableRunInfo) :
-        dataColors = variableRunInfo['display_colors'] 
+    # TODO, possibly remove this section of definitions in the future?
+    latitudeAData         = lonLatDataDict['a']['lat']
+    longitudeAData        = lonLatDataDict['a']['lon']
+    latitudeBData         = lonLatDataDict['b']['lat']
+    longitudeBData        = lonLatDataDict['b']['lon']
+    latitudeCommonData    = lonLatDataDict['common']['lat']
+    longitudeCommonData   = lonLatDataDict['common']['lon']
+    spaciallyInvalidMaskA = lonLatDataDict['a']['inv_mask']
+    spaciallyInvalidMaskB = lonLatDataDict['b']['inv_mask']
     
     # figure out the bounding axis
     aAxis = _get_visible_axes(longitudeAData, latitudeAData, ~goodInAMask)
@@ -589,180 +720,351 @@ def plot_and_save_figure_comparison(aData, bData,
     LOG.info('\t\tloading base map data')
     baseMapInstance, fullAxis = maps.create_basemap(longitudeCommonData, latitudeCommonData, fullAxis, _select_projection(fullAxis))
     
-    # from this point on, we will be forking to create child processes so we can parallelize our image and
-    # report generation
-    isParent = True 
-    childPids = []
-    
-    # the original data figures
-    
     # figure out the shared range for A and B's data, by default don't share a range
     shared_range = None
     if (shouldUseSharedRangeForOriginal) :
         shared_range = _make_range(aData, ~goodInAMask, 50, offset_to_range=offsetToRange,
                                    data_b=bData, invalid_b_mask=~goodInBMask)
     
-    # only plot the two original data plots if they haven't been turned off
-    if (not ('do_plot_originals' in variableRunInfo)) or variableRunInfo['do_plot_originals'] :
+    # make the plotting functions
     
-        # the original A data
-        LOG.info("\t\tcreating image of " + variableDisplayName + " in file a")
-        pid = _handle_fig_creation_task((lambda : _create_mapped_figure(aData, latitudeAData, longitudeAData,
-                                                                        baseMapInstance, fullAxis,
-                                                                        (variableDisplayName + "\nin File A"),
-                                                                        invalidMask=(~goodInAMask),
-                                                                        dataRanges=dataRanges or shared_range,
-                                                                        dataRangeNames=dataRangeNames,
-                                                                        dataRangeColors=dataColors)),
-                                        "\t\tsaving image of " + variableDisplayName + " for file a",
-                                        outputPath, variableName + ".A.png",
-                                        makeSmall, doFork or shouldClearMemoryWithThreads)
-        if not (pid is 0) :
-            if doFork :
-                childPids.append(pid)
-                LOG.debug ("Started child process (pid: " + str(pid) + ") to create file a image for " + variableDisplayName)
-            else :
-                os.waitpid(pid, 0)
-        original_images.append(variableName + ".A.png")
+    functionsToReturn['originalA'] = (lambda : _create_mapped_figure(aData, latitudeAData, longitudeAData,
+                                                                     baseMapInstance, fullAxis,
+                                                                     (variableDisplayName + "\nin File A"),
+                                                                     invalidMask=(~goodInAMask),
+                                                                     dataRanges=dataRanges or shared_range,
+                                                                     dataRangeNames=dataRangeNames,
+                                                                     dataRangeColors=dataColors))
+    functionsToReturn['originalB'] = (lambda : _create_mapped_figure(bData, latitudeBData, longitudeBData,
+                                                                     baseMapInstance, fullAxis,
+                                                                     (variableDisplayName + "\nin File B"),
+                                                                     invalidMask=(~ goodInBMask),
+                                                                     dataRanges=dataRanges or shared_range,
+                                                                     dataRangeNames=dataRangeNames,
+                                                                     dataRangeColors=dataColors))
+    
+    functionsToReturn['absDiff']   = (lambda : _create_mapped_figure(absDiffData,
+                                                                     latitudeCommonData, longitudeCommonData,
+                                                                     baseMapInstance, fullAxis,
+                                                                     ("Absolute value of difference in\n" + variableDisplayName),
+                                                                     invalidMask=(~ goodMask)))
+    functionsToReturn['subDiff']   = (lambda : _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData,
+                                                                     baseMapInstance, fullAxis,
+                                                                     ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
+                                                                     invalidMask=(~ goodMask)))
+    # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
+    # that our plot won't be totally destroyed by missing or non-finite data from B
+    bDataCopy = bData[:]
+    tempMask = goodInAMask & (~goodInBMask) 
+    bDataCopy[tempMask] = aData[tempMask]
+    functionsToReturn['trouble']   = (lambda : _create_mapped_figure(bDataCopy, latitudeCommonData, longitudeCommonData,
+                                                                     baseMapInstance, fullAxis,
+                                                                     ("Areas of trouble data in\n" + variableDisplayName),
+                                                                     (~(goodInAMask | goodInBMask)),
+                                                                     mediumGrayColorMap, troubleMask,
+                                                                     dataRanges=dataRanges,
+                                                                     dataRangeNames=dataRangeNames))
+    
+    # setup the data bins for the histogram
+    numBinsToUse = 50
+    valuesForHist = rawDiffData[goodMask]
+    functionsToReturn['histogram'] = (lambda : _create_histogram(valuesForHist, numBinsToUse,
+                                                                 ("Difference in\n" + variableDisplayName),
+                                                                 ('Value of (Data File B - Data File A) at a Data Point'),
+                                                                 ('Number of Data Points with a Given Difference'),
+                                                                 True))
+    functionsToReturn['scatter']   = (lambda : _create_scatter_plot(aData[goodMask], bData[goodMask],
+                                                                    "Value in File A vs Value in File B",
+                                                                    "File A Value", "File B Value",
+                                                                    outsideEpsilonMask[goodMask],
+                                                                    epsilon))
+    
+    return functionsToReturn
+
+def make_pure_data_plotting_functions (aData, bData,
+                                       absDiffData, rawDiffData,
+                                       variableDisplayName,
+                                       epsilon,
+                                       goodInAMask, goodInBMask, goodMask,
+                                       troubleMask, outsideEpsilonMask,
+                                       
+                                       # additional parameters this function isn't using
+                                       lonLatDataDict=None,
+                                       shouldUseSharedRangeForOriginal=False,
+                                       dataRanges=None, dataRangeNames=None, dataColors=None) :
+    
+    functionsToReturn = { }
+    
+    functionsToReturn['originalA'] = (lambda: _create_simple_figure(aData, variableDisplayName + "\nin File A",
+                                                                    invalidMask=~goodInAMask))
+    functionsToReturn['originalB'] = (lambda: _create_simple_figure(bData, variableDisplayName + "\nin File B",
+                                                                    invalidMask=~goodInBMask))
+    
+    functionsToReturn['absDiff']   = (lambda: _create_simple_figure(absDiffData,
+                                                                    "Absolute value of difference in\n" + variableDisplayName,
+                                                                    invalidMask=~goodMask))
+    functionsToReturn['subDiff']   = (lambda: _create_simple_figure(rawDiffData,
+                                                                    "Value of (Data File B - Data File A) for\n" + variableDisplayName,
+                                                                    invalidMask=~goodMask))
+    # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
+    # that our plot won't be totally destroyed by missing or non-finite data from B
+    bDataCopy = bData[:]
+    tempMask = goodInAMask & (~goodInBMask) 
+    bDataCopy[tempMask] = aData[tempMask]
+    functionsToReturn['trouble']   = (lambda: _create_simple_figure(bDataCopy, "Areas of trouble data in\n" + variableDisplayName,
+                                                                    invalidMask=~(goodInAMask | goodInBMask), tagData=troubleMask,
+                                                                    colorMap=mediumGrayColorMap))
+    
+    # set up the bins and data for a histogram of the values of fileA - file B 
+    numBinsToUse = 50
+    valuesForHist = rawDiffData[goodMask]
+    functionsToReturn['histogram'] = (lambda : _create_histogram(valuesForHist, numBinsToUse,
+                                                                 ("Difference in\n" + variableDisplayName),
+                                                                 ('Value of (Data File B - Data File A) at a Data Point'),
+                                                                 ('Number of Data Points with a Given Difference'),
+                                                                 True))
+    functionsToReturn['scatter']   = (lambda : _create_scatter_plot(aData[goodMask], bData[goodMask],
+                                                                    "Value in File A vs Value in File B",
+                                                                    "File A Value", "File B Value",
+                                                                    outsideEpsilonMask[goodMask],
+                                                                    epsilon))
+    
+    return functionsToReturn
+
+def make_line_plot_plotting_functions (aData, bData,
+                                       absDiffData, rawDiffData,
+                                       variableDisplayName,
+                                       epsilon,
+                                       goodInAMask, goodInBMask, goodMask,
+                                       troubleMask, outsideEpsilonMask,
+                                       
+                                       # additional parameters this function isn't using
+                                       lonLatDataDict=None,
+                                       shouldUseSharedRangeForOriginal=False,
+                                       dataRanges=None, dataRangeNames=None, dataColors=None) :
+    
+    functionsToReturn = { }
+    
+    functionsToReturn['originalA'] = (lambda: _create_line_plot_figure([(aData, ~goodInAMask, 'r', 'A data'),
+                                                                        (bData, ~goodInBMask, 'b', 'B data')],
+                                                                       variableDisplayName + "\nin File A"))
+    #functionsToReturn['originalA'] = (lambda: _create_line_plot_figure(aData, variableDisplayName + "\nin File A",
+    #                                                                   invalidMask=~goodInAMask))
+    functionsToReturn['originalB'] = (lambda: _create_line_plot_figure([(bData, ~goodInBMask, 'b', 'B data')],
+                                                                       variableDisplayName + "\nin File B"))
+    
+    functionsToReturn['absDiff']   = (lambda: _create_line_plot_figure([(absDiffData, ~goodMask, 'k', 'abs. diff.')],
+                                                                       "Absolute value of difference in\n" + variableDisplayName))
+    functionsToReturn['subDiff']   = (lambda: _create_line_plot_figure([(rawDiffData, ~goodMask, 'k', 'raw diff.')],
+                                                                       "Value of (Data File B - Data File A) for\n" + variableDisplayName))
+    functionsToReturn['trouble']   = (lambda: _create_line_plot_figure([(aData, ~goodInAMask, 'r', 'A data'),
+                                                                        (bData, ~goodInBMask, 'b', 'B data')],
+                                                                       "Areas of trouble data in\n" + variableDisplayName,
+                                                                       tagData=troubleMask))
+    
+    # set up the bins and data for a histogram of the values of fileA - file B 
+    numBinsToUse = 50
+    valuesForHist = rawDiffData[goodMask]
+    functionsToReturn['histogram'] = (lambda : _create_histogram(valuesForHist, numBinsToUse,
+                                                                 ("Difference in\n" + variableDisplayName),
+                                                                 ('Value of (Data File B - Data File A) at a Data Point'),
+                                                                 ('Number of Data Points with a Given Difference'),
+                                                                 True))
+    functionsToReturn['scatter']   = (lambda : _create_scatter_plot(aData[goodMask], bData[goodMask],
+                                                                    "Value in File A vs Value in File B",
+                                                                    "File A Value", "File B Value",
+                                                                    outsideEpsilonMask[goodMask],
+                                                                    epsilon))
+    
+    return functionsToReturn
+
+def plot_and_save_comparison_figures (aData, bData,
+                                     plottingFunctionGenerationFunction,
+                                     outputPath,
+                                     variableDisplayName,
+                                     epsilon,
+                                     missingValue,
+                                     missingValueAltInB=None,
+                                     lonLatDataDict=None,
+                                     dataRanges=None,
+                                     dataRangeNames=None,
+                                     dataColors=None,
+                                     makeSmall=False,
+                                     shortCircuitComparisons=False,
+                                     doFork=False,
+                                     shouldClearMemoryWithThreads=False,
+                                     shouldUseSharedRangeForOriginal=False,
+                                     doPlotOriginal=True,
+                                     doPlotAbsDiff=True,
+                                     doPlotSubDiff=True,
+                                     doPlotTrouble=True,
+                                     doPlotHistogram=True,
+                                     doPlotScatter=True) :
+    """
+    Plot images for a set of figures based on the data sets and settings
+    passed in. The images will be saved to disk according to the settings.
+    
+    aData -             the A file data
+    bData -             the B file Data
+    lonLatDataDict -    a dictionary of longitude and latitude info in the form
+                        (or it may be empty if there is no lon/lat info or the
+                         available lon/lat info should not be used for this data
+                         set)
+    
+        lonLatDataDict = {
+                          'a' = {
+                                 'lon': longitudeDataForFileA,
+                                 'lat': latitudeDataForFileA,
+                                 'inv_mask': invalidMaskForFileA
+                                 },
+                          'b' = {
+                                 'lon': longitudeDataForFileB,
+                                 'lat': latitudeDataForFileB,
+                                 'inv_mask': invalidMaskForFileB
+                                 },
+                          'common' = {
+                                      'lon': longitudeDataCommonToBothFiles,
+                                      'lat': latitudeDataCommonToBothFiles,
+                                      'inv_mask': invalidMaskCommonToBothFiles
+                                      }
+                          }
+    
+    required parameters:
+    
+    outputPath -        the path where the output images will be placed
+    variableDisplayName - a descriptive name that will be shown on the
+                          images to label the variable being analyzed
+    epsilon -           the epsilon that should be used for the data comparison
+    missingValue -      the missing value that should be used for the data comparison
+    
+    optional parameters:
+    
+    missingValueAltInB - an alternative missing value in the B file; if None is given
+                         then the missingValue will be used for the B file
+    plottingFunction -  the plotting function that will be used to make the plots,
+                        defaults to using basemap to place your data on the globe
+    makeSmall -         should small "thumbnail" images be made for each large image?
+    shortCircuitComparisons - should the comparison plots be disabled?
+    doFork -            should the process fork to create new processes to create each
+                        image? **
+    shouldClearMemoryWithThreads - should the process use fork to control long term
+                                   memory bloating? **
+    shouldUseSharedRangeForOriginal - should the original images share an all-inclusive
+                                      data range?
+    doPlotOriginal -    should the plots of the two original data sets be made?
+    doPlotAbsDiff -     should the plot of the absolute difference comparison image be made?
+    doPlotSubDiff -     should the plot of the subtractive difference comparison image be made?
+    doPlotTrouble -     should the plot of the trouble point image be made?
+    doPlotHistogram -   should the plot of the historgram be made?
+    doPlotScatter -     should the plot of the scatter plot be made?
+    
+    ** May fail due to a known bug on MacOSX systems.
+    """
+    
+    # lists to hold information on the images we make
+    # TODO, this will interact poorly with doFork
+    original_images = [ ]
+    compared_images = [ ]
+    
+    # figure out what missing values we should be using
+    if missingValueAltInB is None :
+        missingValueAltInB = missingValue
+    
+    # figure out if we have spatially invalid masks to consider
+    spaciallyInvalidMaskA = None
+    spaciallyInvalidMaskB = None
+    if lonLatDataDict is not None:
+        spaciallyInvalidMaskA = lonLatDataDict['a']['inv_mask']
+        spaciallyInvalidMaskB = lonLatDataDict['b']['inv_mask']
+    
+    # compare the two data sets to get our difference data and trouble info
+    rawDiffData, goodMask, (goodInAMask, goodInBMask), troubleMask, outsideEpsilonMask, \
+    (aNotFiniteMask, bNotFiniteMask), (aMissingMask, bMissingMask), \
+    (spaciallyInvalidMaskA, spaciallyInvalidMaskB) = delta.diff(aData, bData, epsilon, (missingValue, missingValueAltInB),
+                                                                (spaciallyInvalidMaskA, spaciallyInvalidMaskB))
+    absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+    
+    LOG.debug("Visible axes will not be calculated for variable data (" + variableDisplayName
+              + ") due to lack of lon/lat comparison.")
+    
+    # from this point on, we will be forking to create child processes so we can parallelize our image and
+    # report generation
+    isParent = True 
+    childPids = [ ]
+    
+    # generate our plotting functions
+    plottingFunctions = plottingFunctionGenerationFunction (aData, bData,
+                                                            absDiffData, rawDiffData,
+                                                            variableDisplayName,
+                                                            epsilon,
+                                                            goodInAMask, goodInBMask, goodMask,
+                                                            troubleMask, outsideEpsilonMask,
+                                                            # below this comment are parameters only needed
+                                                            # for geolocated images
+                                                            lonLatDataDict,
+                                                            shouldUseSharedRangeForOriginal,
+                                                            dataRanges, dataRangeNames, dataColors)
+    
+    # only plot the two original data plots if they haven't been turned off
+    if doPlotOriginal :
         
-        # the original B data
-        LOG.info("\t\tcreating image of " + variableDisplayName + " in file b")
-        pid = _handle_fig_creation_task((lambda : _create_mapped_figure(bData, latitudeBData, longitudeBData,
-                                                                        baseMapInstance, fullAxis,
-                                                                        (variableDisplayName + "\nin File B"),
-                                                                        invalidMask=(~ goodInBMask),
-                                                                        dataRanges=dataRanges or shared_range,
-                                                                        dataRangeNames=dataRangeNames,
-                                                                        dataRangeColors=dataColors)),
-                                        "\t\tsaving image of " + variableDisplayName + " for file b",
-                                        outputPath, variableName + ".B.png",
-                                        makeSmall, doFork or shouldClearMemoryWithThreads)
-        if not (pid is 0) :
-            if doFork:
-                childPids.append(pid)
-                LOG.debug ("Started child process (pid: " + str(pid) + ") to create file b image for " + variableDisplayName)
-            else :
-                os.waitpid(pid, 0)
-        original_images.append(variableName + ".B.png")
+        _log_spawn_and_wait_if_needed(variableDisplayName + " in file a", childPids, original_images,
+                                      plottingFunctions['originalA'],
+                                      outputPath, "A.png",
+                                      makeSmall, doFork, shouldClearMemoryWithThreads)
+        
+        _log_spawn_and_wait_if_needed(variableDisplayName + " in file b", childPids, original_images,
+                                      plottingFunctions['originalB'],
+                                      outputPath, "B.png",
+                                      makeSmall, doFork, shouldClearMemoryWithThreads)
+        
     # this is the end of the if to plot the original data 
     
     # make the data comparison figures
     if not shortCircuitComparisons :
         
         # only plot the absolute difference if if it hasn't been turned off
-        if (not ('do_plot_abs_diff' in variableRunInfo)) or (variableRunInfo['do_plot_abs_diff']) :
+        if doPlotAbsDiff :
             
-            # the distance between the two data sets
-            LOG.info("\t\tcreating image of the absolute value of difference in " + variableDisplayName)
-            pid = _handle_fig_creation_task((lambda : _create_mapped_figure(absDiffData,
-                                                                            latitudeCommonData, longitudeCommonData,
-                                                                            baseMapInstance, fullAxis,
-                                                                            ("Absolute value of difference in\n" + variableDisplayName),
-                                                                            invalidMask=(~ goodMask))),
-                                            "\t\tsaving image of the absolute value of difference for " + variableDisplayName,
-                                            outputPath, variableName + ".AbsDiff.png",
-                                            makeSmall, doFork or shouldClearMemoryWithThreads)
-            if not (pid is 0) :
-                if doFork :
-                    childPids.append(pid)
-                    LOG.debug ("Started child process (pid: " + str(pid)
-                               + ") to create absolute value of difference image for " + variableDisplayName)
-                else :
-                    os.waitpid(pid, 0)
-            compared_images.append(variableName + ".AbsDiff.png")
+            _log_spawn_and_wait_if_needed("absolute value of difference in " + variableDisplayName, childPids, compared_images,
+                                          plottingFunctions['absDiff'],
+                                          outputPath, "AbsDiff.png",
+                                          makeSmall, doFork, shouldClearMemoryWithThreads)
         
         # only plot the difference plot if it hasn't been turned off
-        if (not ('do_plot_sub_diff' in variableRunInfo)) or (variableRunInfo['do_plot_sub_diff']) :
+        if doPlotSubDiff :
             
-            # the subtraction of one data set from the other
-            LOG.info("\t\tcreating image of the difference in " + variableDisplayName)
-            pid = _handle_fig_creation_task((lambda : _create_mapped_figure(rawDiffData, latitudeCommonData, longitudeCommonData,
-                                                                            baseMapInstance, fullAxis,
-                                                                            ("Value of (Data File B - Data File A) for\n" + variableDisplayName),
-                                                                            invalidMask=(~ goodMask))),
-                                            "\t\tsaving image of the difference in " + variableDisplayName,
-                                            outputPath, variableName + ".Diff.png",
-                                            makeSmall, doFork or shouldClearMemoryWithThreads)
-            if not (pid is 0) :
-                if doFork :
-                    childPids.append(pid)
-                    LOG.debug ("Started child process (pid: " + str(pid) + ") to create difference image for " + variableDisplayName)
-                else :
-                    os.waitpid(pid, 0)
-            compared_images.append(variableName + ".Diff.png")
+            _log_spawn_and_wait_if_needed("the difference in " + variableDisplayName, childPids, compared_images,
+                                          plottingFunctions['subDiff'],
+                                          outputPath, "Diff.png",
+                                          makeSmall, doFork, shouldClearMemoryWithThreads)
         
         # only plot the trouble plot if it hasn't been turned off
-        if (not ('do_plot_trouble' in variableRunInfo)) or (variableRunInfo['do_plot_trouble']) :
+        if doPlotTrouble :
             
-            # mark the trouble points
-            LOG.info("\t\tcreating image marking trouble data in " + variableDisplayName)
-            # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
-            # that our plot won't be totally destroyed by missing or non-finite data from B
-            bDataCopy = bData[:]
-            tempMask = goodInAMask & (~goodInBMask) 
-            bDataCopy[tempMask] = aData[tempMask]
-            pid = _handle_fig_creation_task((lambda : _create_mapped_figure(bDataCopy, latitudeCommonData, longitudeCommonData,
-                                                                            baseMapInstance, fullAxis,
-                                                                            ("Areas of trouble data in\n" + variableDisplayName),
-                                                                            (~(goodInAMask | goodInBMask)),
-                                                                            mediumGrayColorMap, troubleMask,
-                                                                            dataRanges=dataRanges,
-                                                                            dataRangeNames=dataRangeNames)),
-                                            "\t\tsaving image marking trouble data in " + variableDisplayName,
-                                            outputPath, variableName + ".Trouble.png",
-                                            makeSmall, doFork or shouldClearMemoryWithThreads)
-            if not (pid is 0) :
-                if doFork :
-                    childPids.append(pid)
-                    LOG.debug ("Started child process (pid: " + str(pid) + ") to create trouble image for " + variableDisplayName)
-                else :
-                    os.waitpid(pid, 0)
-            compared_images.append(variableName + ".Trouble.png")
+            _log_spawn_and_wait_if_needed("trouble data in " + variableDisplayName, childPids, compared_images,
+                                          plottingFunctions['trouble'],
+                                          outputPath, "Trouble.png",
+                                          makeSmall, doFork, shouldClearMemoryWithThreads)
         
         # only plot the histogram if it hasn't been turned off
-        if (not ('do_plot_histogram' in variableRunInfo)) or (variableRunInfo['do_plot_histogram']) :
+        if doPlotHistogram :
             
-            # a histogram of the values of fileA - file B 
-            LOG.info("\t\tcreating histogram of the amount of difference in " + variableDisplayName)
-            numBinsToUse = 50
-            valuesForHist = rawDiffData[goodMask]
-            pid = _handle_fig_creation_task((lambda : _create_histogram(valuesForHist, numBinsToUse,
-                                                                        ("Difference in\n" + variableDisplayName),
-                                                                        ('Value of (Data File B - Data File A) at a Data Point'),
-                                                                        ('Number of Data Points with a Given Difference'),
-                                                                        True)),
-                                            "\t\tsaving histogram of the amount of difference in " + variableDisplayName,
-                                            outputPath, variableName + ".Hist.png",
-                                            makeSmall, doFork or shouldClearMemoryWithThreads)
-            if not (pid is 0) :
-                if doFork :
-                    childPids.append(pid)
-                    LOG.debug ("Started child process (pid: " + str(pid)
-                               + ") to create difference histogram image for " + variableDisplayName)
-                else :
-                    os.waitpid(pid, 0)
-            compared_images.append(variableName + ".Hist.png")
+            _log_spawn_and_wait_if_needed("histogram of the amount of difference in " + variableDisplayName, childPids, compared_images,
+                                          plottingFunctions['histogram'],
+                                          outputPath, "Hist.png",
+                                          makeSmall, doFork, shouldClearMemoryWithThreads)
         
         # only plot the scatter plot if it hasn't been turned off
-        if (not ('do_plot_scatter' in variableRunInfo)) or (variableRunInfo['do_plot_scatter']) :
+        if doPlotScatter :
             
             # scatter plot of file a vs file b values
-            LOG.info("\t\tcreating scatter plot of file a values vs file b values for " + variableDisplayName)
-            pid = _handle_fig_creation_task((lambda : _create_scatter_plot(aData[goodMask], bData[goodMask],
-                                                                           "Value in File A vs Value in File B",
-                                                                           "File A Value", "File B Value",
-                                                                           outsideEpsilonMask[goodMask],
-                                                                           variableRunInfo['epsilon'])),
-                                            "\t\tsaving scatter plot of file a values vs file b values in " + variableDisplayName,
-                                            outputPath, variableName + ".Scatter.png",
-                                            makeSmall, doFork or shouldClearMemoryWithThreads)
-            if not (pid is 0) :
-                if doFork :
-                    childPids.append(pid)
-                    LOG.debug ("Started child process (pid: " + str(pid) + ") to create scatter plot image for " + variableDisplayName)
-                else :
-                    os.waitpid(pid, 0)
-            compared_images.append(variableName + ".Scatter.png")
+            
+            _log_spawn_and_wait_if_needed("scatter plot of file a values vs file b values for " + variableDisplayName,
+                                          childPids, compared_images,
+                                          plottingFunctions['scatter'],
+                                          outputPath, "Scatter.png",
+                                          makeSmall, doFork, shouldClearMemoryWithThreads)
     
     # now we need to wait for all of our child processes to terminate before returning
     if (isParent) : # just in case
