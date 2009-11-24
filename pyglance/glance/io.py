@@ -184,8 +184,8 @@ class nc(CDF):
 nc4 = nc
 cdf = nc
 
-
-FIXME_IDPS = [ '/All_Data/CrIS-SDR_All/ES' + ri + band for ri in ['Real','Imaginary'] for band in ['LW','MW','SW'] ] 
+# TODO remove
+#FIXME_IDPS = [ '/All_Data/CrIS-SDR_All/ES' + ri + band for ri in ['Real','Imaginary'] for band in ['LW','MW','SW'] ] 
 
 class h5(object):
     """wrapper for HDF5 datasets
@@ -196,8 +196,27 @@ class h5(object):
         self._h5 = h5py.File(filename,'r')
     
     def __call__(self):
-        "FIXME: this should return the real list of variables, which will include slashes"
-        return set(FIXME_IDPS)
+        
+        variableList = [ ]
+        def testFn (name, obj) :
+            #print ('checking name: ' + name)
+            print ('object: ' + str(obj))
+            
+            if isinstance(obj, h5py.Dataset) :
+                try :
+                    tempType = obj.dtype # this is required to provoke a type error for closed data sets
+                    #TODO, why are there closed data sets?!?
+                    LOG.debug ('type: ' + str(tempType))
+                    variableList.append(name)
+                except TypeError :
+                    LOG.debug('TypeError prevents the use of variable ' + name
+                              + '. This variable will be ignored')
+        
+        self._h5.visititems(testFn)
+        
+        LOG.debug('variables from visiting h5 file structure: ' + str(variableList))
+        
+        return(variableList)
     
     @staticmethod
     def trav(h5,pth): 

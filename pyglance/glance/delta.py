@@ -8,6 +8,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
 import os, sys, logging
+import numpy as np
 from numpy import *
 from scipy.stats import pearsonr, spearmanr, pointbiserialr
 
@@ -28,8 +29,10 @@ def diff(aData, bData, epsilon=0.,
     take two arrays of similar size and composition
     if an ignoreMask is passed in values in the mask will not be analysed to
     form the various return masks and the corresponding spots in the
-    "difference" return data array will contain nan values.
-    return difference array filled with nans where differences aren't valid,
+    "difference" return data array will contain fill values (selected
+    based on data type).
+    
+    return difference array filled with fill data where differences aren't valid,
     good mask where values are finite in both a and b
     trouble mask where missing values or nans don't match or delta > epsilon
     (a-notfinite-mask, b-notfinite-mask)
@@ -69,16 +72,43 @@ def diff(aData, bData, epsilon=0.,
     
     # construct our diff'ed array
     raw_diff = zeros(shape, dtype=sharedType) #empty_like(aData)
-    raw_diff[~valid_in_both] = nan # throw away invalid data
+    
+    fill_data_value = select_fill_data(sharedType)
+    
+    LOG.debug('current fill data value: ' + str(fill_data_value))
+    
+    raw_diff[~valid_in_both] = fill_data_value # throw away invalid data
     raw_diff[valid_in_both] = bData[valid_in_both] - aData[valid_in_both]
     
     # the valid data which is too different between the two sets according to the given epsilon
     outside_epsilon_mask = (abs(raw_diff) > epsilon) & valid_in_both
-    # trouble points - mismatched nans, mismatched missing-values, differences that are too large 
+    # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
     trouble_pt_mask = (a_not_finite_mask ^ b_not_finite_mask) | (a_missing_mask ^ b_missing_mask) | outside_epsilon_mask
     
     return raw_diff, valid_in_both, (valid_in_a_mask, valid_in_b_mask), trouble_pt_mask, outside_epsilon_mask,  \
-           (a_not_finite_mask, b_not_finite_mask), (a_missing_mask, b_missing_mask), (ignore_mask_a, ignore_mask_b) 
+           (a_not_finite_mask, b_not_finite_mask), (a_missing_mask, b_missing_mask), (ignore_mask_a, ignore_mask_b)
+
+def select_fill_data(dTypeValue) :
+    """
+    select a fill data value based on the type of data that is being
+    inspected/changed
+    """
+    
+    fill_value_to_return = None
+    
+    if issubdtype(dTypeValue, np.float) or issubdtype(dTypeValue, np.complex) :
+        fill_value_to_return = nan
+    elif issubdtype(dTypeValue, np.int) :
+        fill_value_to_return = np.iinfo(dTypeValue).min
+    elif issubdtype(dTypeValue, np.bool) :
+        fill_value_to_return = True
+    elif ((dTypeValue is np.uint8)  or
+          (dTypeValue is np.uint16) or
+          (dTypeValue is np.uint32) or
+          (dTypeValue is np.uint64)) :
+        fill_value_to_return = np.iinfo(dTypeValue).max
+    
+    return fill_value_to_return
 
 def corr(x,y,mask):
     "compute correlation coefficient"

@@ -864,7 +864,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             
             # check to see if there is a directory to put information about this variable in,
             # if not then create it
-            variableDir = os.path.join(pathsTemp['out'], displayName)
+            variableDir = os.path.join(pathsTemp['out'], './' + displayName)
             varRunInfo['variable_dir'] = variableDir
             varRunInfo['variable_report_path_escaped'] = quote(os.path.join(displayName, 'index.html'))
             LOG.debug ("Directory selected for variable information: " + varRunInfo['variable_report_path_escaped'])
