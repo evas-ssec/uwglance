@@ -19,6 +19,7 @@ from pycdf import CDFError
 import glance.io as io
 import glance.delta as delta
 import glance.plot as plot
+import glance.plotcreatefns as plotcreate
 import glance.report as report
 
 from urllib import quote
@@ -854,6 +855,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         LOG.debug ("do_not_test_with_lon_lat = " + str(do_not_test_with_lon_lat))
         LOG.debug ("include_images_for_this_variable = " + str(include_images_for_this_variable))
         
+        # handle vector data
+        isVectorData = False # TODO actually figure out if we have vector data from user inputted settings
+        
         # check if this data can be displayed but
         # don't compare lon/lat sizes if we won't be plotting
         if ( (aData.shape == bData.shape) 
@@ -895,7 +899,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             # based on the settings and whether the variable passsed or failed,
             # should we include images for this variable?
             if ('only_plot_on_fail' in varRunInfo) and varRunInfo['only_plot_on_fail'] :
-                include_images_for_this_variable = include_images_for_this_variable and didPass
+                include_images_for_this_variable = include_images_for_this_variable and (not didPass)
                 varRunInfo['shouldIncludeImages'] = include_images_for_this_variable
             
             # to hold the names of any images created
@@ -908,78 +912,52 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             # TODO, will need to handle averaged/sliced 3D data at some point
             if (include_images_for_this_variable) :
                 
-                # if we only have 1D data, we will want a line plot
-                if (len(aData.shape) is 1) :
-                    image_names['original'], image_names['compared'] = \
-                        plot.plot_and_save_comparison_figures \
-                                    (aData, bData,
-                                     plot.make_line_plot_plotting_functions,
-                                     varRunInfo['variable_dir'],
-                                     displayName,
-                                     varRunInfo['epsilon'],
-                                     varRunInfo['missing_value'],
-                                     missingValueAltInB = varRunInfo['missingValueAltInB'] if 'missingValueAltInB' in varRunInfo else None,
-                                     makeSmall=True,
-                                     doFork=runInfo['doFork'],
-                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
-                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
-                                     doPlotOriginal = varRunInfo['do_plot_originals'] if 'do_plot_originals' in varRunInfo else True,
-                                     doPlotAbsDiff  = varRunInfo['do_plot_abs_diff']  if 'do_plot_abs_diff'  in varRunInfo else True,
-                                     doPlotSubDiff  = varRunInfo['do_plot_sub_diff']  if 'do_plot_sub_diff'  in varRunInfo else True,
-                                     doPlotTrouble  = varRunInfo['do_plot_trouble']   if 'do_plot_trouble'   in varRunInfo else True,
-                                     doPlotHistogram= varRunInfo['do_plot_histogram'] if 'do_plot_histogram' in varRunInfo else True,
-                                     doPlotScatter  = varRunInfo['do_plot_scatter']   if 'do_plot_scatter'   in varRunInfo else True)
-                    
+                plotFunctionGenerationObjects = [ ]
+                
+                # if the data is the same size, we can always make our basic statistical comparison plots
+                if (aData.shape == bData.shape) :
+                    plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
+                
+                # TODO, need a way to match data if it is not the same shape
+                
+                # if it's vector data with longitude and latitude, quiver plot it on the Earth
+                if isVectorData and (not do_not_test_with_lon_lat) :
+                    plotFunctionGenerationObjects.append(plotcreate.MappedQuiverPlotFunctionFactory())
+                
+                # if the data is one dimensional we can plot it as lines
+                elif   (len(aData.shape) is 1) :
+                    plotFunctionGenerationObjects.append(plotcreate.LinePlotsFunctionFactory())
+                
+                # if the data is 2D we have some options based on the type of data
                 elif (len(aData.shape) is 2) :
                     
-                    # create 2D images comparing the variable
-                    print("\tcreating figures for: " + explanationName)
-                    if do_not_test_with_lon_lat :
-                        # plot our non lon/lat info
-                        image_names['original'], image_names['compared'] = \
-                            plot.plot_and_save_comparison_figures \
-                                    (aData, bData,
-                                     plot.make_pure_data_plotting_functions,
-                                     varRunInfo['variable_dir'],
-                                     displayName,
-                                     varRunInfo['epsilon'],
-                                     varRunInfo['missing_value'],
-                                     missingValueAltInB = varRunInfo['missingValueAltInB'] if 'missingValueAltInB' in varRunInfo else None,
-                                     makeSmall=True,
-                                     doFork=runInfo['doFork'],
-                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
-                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
-                                     doPlotOriginal = varRunInfo['do_plot_originals'] if 'do_plot_originals' in varRunInfo else True,
-                                     doPlotAbsDiff  = varRunInfo['do_plot_abs_diff']  if 'do_plot_abs_diff'  in varRunInfo else True,
-                                     doPlotSubDiff  = varRunInfo['do_plot_sub_diff']  if 'do_plot_sub_diff'  in varRunInfo else True,
-                                     doPlotTrouble  = varRunInfo['do_plot_trouble']   if 'do_plot_trouble'   in varRunInfo else True,
-                                     doPlotHistogram= varRunInfo['do_plot_histogram'] if 'do_plot_histogram' in varRunInfo else True,
-                                     doPlotScatter  = varRunInfo['do_plot_scatter']   if 'do_plot_scatter'   in varRunInfo else True)
+                    # if the data is not mapped to a longitude and latitude, just show it as an image
+                    if (do_not_test_with_lon_lat) :
+                        plotFunctionGenerationObjects.append(plotcreate.IMShowPlotFunctionFactory())
+                    
+                    # if it's 2D and mapped to the Earth, contour plot it on the earth
                     else :
-                        # plot our lon/lat related info
-                        image_names['original'], image_names['compared'] = \
-                            plot.plot_and_save_comparison_figures \
-                                    (aData, bData,
-                                     plot.make_geolocated_plotting_functions,
-                                     varRunInfo['variable_dir'],
-                                     displayName,
-                                     varRunInfo['epsilon'],
-                                     varRunInfo['missing_value'],
-                                     missingValueAltInB = varRunInfo['missingValueAltInB'] if 'missingValueAltInB' in varRunInfo else None,
-                                     lonLatDataDict=lon_lat_data,
-                                     dataRanges     = varRunInfo['display_ranges']      if 'display_ranges'      in varRunInfo else None,
-                                     dataRangeNames = varRunInfo['display_range_names'] if 'display_range_names' in varRunInfo else None,
-                                     dataColors     = varRunInfo['display_colors']      if 'display_colors'      in varRunInfo else None,
-                                     makeSmall=True,
-                                     doFork=runInfo['doFork'],
-                                     shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
-                                     shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
-                                     doPlotOriginal = varRunInfo['do_plot_originals'] if 'do_plot_originals' in varRunInfo else True,
-                                     doPlotAbsDiff  = varRunInfo['do_plot_abs_diff']  if 'do_plot_abs_diff'  in varRunInfo else True,
-                                     doPlotSubDiff  = varRunInfo['do_plot_sub_diff']  if 'do_plot_sub_diff'  in varRunInfo else True,
-                                     doPlotTrouble  = varRunInfo['do_plot_trouble']   if 'do_plot_trouble'   in varRunInfo else True,
-                                     doPlotHistogram= varRunInfo['do_plot_histogram'] if 'do_plot_histogram' in varRunInfo else True,
-                                     doPlotScatter  = varRunInfo['do_plot_scatter']   if 'do_plot_scatter'   in varRunInfo else True)
+                        plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
+                
+                # plot our lon/lat related info
+                image_names['original'], image_names['compared'] = \
+                    plot.plot_and_save_comparison_figures \
+                            (aData, bData,
+                             plotFunctionGenerationObjects,
+                             varRunInfo['variable_dir'],
+                             displayName,
+                             varRunInfo['epsilon'],
+                             varRunInfo['missing_value'],
+                             missingValueAltInB = varRunInfo['missingValueAltInB'] if 'missingValueAltInB' in varRunInfo else None,
+                             lonLatDataDict=lon_lat_data,
+                             dataRanges     = varRunInfo['display_ranges']      if 'display_ranges'      in varRunInfo else None,
+                             dataRangeNames = varRunInfo['display_range_names'] if 'display_range_names' in varRunInfo else None,
+                             dataColors     = varRunInfo['display_colors']      if 'display_colors'      in varRunInfo else None,
+                             makeSmall=True,
+                             doFork=runInfo['doFork'],
+                             shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
+                             shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
+                             doPlotSettingsDict = varRunInfo)
                 
                 print("\tfinished creating figures for: " + explanationName)
             

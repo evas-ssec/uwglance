@@ -57,7 +57,7 @@ def create_basemap (lon, lat=None, axis=None, projection='lcc', resolution='i') 
     m = None
     if projection is 'ortho' :
         # orthographic projections require this call
-        m = Basemap(resolution=resolution, projection=projection,
+        m = Basemap(resolution=resolution, area_thresh=10000., projection=projection,
                     lat_0=lat_mid, lon_0=lon_mid)
     else :
         # most of the other projections use this call
@@ -84,9 +84,9 @@ def draw_basic_features(baseMapInstance, axis) :
     lat_top    = axis[3] 
     
     # draw the parallels and meridians
-    parallels = arange(-80.,90,abs(lat_top - lat_bottom) / 4)
+    parallels = arange(-80.,90.,abs(lat_top - lat_bottom) / 4.0)
     baseMapInstance.drawparallels(parallels,labels=[1,0,0,1])
-    meridians = arange(0.,360.,abs(lon_left - lon_right) / 4)
+    meridians = arange(0., 360.,abs(lon_left - lon_right) / 4.0)
     baseMapInstance.drawmeridians(meridians,labels=[1,0,0,1])    
     
     return
@@ -108,18 +108,36 @@ def show_x_y_data(x, y, baseMapInstance, data=None, levelsToUse=None, **kwargs) 
     artistsAdded = [ ]
     
     # only try to plot the data if there is some
-    if data!=None:
+    if data is not None:
         
         newX    = make_2D_version_if_needed(x,    badLonLat)
         newY    = make_2D_version_if_needed(y,    badLonLat)
         newData = make_2D_version_if_needed(data, nan)
         
-        if levelsToUse != None :
+        if levelsToUse is not None :
             p = baseMapInstance.contourf(newX, newY, newData, levelsToUse, **kwargs)
         else :
             p = baseMapInstance.contourf(newX, newY, newData, **kwargs)
     
-    # return the original x and y so the match any external data in shape
+    # return the original x and y so the caller can match any external data in shape
+    return baseMapInstance, x, y
+
+def show_quiver_plot (lon, lat, baseMapInstance, (uData, vData)=(None,None), colordata=None, **kwargs) :
+    """
+    Show a quiver plot of the given vector data at the given longitude and latitude
+    """
+    
+    x, y = baseMapInstance(lon, lat) # translate into the coordinate system of the basemap
+    
+    # show the quiver plot if there is data
+    
+    if (uData is not None) and (vData is not None) :
+        if colordata is None:
+            p = baseMapInstance.quiver(x, y, uData, vData, **kwargs)
+        else :
+            p = baseMapInstance.quiver(x, y, uData, vData, colordata, **kwargs)
+    
+    # return the original x and y so the caller can match any external data in shape
     return baseMapInstance, x, y
 
 def make_2D_version_if_needed(originalArray, fillValue) :

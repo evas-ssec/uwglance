@@ -177,7 +177,7 @@ def collapse_to_index(data, index, collapsing_function=np.mean,
     new_data = new_data.transpose(new_index_order)
     
     # find any bad points that we don't want to collapse
-    bad_mask = np.zeros(new_data.shape, dtype=bool)
+    bad_mask = ~np.isfinite(new_data)
     if missing_value is not None :
         bad_mask[new_data == missing_value] = True
     if ignore_above_exclusive is not None :
@@ -217,8 +217,13 @@ def organize_ipopp_data_into_image(original_ipopp_data, wave_number=None, missin
                   |_|_|_|
                   |_|_|_|
                   
-                  block of the 9 detectors (TODO order?
-                  for the moment assuming increasing linear by line then field of regard)
+                  block of the 9 detectors
+                  
+                  with the index to physical mapping:
+                  
+                  0 1 2
+                  3 4 5
+                  6 7 8
                   
                   for each detector point, if the wave_number was given
                   in the parameters, that specific interferogram data pt will be used

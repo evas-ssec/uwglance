@@ -200,12 +200,12 @@ class h5(object):
         variableList = [ ]
         def testFn (name, obj) :
             #print ('checking name: ' + name)
-            print ('object: ' + str(obj))
+            #print ('object: ' + str(obj))
             
             if isinstance(obj, h5py.Dataset) :
                 try :
                     tempType = obj.dtype # this is required to provoke a type error for closed data sets
-                    #TODO, why are there closed data sets?!?
+                    
                     LOG.debug ('type: ' + str(tempType))
                     variableList.append(name)
                 except TypeError :
