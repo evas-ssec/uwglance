@@ -143,9 +143,6 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
             newX = np.array(x[tagData])
             newY = np.array(y[tagData])
             
-            print ("****newX type: " + str(type(newX)))
-            print ("****newY type: " + str(type(newY)))
-            
             # figure out how many bad points there are
             totalNumPoints = x.size # the number of points
             percentBad = (float(numTroublePoints) / float(totalNumPoints)) * 100.0

@@ -468,7 +468,13 @@ def _get_numerical_data_stats(a, b, diff_data,  data_is_finite_mask,
     return comparison
 
 # get the min, ignoring the stuff in mask
-def min_with_mask(data, mask) :
+def min_with_mask(data, mask=None) :
+    
+    if (mask is None) and (type(data) is numpy.ma) :
+        mask = ~data.mask
+    if mask is None :
+        mask = np.zeros(data.shape, dtype=bool)
+    
     temp = data[~mask]
     toReturn = None
     if len(temp) > 0 :
@@ -476,7 +482,13 @@ def min_with_mask(data, mask) :
     return toReturn
 
 # get the max, ignoring the stuff in mask
-def max_with_mask(data, mask) :
+def max_with_mask(data, mask=None) :
+    
+    if (mask is None) and (type(data) is numpy.ma) :
+        mask = ~data.mask
+    if mask is None :
+        mask = np.zeros(data.shape, dtype=bool)
+    
     temp = data[~mask]
     toReturn = None
     if len(temp) > 0 :
@@ -516,6 +528,163 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     out['General Statistics'] = general_stats
     
     return out
+
+def colocate_matching_points_within_epsilon((aData, alongitude, alatitude),
+                                            (bData, blongitude, blatitude),
+                                            lonlatEpsilon,
+                                            invalidAMask=None, invalidBMask=None):
+    """
+    match data points together based on their longitude and latitude values
+    to match points must be within lonlatEpsilon degrees in both longitude and latitude
+    
+    if the longitude and latitude variables contain invalid data they should represent this by
+    being masked arrays that mask out the invalid data
+    
+    Note: the return will contain all pairs of points that match, this means an individual a or b
+    data point may be repeated if it matches multiple points within the lonlatEpsilon provided
+    
+    Warning: This algorithm will fail to find all matching points if the lonlatEpsilon is set to a
+    value greater than or equal to 1.0 degrees. This is related to the bin size used for searching
+    thoretically the bin size could be corrected to scale with the lonlatEpsilon in the future. TODO
+    """
+    LOG.debug("Preparing to colocate data using longitude and latitude (acceptable epsilon: " + str(lonlatEpsilon) + " degrees)")
+    LOG.debug("size of aData: " + str(aData.shape))
+    LOG.debug("size of bData: " + str(bData.shape))
+    
+    # make sure our invalid masks exist
+    if invalidAMask is None :
+        invalidAMask = np.zeros(aData.shape, dtype=bool)
+    if invalidBMask is None :
+        invalidBMask = np.zeros(bData.shape, dtype=bool)
+    
+    # construct the full invalid mask
+    if type(alatitude)  is ma.array :
+        invalidAMask = invalidAMask |  ~alatitude.mask
+    if type(alongitude) is ma.array :
+        invalidAMask = invalidAMask | ~alongitude.mask
+    if type(blatitude)  is ma.array :
+        invalidBMask = invalidBMask |  ~blatitude.mask
+    if type(blongitude) is ma.array :
+        invalidBMask = invalidBMask | ~blongitude.mask
+    
+    # select only the valid points
+    aData      =      aData[~invalidAMask]
+    alongitude = alongitude[~invalidAMask]
+    alatitude  =  alatitude[~invalidAMask]
+    bData      =      bData[~invalidBMask]
+    blongitude = blongitude[~invalidBMask]
+    blatitude  =  blatitude[~invalidBMask]
+    
+    # Note: at this point the invalid masks are no longer relevant
+    # all the remaining points are valid data in flat arrays
+    # there is no reason for the lon/lat to remain masked arrays
+    alongitude = np.array(alongitude)
+    alatitude  = np.array(alatitude)
+    blongitude = np.array(blongitude)
+    blatitude  = np.array(blatitude)
+    
+    # find the ranges of the longitude and latitude
+    minLatitude  = min(min(alatitude),  min(blatitude))
+    maxLatitude  = max(max(alatitude),  max(blatitude))
+    minLongitude = min(min(alongitude), min(blongitude))
+    maxLongitude = max(max(alongitude), max(blongitude))
+    
+    # make the bins for the data in longitude/latitude space
+    aBins = { }
+    bBins = { }
+    
+    # loop to put all the aData in the bins
+    for index in range(aData.size) :
+        filingLat = int( alatitude[index])
+        filingLon = int(alongitude[index])
+        
+        if (filingLat, filingLon) not in aBins :
+            aBins[(filingLat, filingLon)] = [ ]
+        
+        aBins[(filingLat, filingLon)].append( (aData[index], alatitude[index], alongitude[index]) )
+    
+    # loop to put all the bData in the bins
+    for index in range(bData.size) :
+        filingLat = int( blatitude[index])
+        filingLon = int(blongitude[index])
+        
+        if (filingLat, filingLon) not in bBins :
+            bBins[(filingLat, filingLon)] = [ ]
+        
+        bBins[(filingLat, filingLon)].append( (bData[index], blatitude[index], blongitude[index]) )
+    
+    # some variables to hold our final data
+    aMatchedData        = [ ]
+    bMatchedData        = [ ]
+    matchedLongitude    = [ ]
+    matchedLatitude     = [ ]
+    numDuplicateMatches = 0
+    aUnmatchedData      = [ ]
+    unmatchedALongitude = [ ]
+    unmatchedALatitude  = [ ]
+    bUnmatchedData      = [ ]
+    unmatchedBLongitude = [ ]
+    unmatchedBLatitude  = [ ]
+    
+    # look in all the aData bins and select point pairs that match within epsilon
+    for binLatitude, binLongitude in aBins.keys() :
+        
+        # figure out the lat/lon of the 9 bins that are "near" this one
+        toSearch = [ ]
+        for latValue in range(binLatitude - 1, binLatitude + 1) :
+            for lonValue in range(binLongitude -1, binLongitude + 1) :
+                toSearch.append((latValue, lonValue))
+        
+        # for each A pt in this bin
+        for aDataPt, aDataLatPt, aDataLonPt in aBins[(binLatitude, binLongitude)] :
+            haveFoundMatch = False
+            
+            # look through my nearby B bins and find any
+            # "matching" points that fall within epsilon
+            for latValue, lonValue in toSearch :
+                
+                # if there's anything in the B bin
+                if ((latValue, lonValue) in bBins) and (bBins[(latValue, lonValue)] is not None) :
+                    # for each data point in the B bin, check if it matches our current A point
+                    for bDataPt, bDataLatPt, bDataLonPt in bBins[(latValue, lonValue)] :
+                        if (abs(aDataLatPt - bDataLatPt) < lonlatEpsilon) and (abs(aDataLonPt - bDataLonPt) < lonlatEpsilon) :
+                            # track number of duplicates
+                            if haveFoundMatch :
+                                numDuplicateMatches = numDuplicateMatches + 1
+                            haveFoundMatch = True
+                            # put the point on our matched lists
+                            aMatchedData.append(aDataPt)
+                            bMatchedData.append(bDataPt)
+                            matchedLongitude.append((aDataLonPt + bDataLonPt) / 2.0)
+                            matchedLatitude.append((aDataLatPt + bDataLatPt) / 2.0)
+            
+            # if we couldn't find a match for this a point, put it in the list of unmatched A points
+            if not haveFoundMatch :
+                aUnmatchedData.append(aDataPt)
+                unmatchedALatitude.append(aDataLatPt)
+                unmatchedBLongitude.append(aDataLonPt)
+    
+    LOG.debug('Found ' + str(len(aMatchedData)) + ' matched data points.')
+    
+    # TODO rebuild the lists of matched and unmatched points
+    # TODO, need to find unmatched B points and duplicately matched B points?
+    
+    # convert our data back into numpy arrays
+    aMatchedData        = np.array(aMatchedData)
+    bMatchedData        = np.array(bMatchedData)
+    matchedLongitude    = np.array(matchedLongitude)
+    matchedLatitude     = np.array(matchedLatitude)
+    aUnmatchedData      = np.array(aUnmatchedData)
+    unmatchedALongitude = np.array(unmatchedALongitude)
+    unmatchedALatitude  = np.array(unmatchedALatitude)
+    bUnmatchedData      = np.array(bUnmatchedData)
+    unmatchedBLongitude = np.array(unmatchedBLongitude)
+    unmatchedBLatitude  = np.array(unmatchedBLatitude)
+    
+    # TODO, should we return the number of duplicates?
+    return (aMatchedData, bMatchedData,    matchedLongitude,    matchedLatitude), \
+           (aUnmatchedData,             unmatchedALongitude, unmatchedALatitude), \
+           (bUnmatchedData,             unmatchedBLongitude, unmatchedBLatitude)
 
 STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not NaN or +-Inf); fractions are out of all data, " +
                                "both finite and not, unless otherwise specified",

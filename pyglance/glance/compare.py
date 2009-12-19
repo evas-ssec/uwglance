@@ -858,6 +858,33 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         # handle vector data
         isVectorData = False # TODO actually figure out if we have vector data from user inputted settings
         
+        # TODO This if is for testing data colocation, this feature is not yet functional
+        if False :
+            (aData, bData, newLongitude, newLatitude), \
+            (aUnmatchedData,             unmatchedALongitude, unmatchedALatitude), \
+            (bUnmatchedData,             unmatchedBLongitude, unmatchedBLatitude) = \
+                    delta.colocate_matching_points_within_epsilon((aData, lon_lat_data['a']['lon'], lon_lat_data['a']['lat']),
+                                                                  (bData, lon_lat_data['b']['lon'], lon_lat_data['b']['lat']),
+                                                                  0.03,
+                                                                  invalidAMask=lon_lat_data['a']['inv_mask'],
+                                                                  invalidBMask=lon_lat_data['b']['inv_mask'])
+            lon_lat_data['a'] = {
+                                 'lon': newLongitude,
+                                 'lat': newLatitude,
+                                 'inv_mask': zeros(aData.shape, dtype=bool)
+                                 }
+            lon_lat_data['b'] = {
+                                 'lon': newLongitude,
+                                 'lat': newLatitude,
+                                 'inv_mask': zeros(aData.shape, dtype=bool)
+                                 }
+            lon_lat_data['common'] = {
+                                 'lon': newLongitude,
+                                 'lat': newLatitude,
+                                 'inv_mask': zeros(aData.shape, dtype=bool)
+                                 }
+            good_shape_from_lon_lat = newLatitude.shape
+        
         # check if this data can be displayed but
         # don't compare lon/lat sizes if we won't be plotting
         if ( (aData.shape == bData.shape) 
@@ -917,8 +944,6 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 # if the data is the same size, we can always make our basic statistical comparison plots
                 if (aData.shape == bData.shape) :
                     plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
-                
-                # TODO, need a way to match data if it is not the same shape
                 
                 # if it's vector data with longitude and latitude, quiver plot it on the Earth
                 if isVectorData and (not do_not_test_with_lon_lat) :
