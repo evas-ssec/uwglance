@@ -529,102 +529,97 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     
     return out
 
-def colocate_matching_points_within_epsilon((aData, alongitude, alatitude),
-                                            (bData, blongitude, blatitude),
-                                            lonlatEpsilon,
-                                            invalidAMask=None, invalidBMask=None):
+def create_colocation_mapping_within_epsilon((alongitude, alatitude),
+                                             (blongitude, blatitude),
+                                             lonlatEpsilon,
+                                             invalidAMask=None, invalidBMask=None):
     """
-    match data points together based on their longitude and latitude values
+    match points together based on their longitude and latitude values
     to match points must be within lonlatEpsilon degrees in both longitude and latitude
     
-    if the longitude and latitude variables contain invalid data they should represent this by
-    being masked arrays that mask out the invalid data
+    if the longitude and latitude variables contain invalid data the invalidAMask and
+    invalidBMask should be passed with the appropriate masking to remove the invalid values
     
-    Note: the return will contain all pairs of points that match, this means an individual a or b
-    data point may be repeated if it matches multiple points within the lonlatEpsilon provided
+    the return will be in the form of two dictionaries of points, one from a and one from b,
+    indexed on the index number in the A or B data where they can be found. Each entry will
+    consist of a list of:
+        [longitudeValue, latitudeValue, indexNumber, [list of matching indexes in the other set]]
+    
+    Note: the return will include all pairs of points that match,
+    this means an individual a or b point may be repeated if it matches
+    multiple points within the lonlatEpsilon provided
     
     Warning: This algorithm will fail to find all matching points if the lonlatEpsilon is set to a
     value greater than or equal to 1.0 degrees. This is related to the bin size used for searching
     thoretically the bin size could be corrected to scale with the lonlatEpsilon in the future. TODO
     """
-    LOG.debug("Preparing to colocate data using longitude and latitude (acceptable epsilon: " + str(lonlatEpsilon) + " degrees)")
-    LOG.debug("size of aData: " + str(aData.shape))
-    LOG.debug("size of bData: " + str(bData.shape))
+    assert(alongitude.shape == alatitude.shape)
+    assert(blongitude.shape == blatitude.shape)
+    assert(lonlatEpsilon >= 0.0)
     
-    # make sure our invalid masks exist
+    LOG.debug("Preparing to colocate longitude and latitude points (acceptable epsilon: " + str(lonlatEpsilon) + " degrees)")
+    LOG.debug("size of A: " + str(alongitude.shape))
+    LOG.debug("size of B: " + str(blongitude.shape))
+    
+    # make blank invalid masks if none were passed in
     if invalidAMask is None :
-        invalidAMask = np.zeros(aData.shape, dtype=bool)
+        invalidAMask = np.zeros(alongitude.shape, dtype=bool)
     if invalidBMask is None :
-        invalidBMask = np.zeros(bData.shape, dtype=bool)
+        invalidBMask = np.zeros(blongitude.shape, dtype=bool)
     
-    # construct the full invalid mask
-    if type(alatitude)  is ma.array :
-        invalidAMask = invalidAMask |  ~alatitude.mask
-    if type(alongitude) is ma.array :
-        invalidAMask = invalidAMask | ~alongitude.mask
-    if type(blatitude)  is ma.array :
-        invalidBMask = invalidBMask |  ~blatitude.mask
-    if type(blongitude) is ma.array :
-        invalidBMask = invalidBMask | ~blongitude.mask
-    
-    # select only the valid points
-    aData      =      aData[~invalidAMask]
-    alongitude = alongitude[~invalidAMask]
-    alatitude  =  alatitude[~invalidAMask]
-    bData      =      bData[~invalidBMask]
-    blongitude = blongitude[~invalidBMask]
-    blatitude  =  blatitude[~invalidBMask]
-    
-    # Note: at this point the invalid masks are no longer relevant
-    # all the remaining points are valid data in flat arrays
-    # there is no reason for the lon/lat to remain masked arrays
-    alongitude = np.array(alongitude)
-    alatitude  = np.array(alatitude)
-    blongitude = np.array(blongitude)
-    blatitude  = np.array(blatitude)
+    # make flat versions of our longitude and latitude
+    # so that our index correlations will be simple
+    flatALatitude  =  alatitude.ravel()
+    flatALongitude = alongitude.ravel()
+    flatBLatitude  =  blatitude.ravel()
+    flatBLongitude = blongitude.ravel()
     
     # find the ranges of the longitude and latitude
-    minLatitude  = min(min(alatitude),  min(blatitude))
-    maxLatitude  = max(max(alatitude),  max(blatitude))
-    minLongitude = min(min(alongitude), min(blongitude))
-    maxLongitude = max(max(alongitude), max(blongitude))
+    minLatitude  = min(min(flatALatitude),  min(flatBLatitude))
+    maxLatitude  = max(max(flatALatitude),  max(flatBLatitude))
+    minLongitude = min(min(flatALongitude), min(flatBLongitude))
+    maxLongitude = max(max(flatALongitude), max(flatBLongitude))
     
     # make the bins for the data in longitude/latitude space
     aBins = { }
     bBins = { }
+    allAPts = { }
+    allBPts = { }
     
     # loop to put all the aData in the bins
-    for index in range(aData.size) :
-        filingLat = int( alatitude[index])
-        filingLon = int(alongitude[index])
+    for index in range(flatALatitude.size) :
+        filingLat = int( flatALatitude[index])
+        filingLon = int(flatALongitude[index])
         
         if (filingLat, filingLon) not in aBins :
             aBins[(filingLat, filingLon)] = [ ]
         
-        aBins[(filingLat, filingLon)].append( (aData[index], alatitude[index], alongitude[index]) )
+        # create the simple list holding that point in the form:
+        # the lon/lat values (for ease of comparison), the index number in A, and the list of matches
+        aPoint = [flatALatitude[index], flatALongitude[index], index, [ ]]
+        
+        # put the point in the list and bin
+        allAPts[index] = aPoint
+        aBins[(filingLat, filingLon)].append(aPoint)
     
     # loop to put all the bData in the bins
-    for index in range(bData.size) :
-        filingLat = int( blatitude[index])
-        filingLon = int(blongitude[index])
+    for index in range(flatBLatitude.size) :
+        filingLat = int( flatBLatitude[index])
+        filingLon = int(flatBLongitude[index])
         
         if (filingLat, filingLon) not in bBins :
             bBins[(filingLat, filingLon)] = [ ]
         
-        bBins[(filingLat, filingLon)].append( (bData[index], blatitude[index], blongitude[index]) )
+        # create the simple list holding that point in the form:
+        # the lon/lat values (for ease of comparison), the index number in A, and the list of matches
+        bPoint = [flatBLatitude[index], flatBLongitude[index], index, [ ]]
+        
+        # put the point in the list and bin
+        allBPts[index] = bPoint
+        bBins[(filingLat, filingLon)].append(bPoint)
     
-    # some variables to hold our final data
-    aMatchedData        = [ ]
-    bMatchedData        = [ ]
-    matchedLongitude    = [ ]
-    matchedLatitude     = [ ]
-    numDuplicateMatches = 0
-    aUnmatchedData      = [ ]
-    unmatchedALongitude = [ ]
-    unmatchedALatitude  = [ ]
-    bUnmatchedData      = [ ]
-    unmatchedBLongitude = [ ]
-    unmatchedBLatitude  = [ ]
+    # for debugging purposes
+    totalMatches = 0
     
     # look in all the aData bins and select point pairs that match within epsilon
     for binLatitude, binLongitude in aBins.keys() :
@@ -636,55 +631,211 @@ def colocate_matching_points_within_epsilon((aData, alongitude, alatitude),
                 toSearch.append((latValue, lonValue))
         
         # for each A pt in this bin
-        for aDataPt, aDataLatPt, aDataLonPt in aBins[(binLatitude, binLongitude)] :
-            haveFoundMatch = False
+        for aLat, aLon, aIndex, aMatches in aBins[(binLatitude, binLongitude)] :
             
             # look through my nearby B bins and find any
             # "matching" points that fall within epsilon
             for latValue, lonValue in toSearch :
                 
-                # if there's anything in the B bin
+                # if there's anything in that B bin
                 if ((latValue, lonValue) in bBins) and (bBins[(latValue, lonValue)] is not None) :
+                    
                     # for each data point in the B bin, check if it matches our current A point
-                    for bDataPt, bDataLatPt, bDataLonPt in bBins[(latValue, lonValue)] :
-                        if (abs(aDataLatPt - bDataLatPt) < lonlatEpsilon) and (abs(aDataLonPt - bDataLonPt) < lonlatEpsilon) :
-                            # track number of duplicates
-                            if haveFoundMatch :
-                                numDuplicateMatches = numDuplicateMatches + 1
-                            haveFoundMatch = True
+                    for bLat, bLon, bIndex, bMatches in bBins[(latValue, lonValue)] :
+                        
+                        if (abs(bLat - aLat) < lonlatEpsilon) and (abs(aLon - bLon) < lonlatEpsilon) :
+                            totalMatches = totalMatches + 1
+                            
                             # put the point on our matched lists
-                            aMatchedData.append(aDataPt)
-                            bMatchedData.append(bDataPt)
-                            matchedLongitude.append((aDataLonPt + bDataLonPt) / 2.0)
-                            matchedLatitude.append((aDataLatPt + bDataLatPt) / 2.0)
+                            aMatches.append(bIndex)
+                            bMatches.append(aIndex)
+    
+    LOG.debug('Found ' + str(totalMatches) + ' matched pairs.')
+    
+    return allAPts, allBPts, totalMatches
+
+def create_colocated_lonlat_with_lon_lat_colocation(listOfColocatedALonLat, listOfColocatedBLonLat,
+                                                    totalMatches,
+                                                    aLongitude, aLatitude,
+                                                    bLongitude, bLatitude) :
+    """
+    given a pre colocated list of A and B lon/lat info from create_colocation_mapping_within_epsilon,
+    match up the longitude and latitude and return the colocated sets
+    """
+    
+    # some general statistics
+    multipleMatchesInA      = 0
+    multipleMatchesInB      = 0
+    totalValidMatchedPairs  = 0
+    
+    # our final data sets
+    matchedLongitude   = np.zeros(totalMatches, dtype=aLongitude.dtype) 
+    matchedLatitide    = np.zeros(totalMatches, dtype=aLatitude.dtype) 
+    
+    # we don't know how many unmatched points we may have
+    unmatchedALongitude = [ ]
+    unmatchedALatitude  = [ ]
+    unmatchedBLongitude = [ ]
+    unmatchedBLatitude  = [ ]
+    
+    # go through the A list and collect all the matches
+    currentIndex = 0
+    # look through all the A points
+    for aIndex in sorted(listOfColocatedALonLat.keys()) :
+        
+        [aLon, aLat, aIndex, aMatches] = listOfColocatedALonLat[aIndex]
+        tempMatches = 0
+        
+        # for each match you found on a given a point
+        for matchIndex in sorted(aMatches) :
             
-            # if we couldn't find a match for this a point, put it in the list of unmatched A points
-            if not haveFoundMatch :
-                aUnmatchedData.append(aDataPt)
-                unmatchedALatitude.append(aDataLatPt)
-                unmatchedBLongitude.append(aDataLonPt)
+            [bLon, bLat, bIndex, bMatches] = listOfColocatedBLonLat[matchIndex]
+            
+            # copy the lon/lat info 
+            matchedLongitude[currentIndex] = (aLon + bLon) / 2
+            matchedLatitide[currentIndex]  = (aLat + bLat) / 2
+            
+            currentIndex = currentIndex + 1
+            tempMatches  = tempMatches  + 1
+        
+        # update statistics based on the number of matches
+        totalValidMatchedPairs = totalValidMatchedPairs + tempMatches
+        if tempMatches > 1 :
+            multipleMatchesInA = multipleMatchesInA + tempMatches
+        elif tempMatches <= 0 :
+            unmatchedALatitude.append(aLat)
+            unmatchedALongitude.append(aLon)
     
-    LOG.debug('Found ' + str(len(aMatchedData)) + ' matched data points.')
+    # gather some additional statistics from the B list
+    # go through each b point
+    for bIndex in sorted(listOfColocatedBLonLat) :
+        
+        [bLon, bLat, bIndex, bMatches] = listOfColocatedBLonLat[bIndex]
+        tempMatches = len(bMatches)
+        
+        # update some statistics based on the number of matches
+        if tempMatches > 1 :
+            multipleMatchesInB = multipleMatchesInB + tempMatches
+        elif tempMatches <= 0 :
+            unmatchedBLatitude.append(bLat)
+            unmatchedBLongitude.append(bLon)
     
-    # TODO rebuild the lists of matched and unmatched points
-    # TODO, need to find unmatched B points and duplicately matched B points?
+    # make the unmatched lists into proper numpy arrays
+    unmatchedALatitude  = np.array(unmatchedALatitude,  dtype=aLatitude.dtype)
+    unmatchedALongitude = np.array(unmatchedALongitude, dtype=aLongitude.dtype)
+    unmatchedBLatitude  = np.array(unmatchedBLatitude,  dtype=bLatitude.dtype)
+    unmatchedBLongitude = np.array(unmatchedBLongitude, dtype=bLongitude.dtype)
     
-    # convert our data back into numpy arrays
-    aMatchedData        = np.array(aMatchedData)
-    bMatchedData        = np.array(bMatchedData)
-    matchedLongitude    = np.array(matchedLongitude)
-    matchedLatitude     = np.array(matchedLatitude)
-    aUnmatchedData      = np.array(aUnmatchedData)
-    unmatchedALongitude = np.array(unmatchedALongitude)
-    unmatchedALatitude  = np.array(unmatchedALatitude)
-    bUnmatchedData      = np.array(bUnmatchedData)
-    unmatchedBLongitude = np.array(unmatchedBLongitude)
-    unmatchedBLatitude  = np.array(unmatchedBLatitude)
+    LOG.debug("Total matched pairs of longitude/latitide: " + str(totalValidMatchedPairs))
     
-    # TODO, should we return the number of duplicates?
-    return (aMatchedData, bMatchedData,    matchedLongitude,    matchedLatitude), \
-           (aUnmatchedData,             unmatchedALongitude, unmatchedALatitude), \
-           (bUnmatchedData,             unmatchedBLongitude, unmatchedBLatitude)
+    return (matchedLongitude,    matchedLatitide, (multipleMatchesInA, multipleMatchesInB)), \
+           (unmatchedALongitude, unmatchedALatitude), \
+           (unmatchedBLongitude, unmatchedBLatitude)
+
+def create_colocated_data_with_lon_lat_colocation(listOfColocatedALonLat, listOfColocatedBLonLat,
+                                                  colocatedLongitude, colocatedLatitude,
+                                                  aData, bData,
+                                                  missingData=None, altMissingDataInB=None,
+                                                  invalidAMask=None, invalidBMask=None) :
+    """
+    given a pre colocated list of A and B lon/lat info from create_colocation_mapping_within_epsilon,
+    match up the valid data in two data sets and return the list of valid data, padded with missing
+    values so that it will match the original longitude and latitude
+    """
+    
+    if altMissingDataInB is None :
+        altMissingDataInB = missingData
+    
+    # some general statistics
+    multipleMatchesInA      = 0
+    multipleMatchesInB      = 0
+    totalValidMatchedPairs  = 0
+    
+    # our final data sets
+    matchedAPoints     = np.ones(colocatedLatitude.shape, dtype=aData.dtype) * missingData
+    matchedBPoints     = np.ones(colocatedLatitude.shape, dtype=bData.dtype) * altMissingDataInB
+    
+    # we don't know how many unmatched points we may have
+    unmatchedAPoints    = [ ]
+    unmatchedBPoints    = [ ]
+    unmatchedALongitude = [ ]
+    unmatchedALatitude  = [ ]
+    unmatchedBLongitude = [ ]
+    unmatchedBLatitude  = [ ]
+    
+    # go through the A list and sort all the valid matches
+    currentIndex = 0
+    # go through all the a points
+    for aIndex in sorted(listOfColocatedALonLat.keys()) :
+        
+        [aLon, aLat, aIndex, aMatches] = listOfColocatedALonLat[aIndex]
+        tempMatches = 0
+        
+        # for each point that matched to a given a point
+        for matchIndex in sorted(aMatches) :
+            
+            [bLon, bLat, bIndex, bMatches] = listOfColocatedBLonLat[matchIndex]
+            
+            # if either of our data points is invalid, then the data doesn't match
+            if invalidBMask[matchIndex] or invalidAMask[aIndex] :
+                # fill in missing data in the matches
+                matchedAPoints[currentIndex] = missingData
+                matchedBPoints[currentIndex] = altMissingDataInB
+                
+            else: # we have a valid match!
+                tempMatches = tempMatches + 1
+                matchedAPoints[currentIndex] = aData[aIndex]
+                matchedBPoints[currentIndex] = bData[bIndex]
+            
+            currentIndex = currentIndex + 1
+        
+        totalValidMatchedPairs = totalValidMatchedPairs + tempMatches
+        if tempMatches > 1 :
+            multipleMatchesInA = multipleMatchesInA + tempMatches
+        elif tempMatches <= 0 :
+            unmatchedAPoints.append(aData[aIndex])
+            unmatchedALongitude.append(aLon)
+            unmatchedALatitude.append(aLat)
+    
+    # gather some additional statistics from the B list
+    # go through all the b points
+    for bIndex in sorted(listOfColocatedBLonLat.keys()) :
+        
+        [bLon, bLat, bIndex, bMatches] = listOfColocatedBLonLat[bIndex]
+        tempMatches = 0
+        
+        # for each point that matched to a given b point
+        for matchIndex in sorted(bMatches) :
+            
+            [aLon, aLat, aIndex, aMatches] = listOfColocatedALonLat[matchIndex]
+            
+            # if either of our data points is invalid, then the data doesn't match
+            if invalidAMask[matchIndex] or invalidBMask[bIndex] :
+                # we've already built our matched data, so no need to missing it out
+                pass
+            else: # we have a valid match!
+                tempMatches = tempMatches + 1
+        
+        if tempMatches > 1 :
+            multipleMatchesInB = multipleMatchesInB + tempMatches
+        elif tempMatches <= 0 :
+            unmatchedBPoints.append(bData[bIndex])
+            unmatchedBLongitude.append(bLon)
+            unmatchedBLatitude.append(bLat)
+    
+    # make the unmatched lists into proper numpy arrays
+    unmatchedAPoints    = np.array(unmatchedAPoints,    dtype=aData.dtype)
+    unmatchedBPoints    = np.array(unmatchedBPoints,    dtype=bData.dtype)
+    unmatchedALongitude = np.array(unmatchedALongitude, dtype=colocatedLongitude.dtype)
+    unmatchedALatitude  = np.array(unmatchedALatitude,  dtype=colocatedLatitude.dtype)
+    unmatchedBLongitude = np.array(unmatchedBLongitude, dtype=colocatedLongitude.dtype)
+    unmatchedBLatitude  = np.array(unmatchedBLatitude,  dtype=colocatedLatitude.dtype)
+    
+    LOG.debug("Total matched data point pairs found: " + str(totalValidMatchedPairs))
+    
+    return (matchedAPoints, matchedBPoints, (multipleMatchesInA, multipleMatchesInB)), \
+           (unmatchedAPoints, unmatchedALongitude, unmatchedALatitude), \
+           (unmatchedBPoints, unmatchedBLongitude, unmatchedBLatitude)
 
 STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not NaN or +-Inf); fractions are out of all data, " +
                                "both finite and not, unless otherwise specified",

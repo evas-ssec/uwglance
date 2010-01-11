@@ -15,6 +15,7 @@ from pprint import pprint, pformat
 from numpy import *
 import pkg_resources
 from pycdf import CDFError
+from subprocess import check_call as sh
 
 import glance.io as io
 import glance.delta as delta
@@ -81,11 +82,12 @@ def _parse_varnames(names, terms, epsilon=0.0, missing=None):
     sel = [ ((x,)+_cvt_em(*em)) for x in names for (t,em) in terms if t(x) ]
     return set(sel)
 
-def _setup_file(fileNameAndPath, prefexText='') :
+def _setup_file(fileNameAndPath, prefexText='', allowWrite=False) :
     '''
     open the provided file name/path and extract information on the md5sum and last modification time
     optional prefext text may be passed in for informational output formatting
     '''
+    
     # some info to return
     fileInfo = {'path': fileNameAndPath}
     
@@ -95,20 +97,20 @@ def _setup_file(fileNameAndPath, prefexText='') :
         return None, fileInfo
     
     # open the file
-    LOG.info(prefexText + "opening " + fileNameAndPath)
+    LOG.info(prefexText + " opening " + fileNameAndPath)
     fileNameAndPath = os.path.abspath(os.path.expanduser(fileNameAndPath))
     LOG.debug("User provided path after normalization and user expansion: " + fileNameAndPath)
-    fileObject = io.open(fileNameAndPath)
+    fileObject = io.open(fileNameAndPath, allowWrite=allowWrite)
     
     # get the file md5sum
     tempSubProcess = subprocess.Popen("md5sum \'" + fileNameAndPath + "\'", shell=True, stdout=subprocess.PIPE)
     fileInfo['md5sum'] = tempSubProcess.communicate()[0].split()[0]
-    LOG.info(prefexText + "file md5sum: " + str(fileInfo['md5sum']))
+    LOG.info(prefexText + " file md5sum: " + str(fileInfo['md5sum']))
     
     # get the last modified stamp
     statsForFile = os.stat(fileNameAndPath)
     fileInfo['lastModifiedTime'] = datetime.datetime.fromtimestamp(statsForFile.st_mtime).ctime() # should time zone be forced?
-    LOG.info (prefexText + "file was last modified: " + fileInfo['lastModifiedTime'])
+    LOG.info (prefexText + " file was last modified: " + fileInfo['lastModifiedTime'])
     
     return fileObject, fileInfo
 
@@ -275,9 +277,14 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     
     # set up the paths, they can only come from the command line
     paths = {}
-    paths['a'] = aPath 
-    paths['b'] = bPath
+    paths['a']   = aPath 
+    paths['b']   = bPath
     paths['out'] = optionsSet['outputpath']
+    
+    # the colocation selection can only come from the command line options
+    # TODO since this is really only coming from the user's selection of the call,
+    # this is ok for the moment, may want to reconsider later
+    runInfo['doColocate'] = ('doColocate' in optionsSet) and (optionsSet['doColocate'])
     
     # check to see if the user wants to use a config file and if the path exists
     requestedConfigFile = optionsSet['configFile']
@@ -306,8 +313,8 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
         # this is an exception, since it is not advertised to the user we don't expect it to be in the file
         # (at least not at the moment, it could be added later and if they did happen to put it in the
         # config file, it would override this line)
-        runInfo['shouldIncludeReport'] = not optionsSet['imagesOnly']
-        runInfo['noLonLatVars'] = optionsSet['noLonLatVars']
+        runInfo['shouldIncludeReport'] = not optionsSet['imagesOnly'] if 'imagesOnly'   in optionsSet else False
+        runInfo['noLonLatVars']        = optionsSet['noLonLatVars']   if 'noLonLatVars' in optionsSet else False
         
         # get everything from the config file
         runInfo.update(glanceRunConfig.settings)
@@ -534,7 +541,8 @@ def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_in
     
     return invalid_in_common_mask, spatial_info, longitude_common, latitude_common
 
-def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output_path, should_make_images=False) :
+def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output_path,
+                          should_make_images=False, should_check_equality=True) :
     """
     Manage loading and comparing longitude and latitude information for two files
     
@@ -587,27 +595,32 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
         _get_and_analyze_lon_lat (file_for_b_lon_lat, b_latitude_name, b_longitude_name,
                                   lon_lat_settings['data_filter_function_lat_in_b'], lon_lat_settings['data_filter_function_lon_in_b'])
     
-    # test the "valid" values in our lon/lat
-    moreSpatialInfo = _check_lon_lat_equality(longitude_a, latitude_a, longitude_b, latitude_b,
-                                              spaciallyInvalidMaskA, spaciallyInvalidMaskB,
-                                              lon_lat_settings['lon_lat_epsilon'],
-                                              should_make_images, output_path)
-    # if we got the worst type of error result from the comparison this data is too dissimilar to continue
-    if moreSpatialInfo is None :
-        error_msg = ("Unable to reconcile sizes of longitude and latitude for variables "
-                 + str(lon_lat_settings['longitude']) + str(longitude_a.shape) + "/"
-                 + str(lon_lat_settings['latitude'])  + str(latitude_a.shape) + " in file A and variables "
-                 + str(b_longitude_name) + str(longitude_b.shape) + "/"
-                 + str(b_latitude_name)  + str(latitude_b.shape) + " in file B. Aborting attempt to compare files.")
-        return { }, { }, error_msg # things have gone wrong
-    # update our existing spatial information
-    spatialInfo.update(moreSpatialInfo)
+    # if we need to, test the level of equality of the "valid" values in our lon/lat
+    if should_check_equality :
+        moreSpatialInfo = _check_lon_lat_equality(longitude_a, latitude_a, longitude_b, latitude_b,
+                                                  spaciallyInvalidMaskA, spaciallyInvalidMaskB,
+                                                  lon_lat_settings['lon_lat_epsilon'],
+                                                  should_make_images, output_path)
+        # if we got the worst type of error result from the comparison this data is too dissimilar to continue
+        if moreSpatialInfo is None :
+            error_msg = ("Unable to reconcile sizes of longitude and latitude for variables "
+                     + str(lon_lat_settings['longitude']) + str(longitude_a.shape) + "/"
+                     + str(lon_lat_settings['latitude'])  + str(latitude_a.shape) + " in file A and variables "
+                     + str(b_longitude_name) + str(longitude_b.shape) + "/"
+                     + str(b_latitude_name)  + str(latitude_b.shape) + " in file B. Aborting attempt to compare files.")
+            return { }, { }, error_msg # things have gone wrong
+        # update our existing spatial information
+        spatialInfo.update(moreSpatialInfo)
     
-    # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
-    spaciallyInvalidMask, spatialInfo, longitude_common, latitude_common = \
-                            _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
-                                                        longitude_a, longitude_b, latitude_a, latitude_b,
-                                                        should_make_images, output_path)
+        # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
+        spaciallyInvalidMask, spatialInfo, longitude_common, latitude_common = \
+                                _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
+                                                            longitude_a, longitude_b, latitude_a, latitude_b,
+                                                            should_make_images, output_path)
+    else:
+        spaciallyInvalidMask = None
+        longitude_common     = None
+        latitude_common      = None
     
     return {'a':      {"lon": longitude_a,      "lat": latitude_a,      "inv_mask": spaciallyInvalidMaskA},
             'b':      {"lon": longitude_b,      "lat": latitude_b,      "inv_mask": spaciallyInvalidMaskB},
@@ -734,6 +747,207 @@ def _get_name_info_for_variable(original_display_name, variable_run_info) :
     
     return technical_name, b_variable_technical_name, explanation_name
 
+def _load_variable_data(fileObject, variableNameInFile,
+                        dataFilter=None,
+                        variableToFilterOn=None,
+                        variableBasedFilter=None,
+                        fileDescriptionForDisplay="file") :
+    """
+    load data for a variable from a file
+    optionally filter the variable data based on a data filter or another variable
+    
+    dataFilter must be in the form of (lambda data: some manipulation returning the new data)
+    variableBasedFilter must be in the form of (lambda data, filterData: some manipulation returning the new data))
+    """
+    
+    # get the data for the variable
+    LOG.debug("loading basic data for variable " + variableNameInFile + " from " + fileDescriptionForDisplay)
+    variableData = fileObject[variableNameInFile]
+    
+    # apply the basic filter if there is one
+    if dataFilter is not None :
+        LOG.debug ("applying filter function to data from " + fileDescriptionForDisplay + " for variable " + variableNameInFile)
+        variableData = dataFilter(variableData)
+    
+    # if we've got another variable to filter on, do that
+    if (variableToFilterOn is not None) and (variableBasedFilter is not None) :
+        LOG.debug ("filtering data from " + fileDescriptionForDisplay + " for variable " + variableNameInFile
+                   + " based on additional data from variable " + variableToFilterOn)
+        dataToFilterOn = fileObject[variableToFilterOn]
+        variableData = variableBasedFilter(variableData, dataToFilterOn)
+    
+    return variableData
+
+def _uri_needs_rsync(uri_to_check) :
+    """
+    check if the uri requires an rsync in order to access the data
+    this will return some false positives if you phrase local uri's with the machine name
+    for ex. you are on the machine "lotus" and you use the path "rsync:://lotus/data/"
+    """
+    return not os.path.exists(uri_to_check)
+
+def rsync_or_copy_files (list_of_files, target_directory='.') :
+    """
+    If the files in the list are remote, rsync them, otherwise, just copy
+    them to the target directory
+    """
+    for file_uri in list_of_files :
+        if _uri_needs_rsync(file_uri) :
+            cmd = ['rsync', '-Cuav', file_uri, os.path.join(target_directory, os.path.split(file_uri)[1])]
+        else :
+            cmd = ['cp', os.path.abspath(file_uri), os.path.join(target_directory, os.path.split(file_uri)[1])]
+        LOG.debug('running ' + ' '.join(cmd)) 
+        sh(cmd)
+
+def colocateToFile_library_call(a_path, b_path, var_list=[ ],
+                                options_set={ },
+                                # todo, this doesn't yet do anything
+                                do_document=False,
+                                # todo, the output channel does nothing at the moment
+                                output_channel=sys.stdout) :
+    """
+    this method handles the actual work of the colocateData command line tool
+    and can be used as a library routine.
+    
+    TODO, properly document the options
+    """
+    
+    # load the user settings from either the command line or a user defined config file
+    pathsTemp, runInfo, defaultValues, requestedNames, usedConfigFile = _load_config_or_options(a_path, b_path,
+                                                                                                options_set,
+                                                                                                requestedVars = var_list)
+    
+    # deal with the input and output files
+    if not (os.path.isdir(pathsTemp['out'])) :
+        LOG.info("Specified output directory (" + pathsTemp['out'] + ") does not exist.")
+        LOG.info("Creating output directory.")
+        os.makedirs(pathsTemp['out'])
+    
+    # make copies of the input files for colocation
+    rsync_or_copy_files ([pathsTemp['a'], pathsTemp['b']], target_directory=pathsTemp['out'])
+    pathsTemp['a'] = os.path.join(pathsTemp['out'], os.path.split(pathsTemp['a'])[1])
+    pathsTemp['b'] = os.path.join(pathsTemp['out'], os.path.split(pathsTemp['b'])[1])
+    
+    # open the files
+    LOG.info("Processing File A:")
+    aFile, _ = _setup_file(pathsTemp['a'], "\t", allowWrite = True)
+    if aFile is None:
+        LOG.warn("Unable to continue with comparison because file a (" + pathsTemp['a'] + ") could not be opened.")
+        sys.exit(1)
+    LOG.info("Processing File B:")
+    bFile, _ = _setup_file(pathsTemp['b'], "\t", allowWrite = True)
+    if bFile is None:
+        LOG.warn("Unable to continue with comparison because file b (" + pathsTemp['b'] + ") could not be opened.")
+        sys.exit(1)
+    
+    # get information about the names the user requested
+    finalNames, nameStats = _resolve_names(aFile, bFile,
+                                           defaultValues,
+                                           requestedNames, usedConfigFile)
+    
+    # return for lon_lat_data variables will be in the form 
+    #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
+    # or { } if there is no lon/lat info
+    lon_lat_data, _, fatalErrorMsg = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'], should_check_equality=False)
+    if fatalErrorMsg is not None :
+        LOG.warn(fatalErrorMsg)
+        sys.exit(1)
+    
+    # handle the longitude and latitude colocation
+    LOG.info("Colocating raw longitude and latitude information")
+    aColocationInfomation, bColocationInformation, totalNumberOfMatchedPoints = \
+                                delta.create_colocation_mapping_within_epsilon((lon_lat_data['a']['lon'], lon_lat_data['a']['lat']),
+                                                                               (lon_lat_data['b']['lon'], lon_lat_data['b']['lat']),
+                                                                               runInfo['lon_lat_epsilon'],
+                                                                               invalidAMask=lon_lat_data['a']['inv_mask'],
+                                                                               invalidBMask=lon_lat_data['b']['inv_mask'])
+    (colocatedLongitude, colocatedLatitude, (numMultipleMatchesInA, numMultipleMatchesInB)), \
+    (unmatchedALongitude, unmatchedALatitude), \
+    (unmatchedBLongitude, unmatchedBLatitude) = \
+                delta.create_colocated_lonlat_with_lon_lat_colocation(aColocationInfomation, bColocationInformation,
+                                                                      totalNumberOfMatchedPoints,
+                                                                      lon_lat_data['a']['lon'], lon_lat_data['a']['lat'],
+                                                                      lon_lat_data['b']['lon'], lon_lat_data['b']['lat'])
+    
+    # TODO, based on unmatched, issue warnings and record info in the file?
+    LOG.debug("colocated shape of the longitude: " + str(colocatedLongitude.shape))
+    LOG.debug("colocated shape of the latitude:  " + str(colocatedLatitude.shape))
+    LOG.debug(str(numMultipleMatchesInA) + " lon/lat pairs contain A points used for multiple matches.")
+    LOG.debug(str(numMultipleMatchesInB) + " lon/lat pairs contain B points used for multiple matches.")
+    LOG.debug(str(len(unmatchedALatitude)) + " A lon/lat points could not be matched.")
+    LOG.debug(str(len(unmatchedBLatitude)) + " B lon/lat points could not be matched.")
+    
+    # go through each of the possible variables in our files
+    # and do our colocation for whichever ones we can
+    for displayName in finalNames:
+        
+        # pull out the information for this variable analysis run
+        varRunInfo = finalNames[displayName].copy()
+        
+        # get the various names
+        technical_name, b_variable_technical_name, \
+                explanationName = _get_name_info_for_variable(displayName, varRunInfo)
+        
+        print('analyzing: ' + explanationName + ')')
+        
+        # load the variable data
+        aData = _load_variable_data(aFile, technical_name,
+                                    dataFilter = varRunInfo['data_filter_function_a'] if 'data_filter_function_a' in varRunInfo else None,
+                                    variableToFilterOn = varRunInfo['variable_to_filter_on_a'] if 'variable_to_filter_on_a' in varRunInfo else None,
+                                    variableBasedFilter = varRunInfo['variable_based_filter_a'] if 'variable_based_filter_a' in varRunInfo else None,
+                                    fileDescriptionForDisplay = "file A")
+        bData = _load_variable_data(bFile, b_variable_technical_name,
+                                    dataFilter = varRunInfo['data_filter_function_b'] if 'data_filter_function_b' in varRunInfo else None,
+                                    variableToFilterOn = varRunInfo['variable_to_filter_on_b'] if 'variable_to_filter_on_b' in varRunInfo else None,
+                                    variableBasedFilter = varRunInfo['variable_based_filter_b'] if 'variable_based_filter_b' in varRunInfo else None,
+                                    fileDescriptionForDisplay = "file B")
+        
+        # pre-check if this data should be compared to the longitude and latitude
+        do_not_test_with_lon_lat = (len(lon_lat_data.keys()) <= 0)
+        
+        # colocate the data for this variable
+        if (not do_not_test_with_lon_lat) and runInfo['doColocate'] :
+            
+            # match up our points in A and B
+            (aData, bData, (numberOfMultipleMatchesInA, numberOfMultipleMatchesInB)), \
+            (aUnmatchedData,             unmatchedALongitude, unmatchedALatitude), \
+            (bUnmatchedData,             unmatchedBLongitude, unmatchedBLatitude) = \
+                    delta.create_colocated_data_with_lon_lat_colocation(aColocationInfomation, bColocationInformation,
+                                                                        colocatedLongitude, colocatedLatitude,
+                                                                        aData, bData,
+                                                                        missingData=varRunInfo['missing_value'],
+                                                                        altMissingDataInB=varRunInfo['missing_value_alt_in_b'],
+                                                                        # TODO, should missing data be considered?
+                                                                        invalidAMask=lon_lat_data['a']['inv_mask'],
+                                                                        invalidBMask=lon_lat_data['b']['inv_mask'])
+            
+            LOG.debug(str(numberOfMultipleMatchesInA) + " data pairs contain A data points used for multiple matches.")
+            LOG.debug(str(numberOfMultipleMatchesInB) + " data pairs contain B data points used for multiple matches.")
+            LOG.debug(str(len(aUnmatchedData)) + " A data points could not be matched.")
+            LOG.debug(str(len(bUnmatchedData)) + " B data points could not be matched.")
+            
+            # save the colocated data information in the output files
+            aFile.create_new_variable(technical_name + '-colocated', # TODO, how should this suffix be handled?
+                                      missingvalue = varRunInfo['missing'] if 'missing' in varRunInfo else None,
+                                      data = aData,
+                                      variabletocopyattributesfrom = technical_name)
+            bFile.create_new_variable(b_variable_technical_name + '-colocated', # TODO, how should this suffix be handled?
+                                      missingvalue = varRunInfo['missing_value_alt_in_b'] if 'missing_value_alt_in_b' in varRunInfo else None,
+                                      data = bData,
+                                      variabletocopyattributesfrom = b_variable_technical_name)
+            # TODO, save the unmatched data and info on multiple matches
+            
+        else :
+            LOG.debug(explanationName + " was not selected for colocation and will be ignored.")
+        
+    # the end of the loop to examine all the variables
+    
+    # we're done with the files, so close them up
+    aFile.close()
+    bFile.close()
+    
+    return
+
 def reportGen_library_call (a_path, b_path, var_list=[ ],
                             options_set={ },
                             # todo, this doesn't yet do anything
@@ -793,10 +1007,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                            defaultValues,
                                            requestedNames, usedConfigFile)
     
-    # if there is longitude and latitude info, handle the longitude and latitude
-    #if 'lon_lat' in runInfo : TODO, how can we handle cases where lon/lat is meaningless?
-    
-    print("output dir: " + str(pathsTemp['out']))
+    LOG.debug("output dir: " + str(pathsTemp['out']))
     
     # return for lon_lat_data variables will be in the form 
     #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
@@ -834,17 +1045,17 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         
         print('analyzing: ' + explanationName + ')')
         
-        # get the data for the variable 
-        aData = aFile[technical_name]
-        bData = bFile[b_variable_technical_name]
-        
-        # apply data filter functions if needed
-        if ('data_filter_function_a' in varRunInfo) :
-            aData = varRunInfo['data_filter_function_a'](aData)
-            LOG.debug ("filter function was applied to file A data for variable: " + explanationName)
-        if ('data_filter_function_b' in varRunInfo) :
-            bData = varRunInfo['data_filter_function_b'](bData)
-            LOG.debug ("filter function was applied to file B data for variable: " + explanationName)
+        # load the variable data
+        aData = _load_variable_data(aFile, technical_name,
+                                    dataFilter = varRunInfo['data_filter_function_a'] if 'data_filter_function_a' in varRunInfo else None,
+                                    variableToFilterOn = varRunInfo['variable_to_filter_on_a'] if 'variable_to_filter_on_a' in varRunInfo else None,
+                                    variableBasedFilter = varRunInfo['variable_based_filter_a'] if 'variable_based_filter_a' in varRunInfo else None,
+                                    fileDescriptionForDisplay = "file A")
+        bData = _load_variable_data(bFile, b_variable_technical_name,
+                                    dataFilter = varRunInfo['data_filter_function_b'] if 'data_filter_function_b' in varRunInfo else None,
+                                    variableToFilterOn = varRunInfo['variable_to_filter_on_b'] if 'variable_to_filter_on_b' in varRunInfo else None,
+                                    variableBasedFilter = varRunInfo['variable_based_filter_b'] if 'variable_based_filter_b' in varRunInfo else None,
+                                    fileDescriptionForDisplay = "file B")
         
         # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
         include_images_for_this_variable = ((not('shouldIncludeImages' in runInfo)) or (runInfo['shouldIncludeImages']))
@@ -852,38 +1063,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             include_images_for_this_variable = varRunInfo['shouldIncludeImages']
         do_not_test_with_lon_lat = (not include_images_for_this_variable) or (len(lon_lat_data.keys()) <= 0)
         
-        LOG.debug ("do_not_test_with_lon_lat = " + str(do_not_test_with_lon_lat))
-        LOG.debug ("include_images_for_this_variable = " + str(include_images_for_this_variable))
-        
         # handle vector data
         isVectorData = False # TODO actually figure out if we have vector data from user inputted settings
-        
-        # TODO This if is for testing data colocation, this feature is not yet functional
-        if False :
-            (aData, bData, newLongitude, newLatitude), \
-            (aUnmatchedData,             unmatchedALongitude, unmatchedALatitude), \
-            (bUnmatchedData,             unmatchedBLongitude, unmatchedBLatitude) = \
-                    delta.colocate_matching_points_within_epsilon((aData, lon_lat_data['a']['lon'], lon_lat_data['a']['lat']),
-                                                                  (bData, lon_lat_data['b']['lon'], lon_lat_data['b']['lat']),
-                                                                  0.03,
-                                                                  invalidAMask=lon_lat_data['a']['inv_mask'],
-                                                                  invalidBMask=lon_lat_data['b']['inv_mask'])
-            lon_lat_data['a'] = {
-                                 'lon': newLongitude,
-                                 'lat': newLatitude,
-                                 'inv_mask': zeros(aData.shape, dtype=bool)
-                                 }
-            lon_lat_data['b'] = {
-                                 'lon': newLongitude,
-                                 'lat': newLatitude,
-                                 'inv_mask': zeros(aData.shape, dtype=bool)
-                                 }
-            lon_lat_data['common'] = {
-                                 'lon': newLongitude,
-                                 'lat': newLatitude,
-                                 'inv_mask': zeros(aData.shape, dtype=bool)
-                                 }
-            good_shape_from_lon_lat = newLatitude.shape
         
         # check if this data can be displayed but
         # don't compare lon/lat sizes if we won't be plotting
@@ -950,7 +1131,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                     plotFunctionGenerationObjects.append(plotcreate.MappedQuiverPlotFunctionFactory())
                 
                 # if the data is one dimensional we can plot it as lines
-                elif   (len(aData.shape) is 1) :
+                elif   (len(aData.shape) is 1) : 
                     plotFunctionGenerationObjects.append(plotcreate.LinePlotsFunctionFactory())
                 
                 # if the data is 2D we have some options based on the type of data
@@ -1014,8 +1195,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             if do_not_test_with_lon_lat :
                 message = message + '.'
             else :
-                message = (message + ' or the data may not match the shape of the selected longitude ' +
-                     str(good_shape_from_lon_lat) + ' and ' + 'latitude ' + str(good_shape_from_lon_lat) + ' variables.')
+                message = (message + ' or the data may not match the shape of the selected '
+                     + 'longitude ' + str(good_shape_from_lon_lat) + ' and '
+                     + 'latitude '  + str(good_shape_from_lon_lat) + ' variables.')
             LOG.warn(message)
         
     # the end of the loop to examine all the variables
@@ -1339,6 +1521,53 @@ python -m glance
         tempOptions['missing']       = options.missing
         
         reportGen_library_call(args[0], args[1], args[2:], tempOptions)
+    
+    def colocateData(*args) :
+        """colocate data in two files
+        
+        This option colocates data in the two given input files and saves it to separate output files.
+        Data will be colocated based on its corresponding longitude and latitude. Multiple matches may be
+        made between a data point in file A and those in file B if they are within the longitude/latitude epsilon.
+        Points from each file that could not be matched and the number of duplicate matches will also be
+        recorded in the output file.
+        
+        The user may also use the notation variable_name::missing_value to specify the missing_value which indicates
+        missing data. If no missing value is given, glance will attempt to load a missing value from the input file.
+        If there is no missing value defined for that variable in the file, no missing value will be analyzed.
+        Missing value data points will not be considered for colocation.
+        
+        Data which corresponds to longitude or latitude values which fall outside the earth (outside the normally
+        accepted valid ranges) will also be considered invalid and will not be considered for colocation.
+        
+        The longitude and latitude variables may be specified with --longitude and --latitude
+        If no longitude or latitude are specified the pixel_latitude and pixel_longitude variables will be used.
+        The longitude and latitude epsilon may be specified with --llepsilon
+        If no longitude/latitude epsilon is given the value of 0.0 (degrees) will be used
+        
+        The output data files generated by this option will appear in the selected output directory, or the current
+        directory if no out put directory is selected. The output files will be named originalFileName-colocation.nc
+        (replacing "originalFileName" with the names of your input files).
+        
+        Examples:
+         python -m glance.compare colocateData A.hdf B.hdf variable_name_1 variable_name_2 variable_name_3::missing3 
+         python -m glance.compare colocateData --outputpath=/path/where/output/will/be/placed/ A.nc B.nc
+         python -m glance.compare colocateData --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
+         python -m glance.compare colocateData --llepsilon=0.0001 A.nc B.hdf
+        """
+        
+        tempOptions = { }
+        tempOptions['outputpath']    = options.outputpath
+        tempOptions['configFile']    = options.configFile
+        tempOptions['noLonLatVars']  = options.noLonLatVars
+        tempOptions['latitudeVar']   = options.latitudeVar
+        tempOptions['longitudeVar']  = options.longitudeVar
+        tempOptions['lonlatepsilon'] = options.lonlatepsilon
+        tempOptions['epsilon']       = options.epsilon
+        tempOptions['missing']       = options.missing
+        
+        tempOptions['doColocate']    = True
+        
+        colocateToFile_library_call(args[0], args[1], args[2:], tempOptions)
     
     """
     # This was used to modify files for testing and should not be uncommented

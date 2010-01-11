@@ -161,6 +161,32 @@ def set_to_value_between_bounds(data, value_to_set_to, bottom_bound_exclusive, t
     
     return data
 
+def filter_based_on_additional_data_set_min_max_bounds(data, filterData, missingValue=None,
+                                                       minOkFilterValue=None, maxOkFilterValue=None) :
+    """
+    filter a data set based on values in another data set
+    
+    if some of the filter data is above/below the optional min/max values the corresponding  values in the
+    data will be set to the missingValue
+    
+    ex. this filter might be used to remove winds data that has a quality index below a certain threshold
+    """
+    
+    assert(data.shape == filterData.shape)
+    
+    goodAreas = np.ones(data.shape, dtype=bool)
+    
+    if minOkFilterValue is not None :
+        goodAreas = goodAreas & (filterData >= minOkFilterValue)
+    
+    if maxOkFilterValue is not None :
+        goodAreas = goodAreas & (filterData <= maxOkFilterValue)
+    
+    newData = data.copy()
+    newData[~goodAreas] = missingValue
+    
+    return newData
+
 def collapse_to_index(data, index, collapsing_function=np.mean,
                       missing_value=None, ignore_below_exclusive=None, ignore_above_exclusive=None) :
     """

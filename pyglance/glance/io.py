@@ -14,11 +14,14 @@ try:
     import h5py
 except ImportError:
     pass
-from pycdf import CDF, NC
+from pycdf import CDF, NC, strerror
 
 import numpy as np
 
 LOG = logging.getLogger(__name__)
+
+fillValConst1 = '_FillValue'
+fillValConst2 = 'missing_value'
 
 class hdf(SD):
     """wrapper for HDF4 dataset for comparison
@@ -26,8 +29,11 @@ class hdf(SD):
     __getitem__ returns individual variables ready for slicing to numpy arrays
     """
     
-    def __init__(self,filename):
-        super(self.__class__,self).__init__(filename, SDC.READ)
+    def __init__(self, filename, allowWrite=False):
+        mode = SDC.READ
+        if allowWrite:
+            mode = mode | SDC.WRITE
+        super(self.__class__,self).__init__(filename, mode)
 
     def __call__(self):
         "yield names of variables to be compared"
@@ -101,12 +107,11 @@ class hdf(SD):
         return self.select(name)
     
     def missing_value(self, name):
-        missing_value_attr_name = '_FillValue'
         variable_object = self.select(name)
         
         to_return = None
-        if hasattr(variable_object, missing_value_attr_name) :
-            to_return = getattr(variable_object, missing_value_attr_name, None)
+        if hasattr(variable_object, fillValConst1) :
+            to_return = getattr(variable_object, fillValConst1, None)
         SDS.endaccess(variable_object)
         
         return to_return
@@ -118,8 +123,13 @@ class nc(CDF):
     __getitem__ returns individual variables ready for slicing to numpy arrays
     """
     
-    def __init__(self,filename):
-        super(self.__class__,self).__init__(filename, NC.NOWRITE)
+    def __init__(self, filename, allowWrite=False):
+        
+        mode = NC.NOWRITE
+        if allowWrite :
+            mode = NC.WRITE
+        
+        super(self.__class__,self).__init__(filename, mode)
 
     def __call__(self):
         "yield names of variables to be compared"
@@ -168,18 +178,76 @@ class nc(CDF):
     
     def missing_value(self, name):
         
-        missing_value_attr_name_1 = '_FillValue'
-        missing_value_attr_name_2 = 'missing_value'
         variable_object = self.var(name)
         
         to_return = None
-        if hasattr(variable_object, missing_value_attr_name_1) \
+        if hasattr(variable_object, fillValConst1) \
            or \
-           hasattr(variable_object, missing_value_attr_name_2) :
-            to_return = getattr(variable_object, missing_value_attr_name_1,
-                                getattr(variable_object, missing_value_attr_name_2, None))
+           hasattr(variable_object, fillValConst2) :
+            to_return = getattr(variable_object, fillValConst1,
+                                getattr(variable_object, fillValConst2, None))
         
         return to_return
+    
+    # TODO, this method only exists for nc files at the moment, make the others at some point
+    def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
+        """
+        create a new variable with the given name
+        optionally set the missing value (fill value) and data to those given
+        
+        the created variable will be returned, or None if a variable could not
+        be created
+        """
+        
+        self.redef()
+        
+        # if the variable already exists, stop with a warning
+        if variablename in self.variables().keys() :
+            LOG.warn("New variable name requested (" + variablename + ") is already present in file. " +
+                     "Skipping generation of new variable.")
+            return None
+        
+        dataType = None
+        if np.issubdtype(data.dtype, int) :
+            dataType = NC.INT
+            #print("Picked INT")
+        # TODO, at the moment the fill type is forcing me to use a double, when sometimes I want a float
+        #elif np.issubdtype(data.dtype, np.float32) :
+        #    dataType = NC.FLOAT
+        #    print("Picked FLOAT")
+        elif np.issubdtype(data.dtype, float) :
+            dataType = NC.DOUBLE
+            #print("Picked DOUBLE")
+        # what do we do if it's some other type?
+        
+        # create and set all the dimensions
+        dimensions = [ ]
+        dimensionNum = 0
+        for dimSize in data.shape :
+            dimensions.append(self.def_dim(variablename + '-index' + str(dimensionNum), dimSize))
+            dimensionNum = dimensionNum + 1
+        
+        # create the new variable
+        newVariable = self.def_var(variablename, dataType, tuple(dimensions))
+        
+        # if a missing value was given, use that
+        if missingvalue is not None :
+            newVariable._FillValue = missingvalue
+        
+        # if we have a variable to copy attributes from, do so
+        if variabletocopyattributesfrom is not None :
+            tocopyfrom = self.get_variable_object(variabletocopyattributesfrom)
+            attributes = tocopyfrom.attributes()
+            for attribute in attributes.keys() :
+                newVariable.__setattr__(attribute, attributes[attribute])
+        
+        self.enddef()
+        
+        # if data was given, use that
+        if data is not None :
+            newVariable.put(data.tolist()) 
+        
+        return newVariable
 
 nc4 = nc
 cdf = nc
@@ -192,8 +260,12 @@ class h5(object):
     """
     _h5 = None
     
-    def __init__(self,filename):
-        self._h5 = h5py.File(filename,'r')
+    def __init__(self, filename, allowWrite=False):
+        mode = 'r'
+        if allowWrite :
+            mode = 'r+'
+        
+        self._h5 = h5py.File(filename, mode)
     
     def __call__(self):
         
@@ -266,9 +338,9 @@ class h5(object):
         return None
         
 
-def open(pathname):
+def open(pathname, allowWrite=False):
     cls = globals()[os.path.splitext(pathname)[1][1:]]
-    return cls(pathname)
+    return cls(pathname, allowWrite=allowWrite)
 
 
 
