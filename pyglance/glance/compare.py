@@ -902,11 +902,8 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
                                     variableBasedFilter = varRunInfo['variable_based_filter_b'] if 'variable_based_filter_b' in varRunInfo else None,
                                     fileDescriptionForDisplay = "file B")
         
-        # pre-check if this data should be compared to the longitude and latitude
-        do_not_test_with_lon_lat = (len(lon_lat_data.keys()) <= 0)
-        
-        # colocate the data for this variable
-        if (not do_not_test_with_lon_lat) and runInfo['doColocate'] :
+        # colocate the data for this variable if we have longitude/latitude data
+        if (len(lon_lat_data.keys()) > 0) and runInfo['doColocate'] :
             
             # match up our points in A and B
             (aData, bData, (numberOfMultipleMatchesInA, numberOfMultipleMatchesInB)), \
