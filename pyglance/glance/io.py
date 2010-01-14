@@ -12,6 +12,7 @@ import os, sys, logging
 from pyhdf.SD import SD,SDC, SDS, HDF4Error
 try:
     import h5py
+    from h5py import h5d
 except ImportError:
     pass
 from pycdf import CDF, NC, strerror
@@ -248,6 +249,22 @@ class nc(CDF):
             newVariable.put(data.tolist()) 
         
         return newVariable
+    
+    def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
+        """
+        if the attribute exists for the given variable, set it to the new value
+        if the attribute does not exist for the given variable, create it and set it to the new value
+        """
+        variableObject = self.get_variable_object(variableName)
+        
+        self.redef()
+        
+        variableObject.__setattr__(newAttributeName, newAttributeValue)
+        
+        self.enddef()
+        
+        return
+
 
 nc4 = nc
 cdf = nc
@@ -278,7 +295,7 @@ class h5(object):
                 try :
                     tempType = obj.dtype # this is required to provoke a type error for closed data sets
                     
-                    LOG.debug ('type: ' + str(tempType))
+                    #LOG.debug ('type: ' + str(tempType))
                     variableList.append(name)
                 except TypeError :
                     LOG.debug('TypeError prevents the use of variable ' + name
@@ -299,6 +316,7 @@ class h5(object):
     # for scaling it will be (so the return type may not reflect the
     # type found in the original file)
     def __getitem__(self, name):
+        
         # defaults
         scale_factor = 1.0
         add_offset = 0.0
@@ -308,6 +326,11 @@ class h5(object):
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
         raw_data_copy = variable_object[:]
+        
+        #print ('*************************')
+        #print (dir (variable_object.id)) # TODO, is there a way to get the scale and offset through this?
+        #print ('*************************')
+        
         # load the scale factor and add offset
         if ('scale_factor' in variable_object.attrs) :
             scale_factor = variable_object.attrs['scale_factor']
@@ -335,7 +358,19 @@ class h5(object):
         return h5.trav(self._h5, name)
     
     def missing_value(self, name):
-        return None
+        
+        toReturn = None
+        
+        # get the missing value if it has been set
+        variableObject = self.get_variable_object(name)
+        pListObj = variableObject.id.get_create_plist()
+        fillValueStatus = pListObj.fill_value_defined()
+        if (h5d.FILL_VALUE_DEFAULT is fillValueStatus) or (h5d.FILL_VALUE_USER_DEFINED is fillValueStatus) :
+            temp = np.array((1), dtype=variableObject.dtype)
+            pListObj.get_fill_value(temp)
+            toReturn = temp
+        
+        return toReturn
         
 
 def open(pathname, allowWrite=False):

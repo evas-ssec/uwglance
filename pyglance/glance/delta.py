@@ -770,18 +770,19 @@ def create_colocated_data_with_lon_lat_colocation(listOfColocatedALonLat, listOf
         
         [aLon, aLat, aIndex, aMatches] = listOfColocatedALonLat[aIndex]
         tempMatches = 0
+        isInvalidA = invalidAMask[aIndex]
         
         # for each point that matched to a given a point
         for matchIndex in sorted(aMatches) :
             
             [bLon, bLat, bIndex, bMatches] = listOfColocatedBLonLat[matchIndex]
+            isInvalidB = invalidBMask[bIndex]
             
             # if either of our data points is invalid, then the data doesn't match
-            if invalidBMask[matchIndex] or invalidAMask[aIndex] :
+            if isInvalidA or isInvalidB :
                 # fill in missing data in the matches
                 matchedAPoints[currentIndex] = missingData
                 matchedBPoints[currentIndex] = altMissingDataInB
-                
             else: # we have a valid match!
                 tempMatches = tempMatches + 1
                 matchedAPoints[currentIndex] = aData[aIndex]
@@ -792,7 +793,7 @@ def create_colocated_data_with_lon_lat_colocation(listOfColocatedALonLat, listOf
         totalValidMatchedPairs = totalValidMatchedPairs + tempMatches
         if tempMatches > 1 :
             multipleMatchesInA = multipleMatchesInA + tempMatches
-        elif tempMatches <= 0 :
+        elif (tempMatches <= 0) and (not isInvalidA) :
             unmatchedAPoints.append(aData[aIndex])
             unmatchedALongitude.append(aLon)
             unmatchedALatitude.append(aLat)
@@ -803,14 +804,16 @@ def create_colocated_data_with_lon_lat_colocation(listOfColocatedALonLat, listOf
         
         [bLon, bLat, bIndex, bMatches] = listOfColocatedBLonLat[bIndex]
         tempMatches = 0
+        isInvalidB = invalidBMask[bIndex]
         
         # for each point that matched to a given b point
         for matchIndex in sorted(bMatches) :
             
             [aLon, aLat, aIndex, aMatches] = listOfColocatedALonLat[matchIndex]
+            isInvalidA = invalidAMask[aIndex]
             
             # if either of our data points is invalid, then the data doesn't match
-            if invalidAMask[matchIndex] or invalidBMask[bIndex] :
+            if isInvalidB or isInvalidA :
                 # we've already built our matched data, so no need to missing it out
                 pass
             else: # we have a valid match!
@@ -818,7 +821,7 @@ def create_colocated_data_with_lon_lat_colocation(listOfColocatedALonLat, listOf
         
         if tempMatches > 1 :
             multipleMatchesInB = multipleMatchesInB + tempMatches
-        elif tempMatches <= 0 :
+        elif (tempMatches <= 0) and (not isInvalidB) :
             unmatchedBPoints.append(bData[bIndex])
             unmatchedBLongitude.append(bLon)
             unmatchedBLatitude.append(bLat)

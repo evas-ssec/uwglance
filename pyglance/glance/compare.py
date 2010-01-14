@@ -555,7 +555,8 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
     error_msg = None
     
     # if there is no lon/lat specified, stop now
-    if ('longitude' not in lon_lat_settings) or ('latitude' not in lon_lat_settings) :
+    if ( ('longitude' not in lon_lat_settings) or ('latitude' not in lon_lat_settings)
+        or (('noLonLatVars' in lon_lat_settings) and lon_lat_settings['noLonLatVars']) ) :
         return { }, spatialInfo, error_msg
     
     # if we should not be comparing against the logitude and latitude, stop now
@@ -786,18 +787,45 @@ def _uri_needs_rsync(uri_to_check) :
     """
     return not os.path.exists(uri_to_check)
 
-def rsync_or_copy_files (list_of_files, target_directory='.') :
+def _get_UV_info_from_magnitude_direction_info(fileObject, magnitudeName, directionName, invalidMask=None) :
+    """
+    If there are magnitude and direction names, load that information and calculate the u and v that correspond to it
+    """
+    
+    # if we don't have magnitude and direction, we can't calculate the U and V values
+    if (magnitudeName is None) or (directionName is None) :
+        return None, None
+    
+    # load the magnitude and direction data sets
+    magnitude = _load_variable_data(fileObject, magnitudeName)
+    direction = _load_variable_data(fileObject, directionName)
+    
+    # convert the magnitude and direction data into u and v vectors
+    uData, vData = delta.convert_mag_dir_to_U_V_vector(magnitude, direction, invalidMask=invalidMask)
+    
+    return uData, vData
+
+def rsync_or_copy_files (list_of_files, target_directory='.', additionalFileNameSuffix='') :
     """
     If the files in the list are remote, rsync them, otherwise, just copy
     them to the target directory
     """
+    newPaths = [ ]
+    
     for file_uri in list_of_files :
+        fileName = os.path.split(file_uri)[1]
+        baseFile, ext = os.path.splitext(fileName)
+        newPath = os.path.join(target_directory, baseFile + additionalFileNameSuffix + ext)
+        newPaths.append(newPath)
+        
         if _uri_needs_rsync(file_uri) :
-            cmd = ['rsync', '-Cuav', file_uri, os.path.join(target_directory, os.path.split(file_uri)[1])]
+            cmd = ['rsync', '-Cuav', file_uri, newPath]
         else :
-            cmd = ['cp', os.path.abspath(file_uri), os.path.join(target_directory, os.path.split(file_uri)[1])]
+            cmd = ['cp', os.path.abspath(file_uri), newPath]
         LOG.debug('running ' + ' '.join(cmd)) 
         sh(cmd)
+    
+    return newPaths
 
 def colocateToFile_library_call(a_path, b_path, var_list=[ ],
                                 options_set={ },
@@ -823,10 +851,10 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
         LOG.info("Creating output directory.")
         os.makedirs(pathsTemp['out'])
     
-    # make copies of the input files for colocation
-    rsync_or_copy_files ([pathsTemp['a'], pathsTemp['b']], target_directory=pathsTemp['out'])
-    pathsTemp['a'] = os.path.join(pathsTemp['out'], os.path.split(pathsTemp['a'])[1])
-    pathsTemp['b'] = os.path.join(pathsTemp['out'], os.path.split(pathsTemp['b'])[1])
+    # make copies of the input files for colocation TODO, fix paths
+    [pathsTemp['a'], pathsTemp['b']] = rsync_or_copy_files ([pathsTemp['a'], pathsTemp['b']],
+                                                            target_directory=pathsTemp['out'],
+                                                            additionalFileNameSuffix='-collocated')
     
     # open the files
     LOG.info("Processing File A:")
@@ -905,6 +933,10 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
         # colocate the data for this variable if we have longitude/latitude data
         if (len(lon_lat_data.keys()) > 0) and runInfo['doColocate'] :
             
+            # figure out the invalid masks
+            invalidA = lon_lat_data['a']['inv_mask'] | (aData == varRunInfo['missing_value'])
+            invalidB = lon_lat_data['b']['inv_mask'] | (bData == varRunInfo['missing_value_alt_in_b'])
+            
             # match up our points in A and B
             (aData, bData, (numberOfMultipleMatchesInA, numberOfMultipleMatchesInB)), \
             (aUnmatchedData,             unmatchedALongitude, unmatchedALatitude), \
@@ -915,8 +947,8 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
                                                                         missingData=varRunInfo['missing_value'],
                                                                         altMissingDataInB=varRunInfo['missing_value_alt_in_b'],
                                                                         # TODO, should missing data be considered?
-                                                                        invalidAMask=lon_lat_data['a']['inv_mask'],
-                                                                        invalidBMask=lon_lat_data['b']['inv_mask'])
+                                                                        invalidAMask=invalidA,
+                                                                        invalidBMask=invalidB)
             
             LOG.debug(str(numberOfMultipleMatchesInA) + " data pairs contain A data points used for multiple matches.")
             LOG.debug(str(numberOfMultipleMatchesInB) + " data pairs contain B data points used for multiple matches.")
@@ -924,15 +956,24 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
             LOG.debug(str(len(bUnmatchedData)) + " B data points could not be matched.")
             
             # save the colocated data information in the output files
+            
+            # all the a file information
             aFile.create_new_variable(technical_name + '-colocated', # TODO, how should this suffix be handled?
                                       missingvalue = varRunInfo['missing'] if 'missing' in varRunInfo else None,
                                       data = aData,
                                       variabletocopyattributesfrom = technical_name)
+            aFile.add_attribute_data_to_variable(technical_name + '-colocated', 'number of multiple matches', numberOfMultipleMatchesInA)
+            aFile.add_attribute_data_to_variable(technical_name + '-colocated', 'number of unmatched points', len(aUnmatchedData))
+            
+            # all the b file information
             bFile.create_new_variable(b_variable_technical_name + '-colocated', # TODO, how should this suffix be handled?
                                       missingvalue = varRunInfo['missing_value_alt_in_b'] if 'missing_value_alt_in_b' in varRunInfo else None,
                                       data = bData,
                                       variabletocopyattributesfrom = b_variable_technical_name)
-            # TODO, save the unmatched data and info on multiple matches
+            bFile.add_attribute_data_to_variable(b_variable_technical_name + '-colocated', 'number of multiple matches', numberOfMultipleMatchesInB)
+            bFile.add_attribute_data_to_variable(b_variable_technical_name + '-colocated', 'number of unmatched points', len(bUnmatchedData))
+            
+            # TODO, any additional statistics
             
         else :
             LOG.debug(explanationName + " was not selected for colocation and will be ignored.")
@@ -1061,7 +1102,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         do_not_test_with_lon_lat = (not include_images_for_this_variable) or (len(lon_lat_data.keys()) <= 0)
         
         # handle vector data
-        isVectorData = False # TODO actually figure out if we have vector data from user inputted settings
+        isVectorData = ( ('magnitudeName' in varRunInfo)  and ('directionName'  in varRunInfo) and
+                         ('magnitudeBName' in varRunInfo) and ('directionBName' in varRunInfo) )
         
         # check if this data can be displayed but
         # don't compare lon/lat sizes if we won't be plotting
@@ -1142,6 +1184,18 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                     else :
                         plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
                 
+                # if there's magnitude and direction data, figure out the u and v, otherwise these will be None
+                aUData, aVData = _get_UV_info_from_magnitude_direction_info (aFile,
+                                                                             varRunInfo['magnitudeName'] if ('magnitudeName') in varRunInfo else None,
+                                                                             varRunInfo['directionName'] if ('directionName') in varRunInfo else None,
+                                                                             lon_lat_data['a']['inv_mask']
+                                                                             if ('a' in lon_lat_data) and ('inv_mask' in lon_lat_data['a']) else None)
+                bUData, bVData = _get_UV_info_from_magnitude_direction_info (bFile,
+                                                                             varRunInfo['magnitudeBName'] if ('magnitudeBName') in varRunInfo else None,
+                                                                             varRunInfo['directionBName'] if ('directionBName') in varRunInfo else None,
+                                                                             lon_lat_data['b']['inv_mask']
+                                                                             if ('b' in lon_lat_data) and ('inv_mask' in lon_lat_data['b']) else None)
+                
                 # plot our lon/lat related info
                 image_names['original'], image_names['compared'] = \
                     plot.plot_and_save_comparison_figures \
@@ -1160,7 +1214,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                              doFork=runInfo['doFork'],
                              shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
                              shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
-                             doPlotSettingsDict = varRunInfo)
+                             doPlotSettingsDict = varRunInfo,
+                             aUData=aUData, aVData=aVData,
+                             bUData=bUData, bVData=bVData,)
                 
                 print("\tfinished creating figures for: " + explanationName)
             
@@ -1354,9 +1410,12 @@ python -m glance
         List available variables for comparison.
         """
         for fn in args:
-            lal = list(io.open(fn)())
-            lal.sort()
-            print fn + ': ' + ('\n  ' + ' '*len(fn)).join(lal)
+            try :
+                lal = list(io.open(fn)())
+                lal.sort()
+                print fn + ': ' + ('\n  ' + ' '*len(fn)).join(lal)
+            except KeyError :
+                LOG.warn('Unable to open / process file selection: ' + fn)
     
     def sdr_cris(*args):
         """compare sdr_cris output

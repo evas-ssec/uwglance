@@ -402,7 +402,7 @@ def create_quiver_mapped_figure(data, latitude, longitude, baseMapInstance, boun
     
     # draw our data placed on a map
     maps.draw_basic_features(baseMapInstance, boundingAxes)
-    bMap, x, y = maps.show_quiver_plot (longitudeClean, latitudeClean, baseMapInstance, (uData, vData), colordata=colorData)
+    bMap, x, y = maps.show_quiver_plot (longitudeClean, latitudeClean, baseMapInstance, (uDataClean, vDataClean), colordata=colorData)
     
     # show the title
     axes.set_title(title)
