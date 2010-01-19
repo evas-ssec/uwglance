@@ -1161,28 +1161,35 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 
                 plotFunctionGenerationObjects = [ ]
                 
-                # if the data is the same size, we can always make our basic statistical comparison plots
-                if (aData.shape == bData.shape) :
-                    plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
+                # if the bin and tuple are defined, try to analyze the data as complex
+                # multidimentional information requiring careful sampling
+                if ('binIndex' in varRunInfo) and ('tupleIndex' in varRunInfo) :
+                    plotFunctionGenerationObjects.append(plotcreate.BinTupleAnalysisFunctionFactory())
                 
-                # if it's vector data with longitude and latitude, quiver plot it on the Earth
-                if isVectorData and (not do_not_test_with_lon_lat) :
-                    plotFunctionGenerationObjects.append(plotcreate.MappedQuiverPlotFunctionFactory())
+                else :
                 
-                # if the data is one dimensional we can plot it as lines
-                elif   (len(aData.shape) is 1) : 
-                    plotFunctionGenerationObjects.append(plotcreate.LinePlotsFunctionFactory())
-                
-                # if the data is 2D we have some options based on the type of data
-                elif (len(aData.shape) is 2) :
+                    # if the data is the same size, we can always make our basic statistical comparison plots
+                    if (aData.shape == bData.shape) :
+                        plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
                     
-                    # if the data is not mapped to a longitude and latitude, just show it as an image
-                    if (do_not_test_with_lon_lat) :
-                        plotFunctionGenerationObjects.append(plotcreate.IMShowPlotFunctionFactory())
+                    # if it's vector data with longitude and latitude, quiver plot it on the Earth
+                    if isVectorData and (not do_not_test_with_lon_lat) :
+                        plotFunctionGenerationObjects.append(plotcreate.MappedQuiverPlotFunctionFactory())
                     
-                    # if it's 2D and mapped to the Earth, contour plot it on the earth
-                    else :
-                        plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
+                    # if the data is one dimensional we can plot it as lines
+                    elif   (len(aData.shape) is 1) : 
+                        plotFunctionGenerationObjects.append(plotcreate.LinePlotsFunctionFactory())
+                    
+                    # if the data is 2D we have some options based on the type of data
+                    elif (len(aData.shape) is 2) :
+                        
+                        # if the data is not mapped to a longitude and latitude, just show it as an image
+                        if (do_not_test_with_lon_lat) :
+                            plotFunctionGenerationObjects.append(plotcreate.IMShowPlotFunctionFactory())
+                        
+                        # if it's 2D and mapped to the Earth, contour plot it on the earth
+                        else :
+                            plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
                 
                 # if there's magnitude and direction data, figure out the u and v, otherwise these will be None
                 aUData, aVData = _get_UV_info_from_magnitude_direction_info (aFile,
@@ -1216,7 +1223,11 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                              shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
                              doPlotSettingsDict = varRunInfo,
                              aUData=aUData, aVData=aVData,
-                             bUData=bUData, bVData=bVData,)
+                             bUData=bUData, bVData=bVData,
+                             binIndex=  varRunInfo['binIndex']   if 'binIndex'   in varRunInfo else None,
+                             tupleIndex=varRunInfo['tupleIndex'] if 'tupleIndex' in varRunInfo else None,
+                             binName=   varRunInfo['binName']    if 'binName'    in varRunInfo else 'bin',
+                             tupleName= varRunInfo['tupleName']  if 'tupleName'  in varRunInfo else 'tuple')
                 
                 print("\tfinished creating figures for: " + explanationName)
             

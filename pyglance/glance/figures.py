@@ -528,7 +528,7 @@ def create_line_plot_figure(dataList, figureTitle) :
     if (len(dataList) > 1) or plottedTagData :
         # make a key to explain our plot
         # as long as things have been plotted with proper labels they should show up here
-        #axes.legend(loc=0, markerscale=3.0) # Note: at the moment markerscale doesn't seem to work # TODO, turn back on?
+        axes.legend(loc=0, markerscale=3.0) # Note: at the moment markerscale doesn't seem to work 
         pass
     
     # and some informational stuff

@@ -161,7 +161,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                      doPlotSettingsDict={ },
                                      aUData=None, aVData=None,
                                      bUData=None, bVData=None,
-                                     binIndex=None, tupleIndex=None) :
+                                     binIndex=None, tupleIndex=None,
+                                     binName='bin', tupleName='tuple') :
     """
     Plot images for a set of figures based on the data sets and settings
     passed in. The images will be saved to disk according to the settings.
@@ -282,8 +283,9 @@ def plot_and_save_comparison_figures (aData, bData,
                                        aUData=aUData, aVData=aVData,
                                        bUData=bUData, bVData=bVData,
                                        
-                                       # only used for line plots TODO
-                                       binIndex=0, tupleIndex=1 # TODO, temporary binIndex=None, tupleIndex=None
+                                       # only used for line plots 
+                                       binIndex=binIndex, tupleIndex=tupleIndex,
+                                       binName=binName, tupleName=tupleName
                                        )
         plottingFunctions.update(moreFunctions)
     

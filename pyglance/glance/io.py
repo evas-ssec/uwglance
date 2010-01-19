@@ -116,7 +116,28 @@ class hdf(SD):
         SDS.endaccess(variable_object)
         
         return to_return
+    
+    def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
+        """
+        create a new variable with the given name
+        optionally set the missing value (fill value) and data to those given
         
+        the created variable will be returned, or None if a variable could not
+        be created
+        """
+        
+        # TODO
+        
+        return None
+    
+    def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
+        """
+        if the attribute exists for the given variable, set it to the new value
+        if the attribute does not exist for the given variable, create it and set it to the new value
+        """
+        # TODO
+        
+        return
 
 class nc(CDF):
     """wrapper for NetCDF3/4/opendap dataset for comparison
@@ -190,7 +211,6 @@ class nc(CDF):
         
         return to_return
     
-    # TODO, this method only exists for nc files at the moment, make the others at some point
     def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
         """
         create a new variable with the given name
@@ -371,7 +391,28 @@ class h5(object):
             toReturn = temp
         
         return toReturn
+    
+    def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
+        """
+        create a new variable with the given name
+        optionally set the missing value (fill value) and data to those given
         
+        the created variable will be returned, or None if a variable could not
+        be created
+        """
+        
+        # TODO
+        
+        return None
+    
+    def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
+        """
+        if the attribute exists for the given variable, set it to the new value
+        if the attribute does not exist for the given variable, create it and set it to the new value
+        """
+        # TODO
+        
+        return
 
 def open(pathname, allowWrite=False):
     cls = globals()[os.path.splitext(pathname)[1][1:]]

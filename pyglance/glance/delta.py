@@ -188,15 +188,74 @@ def convert_mag_dir_to_U_V_vector(magnitude_data, direction_data, invalidMask=No
     if invalidMask is None :
         invalidMask = zeros(magnitude_data.shape, dtype=bool)
     
+    new_direction_data = direction_data[:] + 180
+    
+    print ("direction data: " + str(new_direction_data[~invalidMask]))
+    
     uData = zeros(magnitude_data.shape, dtype=float)
     uData[invalidMask]  = nan
-    uData[~invalidMask] = magnitude_data[~invalidMask] * cos (direction_data[~invalidMask])
+    uData[~invalidMask] = magnitude_data[~invalidMask] * np.sin (deg2rad(new_direction_data[~invalidMask]))
     
     vData = zeros(magnitude_data.shape, dtype=float)
     vData[invalidMask]  = nan
-    vData[~invalidMask] = magnitude_data[~invalidMask] * sin (direction_data[~invalidMask])
+    vData[~invalidMask] = magnitude_data[~invalidMask] * np.cos (deg2rad(new_direction_data[~invalidMask]))
     
     return uData, vData
+
+# a method to make a list of index numbers for reordering a multi-dimensional array
+def _make_new_index_list(numberOfIndexes, firstIndexNumber=0, lastIndexNumber=None) :
+    """
+    the first and last index numbers represent the dimensions you want to be first and last (respectively)
+    when the list is reordered; any other indexes will retain their relative ordering
+    
+    newIndexList = _make_new_index_list(numIndexes, binIndex, tupleIndex)
+    """
+    
+    if lastIndexNumber is None:
+        lastIndexNumber = numberOfIndexes - 1
+    
+    newIndexList = range(numberOfIndexes)
+    maxSpecial   = max(firstIndexNumber, lastIndexNumber)
+    minSpecial   = min(firstIndexNumber, lastIndexNumber)
+    del(newIndexList[maxSpecial])
+    del(newIndexList[minSpecial])
+    newIndexList = [firstIndexNumber] + newIndexList + [lastIndexNumber]
+    
+    return newIndexList
+
+def reorder_for_bin_tuple (data, binIndexNumber, tupleIndexNumber) :
+    """
+    reorder the data given so that the bin index is first, the tuple index is last,
+    and any additional dimensions are flattened into a middle "case" index
+    
+    the reordered data and the shape of flattened case indexes will be returned
+    (note if the original data was only 2 dimensional, None will be returned for the
+    shape of the flattened case indexes, since there were no other dimensions to flatten)
+    """
+    
+    # put the bin and tuple dimensions in the correct places
+    newIndexList = _make_new_index_list(len(data.shape), binIndexNumber, tupleIndexNumber)
+    newData = data.transpose(newIndexList)
+    
+    # get the shape information on the internal dimensions we're going to combine
+    caseOriginalShape = newData.shape[1:-1]
+    
+    # combine the internal dimensions, to figure out what shape things
+    # will be with the flattened cases
+    numDimensionsToFlatten = len(caseOriginalShape)
+    sizeAfterFlattened = np.multiply.accumulate(caseOriginalShape)[-1]
+    newShape = (newData.shape[0], sizeAfterFlattened, newData.shape[-1])
+    
+    # flatten the case dimensions
+    newData = newData.reshape(newShape)
+    
+    # TODO, remove once this is tested
+    #print ('original data shape: ' + str(data.shape))
+    #print ('original case shape: ' + str(caseOriginalShape))
+    #print ('new data shape:      ' + str(newData.shape))
+    
+    return newData, caseOriginalShape
+    
 
 def calculate_root_mean_square (data, goodMask=None) :
     """
@@ -211,108 +270,6 @@ def calculate_root_mean_square (data, goodMask=None) :
     rootMeanSquare = sqrt( sum( data[goodMask] ** 2 ) / sum( goodMask ) )
     
     return rootMeanSquare
-
-def organize_dimensions_and_produce_rms_info(dataA, dataB, binDimensionIndexNum, tupleDimensionIndexNum,
-                                             epsilon=0., (a_missing_value, b_missing_value)=(None, None),
-                                             (ignore_mask_a, ignore_mask_b)=(None, None)) :
-    """
-    reorganize the dimensions in the given data sets in order to put the bin dimension first
-    and the tuple dimension last
-    collapse all other dimensions into a single "case" dimension, but preserve information on their
-    previous shape so that the coresponding index of a given case can be recovered
-    
-    once the data is reshaped to the desired ordering with the appopriate set of cases, diff the
-    data and calculate the rms on a per case basis
-    
-    return reshaped original and diffrence data sets, masks as corresponding to the output of diff and
-    matching the shape of the reshaped data, and information on the shape of the collapsed case dimensions
-    
-    TODO, this method has not yet been tested or integrated with the rest of glance
-    """
-    
-    # make sure we meet the minimal requirement for compatable shapes/index sizes
-    assert(dataA.shape is dataB.shape)
-    assert(binDimensionIndexNum   < len(dataA.shape))
-    assert(tupleDimensionIndexNum < len(dataA.shape))
-    assert(tupleDimensionIndexNum is not binDimensionIndexNum)
-    
-    # figure out the order to put the index we want first
-    new_index_order = range(len(dataA.shape))
-    smaller = tupleDimensionIndexNum
-    larger  = binDimensionIndexNum
-    if (tupleDimensionIndexNum > binDimensionIndexNum) :
-        larger  = tupleDimensionIndexNum
-        smaller = binDimensionIndexNum
-    del(new_index_order[larger])
-    del(new_index_order[smaller])
-    new_index_order = [binDimensionIndexNum] + new_index_order + [tupleDimensionIndexNum]
-    
-    # copy our data, then put the indexes into the new order
-    new_a_data = dataA.copy()
-    new_a_data = new_a_data.transpose(new_index_order)
-    new_b_data = dataB.copy()
-    new_b_data = new_b_data.transpose(new_index_order)
-    # if our masks need to be reordered, do that
-    new_a_missing_mask = a_missing_mask
-    if new_a_missing_mask is not None :
-        new_a_missing_mask = new_a_missing_mask.copy()
-        new_a_missing_mask = new_a_missing_mask.transpose(new_index_order)
-    new_b_missing_mask = b_missing_mask
-    if new_b_missing_mask is not None :
-        new_b_missing_mask = new_b_missing_mask.copy()
-        new_b_missing_mask = new_b_missing_mask.transpose(new_index_order)
-    new_a_ignore_mask = ignore_mask_a
-    if new_a_ignore_mask is not None :
-        new_a_ignore_mask = new_a_ignore_mask.copy()
-        new_a_ignore_mask = new_a_ignore_mask.transpose(new_index_order)
-    new_b_ignore_mask = ignore_mask_b
-    if new_b_ignore_mask is not None :
-        new_b_ignore_mask = new_b_ignore_mask.copy()
-        new_b_ignore_mask = new_b_ignore_mask.transpose(new_index_order)
-    
-    # get the shape information on the internal dimensions we're going to combine
-    case_dimension_original_shape = new_b_data.shape[1:-1]
-    
-    # combine the internal dimensions, to figure out what shape things
-    # will be with the flattened cases
-    numDimensionsToFlatten = len(case_dimension_original_shape)
-    sizeAfterFlattened = np.multiply.accumulate(case_dimension_original_shape)[-1]
-    newShape = (new_a_data.shape[0], sizeAfterFlattened, new_a_data.shape[-1])
-    
-    # flatten the case dimensions
-    new_a_data = new_a_data.reshape(newShape)
-    new_b_data = new_b_data.reshape(newShape)
-    if new_a_missing_mask is not None :
-        new_a_missing_mask = new_a_missing_mask.reshape(newShape)
-    if new_b_missing_mask is not None :
-        new_b_missing_mask = new_b_missing_mask.reshape(newShape)
-    if new_a_ignore_mask is not None :
-        new_a_ignore_mask = new_a_ignore_mask.reshape(newShape)
-    if new_b_ignore_mask is not None :
-        new_b_ignore_mask = new_b_ignore_mask.reshape(newShape)
-    
-    # diff our data
-    rawDiffData, goodInBothMask, (goodInAMask, goodInBMask), troubleMask, outsideEpsilonMask, \
-        (aNotFiniteMask, bNotFiniteMask), (aMissingMask, bMissingMask), (finalAIgnoreMask, finalBIgnoreMask) = diffOutput = \
-            diff(new_a_data, new_b_data, epsilon, (new_a_missing_mask, new_b_missing_mask), (new_a_ignore_mask, new_b_ignore_mask))
-    
-    # calculate the rms diffs for all the cases
-    caseRMSInfo = np.zeros(rawDiffData.shape[:-1], dtype=np.float64)
-    # TODO, how to do this without a loop?
-    for caseNum in range(sizeAfterFlattened) :
-        caseRMSInfo[caseNum] = calculate_root_mean_square(rawDiffData[caseNum], goodMask=goodInBothMask[caseNum])
-    
-    # return the reshaped original data,
-    # information on the original shape of the case dimension that was flattened,
-    # the rms diff info,
-    # and then the full set of info that came out of the diff between the reshaped a and b data
-    return (new_a_data, new_b_data), case_dimension_original_shape, caseRMSInfo, diffOutput
-    """
-    diffOutput is in the form:
-    
-        rawDiffData, goodInBothMask, (goodInAMask, goodInBMask), troubleMask, outsideEpsilonMask, \
-        (aNotFiniteMask, bNotFiniteMask), (aMissingMask, bMissingMask), (finalAIgnoreMask, finalBIgnoreMask)
-    """
 
 def _get_num_perfect(a, b, ignoreMask=None):
     numPerfect = 0

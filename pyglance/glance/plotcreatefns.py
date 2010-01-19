@@ -22,6 +22,7 @@ from matplotlib.ticker import FormatStrFormatter
 from PIL import Image
 
 import os, sys, logging
+import random as random
 import numpy as np
 from numpy import ma 
 
@@ -144,29 +145,6 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, shouldUseSh
     
     return fullAxis, baseMapInstance, sharedRange
 
-# a method to make a list of index numbers for reordering a multi-dimensional array
-def _make_new_index_list(numberOfIndexes, firstIndexNumber=0, lastIndexNumber=None) :
-    """
-    the first and last index numbers represent the dimensions you want to be first and last (respectively)
-    when the list is reordered; any other indexes will retain their relative ordering
-    
-    newIndexList = _make_new_index_list(numIndexes, binIndex, tupleIndex)
-    
-    TODO, move this to delta?
-    """
-    
-    if lastIndexNumber is None:
-        lastIndexNumber = numberOfIndexes - 1
-    
-    newIndexList = range(numberOfIndexes)
-    maxSpecial   = max(firstIndexNumber, lastIndexNumber)
-    minSpecial   = min(firstIndexNumber, lastIndexNumber)
-    del(newIndexList[maxSpecial])
-    del(newIndexList[minSpecial])
-    newIndexList = [firstIndexNumber] + newIndexList + [lastIndexNumber]
-    
-    return newIndexList
-
 # ********************* Section of public classes ***********************
 
 """
@@ -208,7 +186,8 @@ class PlottingFunctionFactory :
                                    bUData=None, bVData=None,
                                    
                                    # only used for line plots
-                                   binIndex=None, tupleIndex=None
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None
                                    
                                    ) : _abstract
 
@@ -248,7 +227,8 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    bUData=None, bVData=None,
                                    
                                    # only used for line plots
-                                   binIndex=None, tupleIndex=None
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None
                                    ) :
         
         functionsToReturn = { }
@@ -320,7 +300,8 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    bUData=None, bVData=None,
                                    
                                    # only used for line plots
-                                   binIndex=None, tupleIndex=None
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None
                                    ) :
         
         # the default for plotting geolocated data
@@ -484,7 +465,8 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    bUData=None, bVData=None,
                                    
                                    # only used for line plots
-                                   binIndex=None, tupleIndex=None
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None
                                    ) :
         
         # the default for plotting geolocated data
@@ -655,7 +637,8 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    bUData=None, bVData=None,
                                    
                                    # only used for line plots
-                                   binIndex=None, tupleIndex=None
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None
                                    ) :
         """
         This method generates line plotting functions for one dimensional data
@@ -667,98 +650,17 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
         """
         assert(aData is not None)
         assert(bData is not None)
-        # TODO, assert about more of the data
+        assert(len(aData.shape) is 1)
+        assert(aData.shape == bData.shape)
         
-        if len(aData.shape) > 1 :
-            assert(binIndex   is not None)
-            assert(tupleIndex is not None)
-            assert(binIndex   is not tupleIndex)
-            
-            numIndexes   = len(aData.shape)
-            assert(binIndex   < numIndexes)
-            assert(tupleIndex < numIndexes)
+        # make all our data sets for plotting ahead of time for simplicity
+        aList = [(aData, ~goodInAMask, 'r', 'A data', None)]
+        bList = [(bData, ~goodInBMask, 'b', 'B data', None)]
+        absDiffList = [(absDiffData, ~goodInBothMask, '', 'abs. diff. data', None)]
+        subDiffList = [(rawDiffData, ~goodInBothMask, '', 'sub. diff. data', None)]
         
-        # TODO, the rest of this function is not totally refactored but should be functional for now
-        
-        # TODO, temporary
-        aList       = [ ]
-        bList       = [ ]
-        singleAList = [ ]
-        singleBList = [ ]
-        absDiffList = [ ]
-        subDiffList = [ ]
-        troubleSingleList = [ ]
-        troubleFullList   = [ ]
-        if len(aData.shape) > 1 :
-            
-            newIndexList = _make_new_index_list(numIndexes, binIndex, tupleIndex)
-            aData              =              aData.transpose(newIndexList)
-            bData              =              bData.transpose(newIndexList)
-            goodInAMask        =        goodInAMask.transpose(newIndexList)
-            goodInBMask        =        goodInBMask.transpose(newIndexList)
-            absDiffData        =        absDiffData.transpose(newIndexList)
-            rawDiffData        =        rawDiffData.transpose(newIndexList)
-            goodInBothMask     =     goodInBothMask.transpose(newIndexList)
-            troubleMask        =        troubleMask.transpose(newIndexList)
-            outsideEpsilonMask = outsideEpsilonMask.transpose(newIndexList)
-            
-            for firstIndexValue in range(aData.shape[0]) :
-                # get the a and b data with it's masks
-                aSlice           = filters.collapse_to_index(aData[firstIndexValue], (numIndexes - 1), missing_value=-999.0, ignore_below_exclusive=-990.0)
-                bSlice           = filters.collapse_to_index(bData[firstIndexValue], (numIndexes - 1), missing_value=-999.0, ignore_below_exclusive=-990.0)
-                goodInAMaskSlice = filters.collapse_to_index(goodInAMask[firstIndexValue], (numIndexes - 1), collapsing_function=(lambda data: any(data)))
-                goodInBMaskSlice = filters.collapse_to_index(goodInBMask[firstIndexValue], (numIndexes - 1), collapsing_function=(lambda data: any(data)))
-                
-                # add to the plain a and b lists
-                aList.append((aSlice, ~goodInAMaskSlice, 'r', 'A data, ' + str(firstIndexValue), None))
-                bList.append((bSlice, ~goodInBMaskSlice, 'b', 'B data, ' + str(firstIndexValue), None))
-                
-                # deal with the trouble data and it's list
-                troubleMaskSlice = filters.collapse_to_index(troubleMask[firstIndexValue], (numIndexes - 1), collapsing_function=(lambda data: any(data)))
-                troubleFullList.append((aSlice, ~goodInAMaskSlice, 'r', 'A data, ' + str(firstIndexValue), troubleMaskSlice))
-                troubleFullList.append((bSlice, ~goodInBMaskSlice, 'b', 'B data, ' + str(firstIndexValue), troubleMaskSlice))
-                
-                # get the diff data with it's masks
-                absDiffDataSlice = filters.collapse_to_index(absDiffData[firstIndexValue], (numIndexes - 1), missing_value=-999.0, ignore_below_exclusive=-990.0)
-                rawDiffDataSlice = filters.collapse_to_index(rawDiffData[firstIndexValue], (numIndexes - 1), missing_value=-999.0, ignore_below_exclusive=-990.0)
-                goodMaskSlice    = filters.collapse_to_index(goodInBothMask[firstIndexValue], (numIndexes - 1), collapsing_function=(lambda data: any(data)))
-                
-                # add to the diff data lists
-                absDiffList.append((absDiffDataSlice, ~goodMaskSlice, '', 'abs. diff. data, ' + str(firstIndexValue), None))
-                subDiffList.append((rawDiffDataSlice, ~goodMaskSlice, '', 'sub. diff. data, ' + str(firstIndexValue), None))
-                
-            # also collapse the masks
-            troubleMask        = filters.collapse_to_index(troubleMask,        numIndexes, collapsing_function=(lambda data: any(data)))
-            #outsideEpsilonMask = filters.collapse_to_index(outsideEpsilonMask, numIndexes, collapsing_function=(lambda data: any(data)))
-            #goodInBothMask     = filters.collapse_to_index(goodInBothMask,     numIndexes, collapsing_function=(lambda data: any(data)))
-            
-            # make some averages
-            aDataAvg           = filters.collapse_to_index(aData,       numIndexes, missing_value=-999.0, ignore_below_exclusive=-990.0)
-            bDataAvg           = filters.collapse_to_index(bData,       numIndexes, missing_value=-999.0, ignore_below_exclusive=-990.0)
-            goodInAMaskAvg     = filters.collapse_to_index(goodInAMask, numIndexes, collapsing_function=(lambda data: any(data)))
-            goodInBMaskAvg     = filters.collapse_to_index(goodInBMask, numIndexes, collapsing_function=(lambda data: any(data)))
-            
-            # make our averaged sets
-            singleAList       = [(aDataAvg, ~goodInAMaskAvg, 'r', 'A data', None)]
-            singleBList       = [(bDataAvg, ~goodInBMaskAvg, 'b', 'B data', None)]
-            troubleSingleList = [(aDataAvg, ~goodInAMaskAvg, 'r', 'A data', troubleMask),
-                                 (bDataAvg, ~goodInBMaskAvg, 'b', 'B data', troubleMask)]
-        else :
-            aList = [(aData, ~goodInAMask, 'r', 'A data', None)]
-            bList = [(bData, ~goodInBMask, 'b', 'B data', None)]
-            absDiffList = [(absDiffData, ~goodInBothMask, '', 'abs. diff. data', None)]
-            subDiffList = [(rawDiffData, ~goodInBothMask, '', 'sub. diff. data', None)]
-            
-            singleAList = aList
-            singleBList = bList
-            
-            troubleFullList   = [(aData, ~goodInAMask, 'r', 'A data', troubleMask),
-                                 (bData, ~goodInBMask, 'b', 'B data', troubleMask)]
-            troubleSingleList = troubleFullList
-        
-        # make a list of both the A and B values together
-        allList       = aList       + bList
-        allSingleList = singleAList + singleBList
+        troubleList   = [(aData, ~goodInAMask, 'r', 'A data', troubleMask),
+                             (bData, ~goodInBMask, 'b', 'B data', troubleMask)]
         
         functionsToReturn = { }
         
@@ -766,7 +668,7 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
         if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
             
             
-            functionsToReturn['original'] = ((lambda: figures.create_line_plot_figure(allList,
+            functionsToReturn['original'] = ((lambda: figures.create_line_plot_figure((aList + bList),
                                                                                variableDisplayName + "\nin Both Files")),
                                              variableDisplayName + " in both files",
                                              "AB.png", original_fig_list)
@@ -778,20 +680,6 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                                                                 variableDisplayName + "\nin File B")),
                                               variableDisplayName + " in file b",
                                               "B.png",  original_fig_list)
-            
-            if len(allSingleList) < len(allList) :
-                functionsToReturn['originalS'] = ((lambda: figures.create_line_plot_figure(allSingleList,
-                                                                                    variableDisplayName + "\nAvg. in Both Files")),
-                                                  variableDisplayName + " avg. in both files",
-                                                  "ABsingle.png", original_fig_list)
-                functionsToReturn['originalAS'] = ((lambda: figures.create_line_plot_figure(singleAList,
-                                                                                     variableDisplayName + "\nAvg. in File A")),
-                                                   variableDisplayName + " avg. in file a",
-                                                   "Asingle.png",  original_fig_list)
-                functionsToReturn['originalBS'] = ((lambda: figures.create_line_plot_figure(singleBList,
-                                                                                     variableDisplayName + "\nAvg. in File B")),
-                                                   variableDisplayName + " avg. in file b",
-                                                   "Bsingle.png",  original_fig_list)
         
         # make the absolute value difference plot
         if ('do_plot_abs_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_abs_diff']) :
@@ -808,15 +696,164 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
         
         # make the trouble data plot
         if ('do_plot_trouble' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_trouble']) :
-            functionsToReturn['trouble']   = ((lambda: figures.create_line_plot_figure(troubleFullList,
+            functionsToReturn['trouble']   = ((lambda: figures.create_line_plot_figure(troubleList,
                                                                                "Areas of trouble data in\n" + variableDisplayName)),
                                               "trouble data in " + variableDisplayName,
                                               "Trouble.png", compared_fig_list)
-            if len(troubleSingleList) < len(troubleFullList) :
-                functionsToReturn['troubleAvg']   = ((lambda: figures.create_line_plot_figure(troubleSingleList,
-                                                                                       "Avg. areas of trouble data in\n" + variableDisplayName)),
-                                                     "avg. trouble data in " + variableDisplayName,
-                                                     "TroubleAvg.png", compared_fig_list)
+        
+        return functionsToReturn
+
+class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
+    def create_plotting_functions (
+                                   self,
+                                   
+                                   # the most basic data set needed
+                                   aData, bData,
+                                   variableDisplayName,
+                                   epsilon,
+                                   goodInAMask, goodInBMask,
+                                   doPlotSettingsDict,
+                                   
+                                   # where the names of the created figures will be stored
+                                   original_fig_list, compared_fig_list,
+                                   
+                                   # parameters that are only needed for geolocated data
+                                   lonLatDataDict=None,
+                                   
+                                   # only used if we are plotting a contour
+                                   dataRanges=None, dataRangeNames=None, dataColors=None,
+                                   shouldUseSharedRangeForOriginal=True,
+                                   
+                                   # parameters that are only used if the data can be compared
+                                   # point by point
+                                   absDiffData=None, rawDiffData=None,
+                                   goodInBothMask=None,
+                                   troubleMask=None, outsideEpsilonMask=None,
+                                   
+                                   # only used for plotting quiver data
+                                   aUData=None, aVData=None,
+                                   bUData=None, bVData=None,
+                                   
+                                   # only used for line plots
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None
+                                   ) :
+        """
+        This method generates histogram and sample line plot functions for complex three dimensional data
+        and returns them in a dictionary of tupples, where each tupple is in the form:
+        
+            returnDictionary['descriptive name'] = (function, title, file_name, list_this_figure_should_go_into)
+        
+        The file name is only the name of the file, not the full path.
+        """
+        
+        # confirm that our a and b data are minimally ok
+        assert(aData is not None)
+        assert(bData is not None)
+        assert(len(aData.shape) >= 2)
+        assert(aData.shape == bData.shape)
+        
+        # confirm that our bin and tuple indexes are valid
+        assert(binIndex   is not None)
+        assert(tupleIndex is not None)
+        assert(binIndex   is not tupleIndex)
+        assert(binIndex   < len(aData.shape))
+        assert(tupleIndex < len(aData.shape))
+        
+        # reorder and reshape our data into the [bin][case][tuple] form
+        aData,              caseInfo1 = delta.reorder_for_bin_tuple(aData,              binIndex, tupleIndex)
+        bData,              caseInfo2 = delta.reorder_for_bin_tuple(bData,              binIndex, tupleIndex)
+        goodInAMask,        caseInfo3 = delta.reorder_for_bin_tuple(goodInAMask,        binIndex, tupleIndex)
+        goodInBMask,        caseInfo4 = delta.reorder_for_bin_tuple(goodInBMask,        binIndex, tupleIndex)
+        absDiffData,        caseInfo5 = delta.reorder_for_bin_tuple(absDiffData,        binIndex, tupleIndex)
+        rawDiffData,        caseInfo6 = delta.reorder_for_bin_tuple(rawDiffData,        binIndex, tupleIndex)
+        goodInBothMask,     caseInfo7 = delta.reorder_for_bin_tuple(goodInBothMask,     binIndex, tupleIndex)
+        troubleMask,        caseInfo8 = delta.reorder_for_bin_tuple(troubleMask,        binIndex, tupleIndex)
+        outsideEpsilonMask, caseInfo9 = delta.reorder_for_bin_tuple(outsideEpsilonMask, binIndex, tupleIndex)
+        
+        # assert that all our case dimensions were originally the same
+        # TODO, should I have just compared the shape of all the data before modifying it?
+        assert(caseInfo1 == caseInfo2)
+        assert(caseInfo2 == caseInfo3)
+        assert(caseInfo3 == caseInfo4)
+        assert(caseInfo4 == caseInfo5)
+        assert(caseInfo5 == caseInfo6)
+        assert(caseInfo6 == caseInfo7)
+        assert(caseInfo7 == caseInfo8)
+        assert(caseInfo8 == caseInfo9)
+        
+        # our list of functions that will later create the plots
+        functionsToReturn = { }
+        
+        # for each of the bins, make the rms histogram data
+        numHistogramSections = 7 # TODO at some point make this controlable via the doPlotSettingsDict
+        for binNumber in range(rawDiffData.shape[0]) :
+            
+            # figure out all the rms diff values for the various cases
+            rmsDiffValues = np.zeros(rawDiffData.shape[1])
+            for caseNumber in range(rawDiffData.shape[1]) :
+                rmsDiffValues[caseNumber] = delta.calculate_root_mean_square(rawDiffData[binNumber][caseNumber],
+                                                                             goodInBothMask[binNumber][caseNumber])
+            
+            # make the basic histogram for this binNumber
+            dataForHistogram = rmsDiffValues[isfinite(rmsDiffValues)] # remove any invalid data "nan" values
+            if ('do_plot_histogram' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_histogram']) :
+                def make_histogram(binNumber=binNumber, dataForHistogram=dataForHistogram):
+                    return figures.create_histogram(dataForHistogram, numHistogramSections,
+                                                                             ("RMS Diff. in " + variableDisplayName +
+                                                                              "\nfor " + binName + " # " + str(binNumber + 1)),
+                                                                             ('RMS Difference across ' + tupleName + ' dimension'),
+                                                                             ('Number of Cases with a Given RMS Diff.'),
+                                                                             True)
+                functionsToReturn[str(binNumber + 1) + 'histogram'] = (make_histogram,
+                                                  "histogram of rms differences in " + variableDisplayName,
+                                                  str(binNumber + 1) + "Hist.png", compared_fig_list)
+            
+            # we will need to be able to mask out the non-finite data
+            tempFiniteMap = np.isfinite(rmsDiffValues)
+            
+            # figure out the min/max rms diff values
+            minRMSDiff = min(rmsDiffValues[tempFiniteMap])
+            maxRMSDiff = max(rmsDiffValues[tempFiniteMap])
+            
+            # sort the cases by their rms diff values
+            counts = np.zeros(numHistogramSections)
+            histogramSections = { }
+            histogramSectionLimits = np.linspace(minRMSDiff, maxRMSDiff, numHistogramSections + 1)
+            histogramSectionLimits[0] = histogramSectionLimits[0] - 0.00000001
+            print ('*** section limits *** : ' + str(histogramSectionLimits))
+            for caseNumber in range(rmsDiffValues.size) :
+                
+                # check each of the sections to see which one it falls in
+                for limitIndex in range(histogramSectionLimits.size - 1) :
+                    
+                    # if it falls in this section, add it's case number index to the list for this section
+                    if ( (rmsDiffValues[caseNumber] > histogramSectionLimits[limitIndex]) and
+                         (rmsDiffValues[caseNumber] <= histogramSectionLimits[limitIndex + 1]) ) :
+                        
+                        if limitIndex not in histogramSections :
+                            histogramSections[limitIndex] = [ ]
+                        
+                        histogramSections[limitIndex].append(caseNumber)
+            
+            # select example cases for the histogram
+            random.seed('test') # TODO, seed with something else?
+            for section in sorted(histogramSections.keys()) :
+                listOfCases = histogramSections[section]
+                caseNumber  = listOfCases[random.randint(0, len(listOfCases) - 1)]
+                
+                # TODO, make lineplot functions for the example cases
+                dataList = [(aData[binNumber][caseNumber], ~goodInAMask[binNumber][caseNumber], 'r', 'A case', None),
+                            (bData[binNumber][caseNumber], ~goodInBMask[binNumber][caseNumber], 'b', 'B case', None)]
+                def make_lineplot(data=dataList, binNumber=binNumber, caseNumber=caseNumber):
+                    return figures.create_line_plot_figure(data,
+                                                           variableDisplayName + " in both files" + "\n" + "for "
+                                                           + binName + " # " + str(binNumber + 1) + " and case # "
+                                                           + str(caseNumber))
+                functionsToReturn[str(binNumber + 1) + 'sample' + str(section + 1) + '.AB.png'] = (make_lineplot,
+                                                                                           variableDisplayName + " sample in both files",
+                                                                                           str(binNumber + 1) + 'sample' + str(section + 1) + '.AB.png',
+                                                                                           compared_fig_list)
         
         return functionsToReturn
 
@@ -855,7 +892,8 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    bUData=None, bVData=None,
                                    
                                    # only used for line plots
-                                   binIndex=None, tupleIndex=None
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None
                                    ) :
         """
         This method generates imshow plotting functions for two dimensional data
