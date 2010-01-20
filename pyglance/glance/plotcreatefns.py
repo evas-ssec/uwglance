@@ -789,6 +789,9 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         numHistogramSections = 7 # TODO at some point make this controlable via the doPlotSettingsDict
         for binNumber in range(rawDiffData.shape[0]) :
             
+            new_list = [ ]
+            compared_fig_list.append(new_list)
+            
             # figure out all the rms diff values for the various cases
             rmsDiffValues = np.zeros(rawDiffData.shape[1])
             for caseNumber in range(rawDiffData.shape[1]) :
@@ -807,7 +810,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                                                              True)
                 functionsToReturn[str(binNumber + 1) + 'histogram'] = (make_histogram,
                                                   "histogram of rms differences in " + variableDisplayName,
-                                                  str(binNumber + 1) + "Hist.png", compared_fig_list)
+                                                  str(binNumber + 1) + "Hist.png", new_list)
             
             # we will need to be able to mask out the non-finite data
             tempFiniteMap = np.isfinite(rmsDiffValues)
@@ -821,7 +824,6 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
             histogramSections = { }
             histogramSectionLimits = np.linspace(minRMSDiff, maxRMSDiff, numHistogramSections + 1)
             histogramSectionLimits[0] = histogramSectionLimits[0] - 0.00000001
-            print ('*** section limits *** : ' + str(histogramSectionLimits))
             for caseNumber in range(rmsDiffValues.size) :
                 
                 # check each of the sections to see which one it falls in
@@ -842,18 +844,22 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                 listOfCases = histogramSections[section]
                 caseNumber  = listOfCases[random.randint(0, len(listOfCases) - 1)]
                 
-                # TODO, make lineplot functions for the example cases
+                # make lineplot functions for the example cases
+                caseIndexes = delta.determine_case_indecies(caseNumber, caseInfo1)
+                caseNumText = ''
+                for caseIndex in caseIndexes :
+                    caseNumText = caseNumText + str(caseIndex)
                 dataList = [(aData[binNumber][caseNumber], ~goodInAMask[binNumber][caseNumber], 'r', 'A case', None),
                             (bData[binNumber][caseNumber], ~goodInBMask[binNumber][caseNumber], 'b', 'B case', None)]
-                def make_lineplot(data=dataList, binNumber=binNumber, caseNumber=caseNumber):
+                def make_lineplot(data=dataList, binNumber=binNumber, caseNumberText=caseNumText):
                     return figures.create_line_plot_figure(data,
                                                            variableDisplayName + " in both files" + "\n" + "for "
                                                            + binName + " # " + str(binNumber + 1) + " and case # "
-                                                           + str(caseNumber))
+                                                           + caseNumberText)
                 functionsToReturn[str(binNumber + 1) + 'sample' + str(section + 1) + '.AB.png'] = (make_lineplot,
                                                                                            variableDisplayName + " sample in both files",
                                                                                            str(binNumber + 1) + 'sample' + str(section + 1) + '.AB.png',
-                                                                                           compared_fig_list)
+                                                                                           new_list)
         
         return functionsToReturn
 

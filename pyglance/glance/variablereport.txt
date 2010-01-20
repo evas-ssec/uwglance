@@ -195,8 +195,30 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     
     % if (len(imageNames['compared']) > 0) and (not hideComparisonImages) :
         <p>
+            <% inSubSet = False %>
+            
             % for image in imageNames['compared'] :
-                <a href="./${image}"><img src="./small.${image}"></a>
+                
+                ## if we have a plain image, display it
+                % if (type(image) is str) :
+                    % if inSubSet :
+                        <hr>
+                        <% inSubSet = False %>
+                    % endif
+                    
+                    <a href="./${image}"><img src="./small.${image}"></a>
+                
+                ## if we have a subset of images, separate it from the rest
+                % elif (type(image) is list) :
+                    <% inSubSet = True %>
+                    <hr>
+                    <blockquote>
+                        % for subImage in image :
+                            <a href="./${subImage}"><img src="./small.${subImage}"></a>
+                        % endfor
+                    </blockquote>
+                % endif
+                
             % endfor
         </p>
     % endif

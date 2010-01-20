@@ -242,7 +242,6 @@ def reorder_for_bin_tuple (data, binIndexNumber, tupleIndexNumber) :
     
     # combine the internal dimensions, to figure out what shape things
     # will be with the flattened cases
-    numDimensionsToFlatten = len(caseOriginalShape)
     sizeAfterFlattened = np.multiply.accumulate(caseOriginalShape)[-1]
     newShape = (newData.shape[0], sizeAfterFlattened, newData.shape[-1])
     
@@ -255,7 +254,28 @@ def reorder_for_bin_tuple (data, binIndexNumber, tupleIndexNumber) :
     #print ('new data shape:      ' + str(newData.shape))
     
     return newData, caseOriginalShape
+
+def determine_case_indecies (flatIndex, originalCaseShape) :
+    """
+    determine the original indexes of the case
+    given the flat index number and the original shape
     
+    Note: this method is very memory inefficent
+    TODO, find a better way of doing this? does numpy guarantee reshaping strategy?
+    """
+    
+    # create a long flat array with the contents being the index number
+    numCases = np.multiply.accumulate(originalCaseShape)[-1]
+    temp = np.array(range(numCases))
+    
+    # reshape the flat array back to the original shape
+    # then figure out where our index went
+    temp = temp.reshape(originalCaseShape)
+    positionOfIndex = np.where(temp == flatIndex)
+    
+    del temp
+    
+    return positionOfIndex
 
 def calculate_root_mean_square (data, goodMask=None) :
     """
