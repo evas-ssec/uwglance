@@ -1165,9 +1165,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 # multidimentional information requiring careful sampling
                 if ('binIndex' in varRunInfo) and ('tupleIndex' in varRunInfo) :
                     plotFunctionGenerationObjects.append(plotcreate.BinTupleAnalysisFunctionFactory())
-                
+                    
                 else :
-                
+                    
                     # if the data is the same size, we can always make our basic statistical comparison plots
                     if (aData.shape == bData.shape) :
                         plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
@@ -1631,6 +1631,11 @@ python -m glance
         tempOptions['lonlatepsilon'] = options.lonlatepsilon
         tempOptions['epsilon']       = options.epsilon
         tempOptions['missing']       = options.missing
+        
+        # TODO, remove these eventually
+        tempOptions['htmlOnly']      = False
+        tempOptions['imagesOnly']    = False
+        tempOptions['doFork']        = False
         
         tempOptions['doColocate']    = True
         

@@ -133,6 +133,14 @@ def rotate_indexes_right (data) :
     note: at the moment this filter only works with 3 dimentional data sets
     """
     
+    # figure out the new order of the indexes
+    numDims = len(data.shape)
+    newIndexOrder = [numDims - 1] + range(numDims - 1)
+    
+    # reorder the data
+    data_new = data.transpose(newIndexOrder)
+    
+    """
     # figure out the shapes we have/need
     old_shape = data.shape
     #print ('old shape: ' + str(old_shape))
@@ -148,6 +156,7 @@ def rotate_indexes_right (data) :
         for index2 in range(old_shape[1]) :
             for index3 in range(old_shape[2]) :
                 data_new[index3, index1, index2] = data[index1, index2, index3]
+                """
     
     return data_new
 
@@ -186,42 +195,6 @@ def filter_based_on_additional_data_set_min_max_bounds(data, filterData, missing
     newData[~goodAreas] = missingValue
     
     return newData
-
-def collapse_to_index(data, index, collapsing_function=np.mean,
-                      missing_value=None, ignore_below_exclusive=None, ignore_above_exclusive=None) :
-    """
-    collapse the data given along the selected index, using the collapsing_function
-    """
-    
-    # figure the order to put the index we want first
-    new_index_order = range(len(data.shape))
-    del(new_index_order[index])
-    new_index_order = [index] + new_index_order
-    
-    # copy our data and put the index we won't collapse first
-    new_data = data.copy()
-    new_data = new_data.transpose(new_index_order)
-    
-    # find any bad points that we don't want to collapse
-    bad_mask = ~np.isfinite(new_data)
-    if missing_value is not None :
-        bad_mask[new_data == missing_value] = True
-    if ignore_above_exclusive is not None :
-        bad_mask[new_data > ignore_above_exclusive] = True
-    if ignore_below_exclusive is not None :
-        bad_mask[new_data < ignore_below_exclusive] = True
-    
-    # collapse any non bad data
-    final_num_pts = new_data.shape[0]
-    collapsed_data = np.zeros((final_num_pts), dtype=new_data.dtype)
-    for index_1_val in range(final_num_pts) :
-        values_to_use = new_data[index_1_val][~(bad_mask[index_1_val])]
-        if len(values_to_use) > 0 :
-            collapsed_data[index_1_val] = collapsing_function(values_to_use)
-        else:
-            collapsed_data[index_1_val] = missing_value
-    
-    return collapsed_data
 
 def organize_ipopp_data_into_image(original_ipopp_data, wave_number=None, missing_value=None,
                                    propagate_partial_missing_values=False) :

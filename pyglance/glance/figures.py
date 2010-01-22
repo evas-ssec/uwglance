@@ -46,7 +46,7 @@ greenColorMapData = {
 }
 greenColorMap = colors.LinearSegmentedColormap('greenColorMap', greenColorMapData, 256)
 
-# todo, the use off the offset here is covering a problem with
+# todo, the use of the offset here is covering a problem with
 # contourf hiding data exactly at the end of the range and should
 # be removed if a better solution can be found
 def _make_range(data_a, invalid_a_mask, num_intervals, offset_to_range=0.0, data_b=None, invalid_b_mask=None) :
@@ -65,7 +65,6 @@ def _make_range(data_a, invalid_a_mask, num_intervals, offset_to_range=0.0, data
     if (data_b is not None) :
         minVal = min(delta.min_with_mask(data_b, invalid_b_mask), minVal)
         maxVal = max(delta.max_with_mask(data_b, invalid_b_mask), maxVal)
-    
     
     minVal = minVal - offset_to_range
     maxVal = maxVal + offset_to_range

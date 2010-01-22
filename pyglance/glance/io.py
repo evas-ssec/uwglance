@@ -227,6 +227,11 @@ class nc(CDF):
             LOG.warn("New variable name requested (" + variablename + ") is already present in file. " +
                      "Skipping generation of new variable.")
             return None
+        # if we have no data we won't be able to determine the data type to create the variable
+        if (data is None) or (len(data) <= 0) :
+            LOG.warn("Data type for new variable (" + variablename + ") could not be determined. " +
+                     "Skipping generation of new variable.")
+            return None
         
         dataType = None
         if np.issubdtype(data.dtype, int) :
@@ -249,6 +254,9 @@ class nc(CDF):
             dimensionNum = dimensionNum + 1
         
         # create the new variable
+        #print('variable name: ' + variablename)
+        #print('data type:     ' + str(dataType))
+        #print('dimensions:    ' + str(dimensions))
         newVariable = self.def_var(variablename, dataType, tuple(dimensions))
         
         # if a missing value was given, use that
