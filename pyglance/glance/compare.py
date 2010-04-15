@@ -67,6 +67,16 @@ def _cvt_names(namelist, epsilon, missing):
             else: m = float(m)
             yield n, e, m
 
+def _clean_path(string_path) :
+    """
+    Return a clean form of the path without any '.', '..', or '~'
+    """
+    if string_path is not None :
+        clean_path = os.path.abspath(os.path.expanduser(string_path))
+    else :
+        clean_path = string_path
+    return clean_path
+
 def _parse_varnames(names, terms, epsilon=0.0, missing=None):
     """filter variable names and substitute default epsilon and missing settings if none provided
     returns name,epsilon,missing triples
@@ -289,6 +299,7 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     # check to see if the user wants to use a config file and if the path exists
     requestedConfigFile = optionsSet['configFile']
     usedConfigFile = False
+    
     if (not (requestedConfigFile is None)) and os.path.exists(requestedConfigFile):
         
         LOG.info ("Using Config File Settings")
@@ -391,6 +402,11 @@ def _get_and_analyze_lon_lat (fileObject,
     if not (longitudeDataFilterFn is None) :
         longitudeData = longitudeDataFilterFn(longitudeData)
         LOG.debug ('longitude size after application of filter: ' + str(longitudeData.shape))
+    
+    # we are going to have issues with our comparision if they aren't the same shape
+    LOG.debug('latitude  shape: ' + str(latitudeData.shape))
+    LOG.debug('longitude shape: ' + str(longitudeData.shape))
+    assert (latitudeData.shape == longitudeData.shape)
     
     # build a mask of our spacially invalid data TODO, load actual valid range attributes?
     invalidLatitude = (latitudeData < -90) | (latitudeData > 90) | ~isfinite(latitudeData)
@@ -1505,7 +1521,7 @@ python -m glance
          python -m glance.compare stats --epsilon=0.00001 A.hdf B.hdf baseline_cmask_seviri_cloud_mask:0.002:
          python -m glance.compare -w stats --epsilon=0.00001 A.hdf A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
         """ 
-        afn,bfn = args[:2]
+        afn, bfn = args[:2]
         do_doc = (options.verbose or options.debug)
         
         tempOptions = { }
@@ -1513,7 +1529,8 @@ python -m glance
         tempOptions['missing']       = options.missing
         # add more if needed for stats
         
-        _ = stats_library_call(afn, bfn, var_list=args[2:],
+        _ = stats_library_call(_clean_path(afn), _clean_path(bfn),
+                               var_list=args[2:],
                                options_set=tempOptions,
                                do_document=do_doc)
 
@@ -1575,8 +1592,8 @@ python -m glance
         """
         
         tempOptions = { }
-        tempOptions['outputpath']    = options.outputpath
-        tempOptions['configFile']    = options.configFile
+        tempOptions['outputpath']    = _clean_path(options.outputpath)
+        tempOptions['configFile']    = _clean_path(options.configFile)
         tempOptions['imagesOnly']    = options.imagesOnly
         tempOptions['htmlOnly']      = options.htmlOnly
         tempOptions['doFork']        = options.doFork
@@ -1587,7 +1604,10 @@ python -m glance
         tempOptions['epsilon']       = options.epsilon
         tempOptions['missing']       = options.missing
         
-        reportGen_library_call(args[0], args[1], args[2:], tempOptions)
+        a_path = _clean_path(args[0])
+        b_path = _clean_path(args[1])
+        
+        reportGen_library_call(a_path, b_path, args[2:], tempOptions)
     
     def colocateData(*args) :
         """colocate data in two files
@@ -1623,8 +1643,8 @@ python -m glance
         """
         
         tempOptions = { }
-        tempOptions['outputpath']    = options.outputpath
-        tempOptions['configFile']    = options.configFile
+        tempOptions['outputpath']    = _clean_path(options.outputpath)
+        tempOptions['configFile']    = _clean_path(options.configFile)
         tempOptions['noLonLatVars']  = options.noLonLatVars
         tempOptions['latitudeVar']   = options.latitudeVar
         tempOptions['longitudeVar']  = options.longitudeVar
@@ -1639,7 +1659,10 @@ python -m glance
         
         tempOptions['doColocate']    = True
         
-        colocateToFile_library_call(args[0], args[1], args[2:], tempOptions)
+        a_path = _clean_path(args[0])
+        b_path = _clean_path(args[1])
+        
+        colocateToFile_library_call(a_path, b_path, args[2:], tempOptions)
     
     """
     # This was used to modify files for testing and should not be uncommented
