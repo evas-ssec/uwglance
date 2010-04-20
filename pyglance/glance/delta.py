@@ -16,6 +16,14 @@ compute_r = pearsonr #spearmanr
 
 LOG = logging.getLogger(__name__)
 
+# Upcasts to be used in difference computation to avoid overflow. Currently only unsigned
+# ints are upcast.
+# FUTURE: handle uint64s as well (there is no int128, so might have to detect overflow)
+datatype_upcasts = {
+    uint8: int16,
+    uint16: int32,
+    uint32: int64
+    }
 
 def _missing(x,missing_value=None):
     if missing_value is not None:
@@ -68,6 +76,11 @@ def diff(aData, bData, epsilon=0.,
     sharedType = aData.dtype
     if (aData.dtype is not bData.dtype) :
         sharedType = common_type(aData, bData)
+
+    # upcast if needed to avoid overflow in difference operation
+    if sharedType in datatype_upcasts:
+        sharedType = datatype_upcasts[sharedType]
+
     LOG.debug('Shared data type that will be used for diff comparison: ' + str(sharedType))
     
     # construct our diff'ed array
@@ -78,8 +91,10 @@ def diff(aData, bData, epsilon=0.,
     LOG.debug('current fill data value: ' + str(fill_data_value))
     
     raw_diff[~valid_in_both] = fill_data_value # throw away invalid data
-    raw_diff[valid_in_both] = bData[valid_in_both] - aData[valid_in_both]
-    
+
+    # compute difference, using shared type in computation
+    raw_diff[valid_in_both] = bData[valid_in_both].astype(sharedType) - aData[valid_in_both].astype(sharedType)
+        
     # the valid data which is too different between the two sets according to the given epsilon
     outside_epsilon_mask = (abs(raw_diff) > epsilon) & valid_in_both
     # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
