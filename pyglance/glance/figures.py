@@ -13,21 +13,18 @@ matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
 
 from pylab import *
 
-from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
-from matplotlib import cm
 import matplotlib.colors as colors
 from matplotlib.ticker import FormatStrFormatter
 
-from PIL import Image
-
-import os, sys, logging
+import logging
 import numpy as np
 from numpy import ma 
 
 import glance.graphics as maps
 import glance.delta    as delta
 import glance.report   as report
+import glance.stats    as statistics
 
 LOG = logging.getLogger(__name__)
 
@@ -268,10 +265,10 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
     if displayStats :
         # info on the basic stats
         tempMask = ones(data.shape,dtype=bool)
-        tempStats = delta.stats(data, tempMask, None)
+        tempStats = statistics.stats(data, tempMask, None)
         medianVal = tempStats['median_diff']
-        meanVal = tempStats['mean_diff']
-        stdVal = tempStats['std_diff']
+        meanVal   = tempStats['mean_diff']
+        stdVal    = tempStats['std_diff']
         numPts = data.size
         
         # info on the display of our statistics

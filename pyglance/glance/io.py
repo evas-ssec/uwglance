@@ -7,7 +7,7 @@ Created by rayg Apr 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-import os, sys, logging
+import os, logging
 
 from pyhdf.SD import SD,SDC, SDS, HDF4Error
 try:

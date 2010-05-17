@@ -11,19 +11,18 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys, logging, re, subprocess, datetime
 import imp as imp
-from pprint import pprint, pformat
 from numpy import *
 import pkg_resources
 from pycdf import CDFError
 from subprocess import check_call as sh
-
-import glance.io as io
-import glance.delta as delta
-import glance.plot as plot
-import glance.plotcreatefns as plotcreate
-import glance.report as report
-
 from urllib import quote
+
+import glance.io     as io
+import glance.delta  as delta
+import glance.plot   as plot
+import glance.report as report
+import glance.stats  as statistics
+import glance.plotcreatefns as plotcreate
 
 LOG = logging.getLogger(__name__)
 
@@ -1146,11 +1145,11 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             if not do_not_test_with_lon_lat :
                 mask_a_to_use = lon_lat_data['a']['inv_mask']
                 mask_b_to_use = lon_lat_data['b']['inv_mask']
-            variable_stats = delta.summarize(aData, bData,
-                                             varRunInfo['epsilon'],
-                                             (varRunInfo['missing_value'],
-                                             varRunInfo['missing_value_alt_in_b']),
-                                             mask_a_to_use, mask_b_to_use)
+            variable_stats = statistics.summarize(aData, bData,
+                                                  varRunInfo['epsilon'],
+                                                  (varRunInfo['missing_value'],
+                                                   varRunInfo['missing_value_alt_in_b']),
+                                                  mask_a_to_use, mask_b_to_use)
             
             # add a little additional info to our variable run info before we squirrel it away
             varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
@@ -1299,7 +1298,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         
         # make the glossary
         print ('generating glossary')
-        report.generate_and_save_doc_page(delta.STATISTICS_DOC, pathsTemp['out'])
+        report.generate_and_save_doc_page(statistics.STATISTICS_DOC, pathsTemp['out'])
     
     return
 
@@ -1348,17 +1347,17 @@ def stats_library_call(afn, bfn, var_list=[ ],
         print >> output_channel, '-'*32
         print >> output_channel, name
         print >> output_channel, '' 
-        lal = list(delta.summarize(aval,bval,epsilon,(amiss,bmiss)).items()) 
+        lal = list(statistics.summarize(aval,bval,epsilon,(amiss,bmiss)).items()) 
         lal.sort()
         for dictionary_title, dict_data in lal:
             print >> output_channel, '%s' %  dictionary_title
             dict_data
             for each_stat in sorted(list(dict_data)):
                 print >> output_channel, '  %s: %s' % (each_stat, dict_data[each_stat])
-                if doc_each: print >> output_channel, ('    ' + delta.STATISTICS_DOC[each_stat])
+                if doc_each: print >> output_channel, ('    ' + statistics.STATISTICS_DOC[each_stat])
             print >> output_channel, '' 
     if doc_atend:
-        print >> output_channel, ('\n\n' + delta.STATISTICS_DOC_STR)
+        print >> output_channel, ('\n\n' + statistics.STATISTICS_DOC_STR)
 
 def main():
     import optparse
@@ -1466,46 +1465,6 @@ python -m glance
         bspc = get(b)
         plot.compare_spectra(bspc,aspc)
         plot.show()
-    
-    def noisecheck(*args):
-        """gives statistics for dataset comparisons against truth with and without noise
-        usage: noisecheck truth-file noise-file actual-file variable1{:epsilon{:missing}} {variable2...}
-        glance noisecheck /Volumes/snaapy/data/justins/abi_graffir/coreg/pure/l2_data/geocatL2.GOES-R.2005155.220000.hdf.gz /Volumes/snaapy/data/justins/abi_graffir/noise/noise1x/l2_data/geocatL2.GOES-R.2005155.220000.hdf 
-        """ # TODO ******* standardize with method?
-        afn,noizfn,bfn = args[:3]
-        LOG.info("opening truth file %s" % afn)
-        a = io.open(afn)
-        LOG.info("opening actual file %s" % noizfn)
-        noiz = io.open(noizfn)
-        LOG.info("opening noise file %s" % bfn)
-        b = io.open(bfn)
-        
-        anames = set(a())
-        bnames = set(b()) 
-        cnames = anames.intersection(bnames) # common names
-        pats = args[3:] or ['.*']
-        names = _parse_varnames( cnames, pats, options.epsilon, options.missing )
-        for name,epsilon,missing in names:
-            aData = a[name]
-            bData = b[name]
-            nData = noiz[name]
-            if missing is None:
-                amiss = a.missing_value(name)
-                bmiss = b.missing_value(name)
-            else:
-                amiss,bmiss = missing,missing
-            x = aData
-            y = bData
-            z = nData
-            def scat(x,xn,y):
-                from pylab import plot,show,scatter
-                scatter(x,y)
-                show()
-            nfo = delta.rms_corr_withnoise(x,y,z,epsilon,(amiss,bmiss),plot=scat)
-            print '-'*32
-            print name
-            for kv in sorted(nfo.items()):
-                print '  %s: %s' % kv
     
     def stats(*args):
         """create statistics summary of variables

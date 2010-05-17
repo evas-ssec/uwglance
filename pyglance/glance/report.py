@@ -7,9 +7,9 @@ Created by rayg Apr 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-import os, sys, logging
+import sys, logging
 
-from pkg_resources import resource_string, resource_stream, resource_filename
+from pkg_resources import resource_string, resource_filename #, resource_stream
 from mako.template import Template
 import types as types
 import numpy as np

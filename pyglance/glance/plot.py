@@ -13,21 +13,15 @@ matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
 
 from pylab import *
 
-from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
-from matplotlib import cm
-import matplotlib.colors as colors
-from matplotlib.ticker import FormatStrFormatter
 
 from PIL import Image
 
 import os, sys, logging
 import numpy as np
-from numpy import ma 
 
 import glance.graphics as maps
 import glance.delta    as delta
-import glance.report   as report
 import glance.figures  as figures
 import glance.plotcreatefns as plotfns
 

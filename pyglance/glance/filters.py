@@ -7,7 +7,7 @@ Created by Eva Schiffer August 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-import numpy      as np
+import numpy as np
 
 def trim_off_of_top (data, num_elements_to_trim) :
     """

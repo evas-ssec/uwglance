@@ -6,7 +6,6 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 </%doc>
 
 <%!
-    import types as types
     import glance.report as report
 %>
 
