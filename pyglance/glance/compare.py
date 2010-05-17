@@ -22,6 +22,7 @@ import glance.delta  as delta
 import glance.plot   as plot
 import glance.report as report
 import glance.stats  as statistics
+import glance.collocation as collocation
 import glance.plotcreatefns as plotcreate
 
 LOG = logging.getLogger(__name__)
@@ -899,18 +900,18 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
     # handle the longitude and latitude colocation
     LOG.info("Colocating raw longitude and latitude information")
     aColocationInfomation, bColocationInformation, totalNumberOfMatchedPoints = \
-                                delta.create_colocation_mapping_within_epsilon((lon_lat_data['a']['lon'], lon_lat_data['a']['lat']),
-                                                                               (lon_lat_data['b']['lon'], lon_lat_data['b']['lat']),
-                                                                               runInfo['lon_lat_epsilon'],
-                                                                               invalidAMask=lon_lat_data['a']['inv_mask'],
-                                                                               invalidBMask=lon_lat_data['b']['inv_mask'])
+                                collocation.create_colocation_mapping_within_epsilon((lon_lat_data['a']['lon'], lon_lat_data['a']['lat']),
+                                                                                     (lon_lat_data['b']['lon'], lon_lat_data['b']['lat']),
+                                                                                     runInfo['lon_lat_epsilon'],
+                                                                                     invalidAMask=lon_lat_data['a']['inv_mask'],
+                                                                                     invalidBMask=lon_lat_data['b']['inv_mask'])
     (colocatedLongitude, colocatedLatitude, (numMultipleMatchesInA, numMultipleMatchesInB)), \
     (unmatchedALongitude, unmatchedALatitude), \
     (unmatchedBLongitude, unmatchedBLatitude) = \
-                delta.create_colocated_lonlat_with_lon_lat_colocation(aColocationInfomation, bColocationInformation,
-                                                                      totalNumberOfMatchedPoints,
-                                                                      lon_lat_data['a']['lon'], lon_lat_data['a']['lat'],
-                                                                      lon_lat_data['b']['lon'], lon_lat_data['b']['lat'])
+                collocation.create_colocated_lonlat_with_lon_lat_colocation(aColocationInfomation, bColocationInformation,
+                                                                            totalNumberOfMatchedPoints,
+                                                                            lon_lat_data['a']['lon'], lon_lat_data['a']['lat'],
+                                                                            lon_lat_data['b']['lon'], lon_lat_data['b']['lat'])
     
     # TODO, based on unmatched, issue warnings and record info in the file?
     LOG.debug("colocated shape of the longitude: " + str(colocatedLongitude.shape))
@@ -956,14 +957,14 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
             (aData, bData, (numberOfMultipleMatchesInA, numberOfMultipleMatchesInB)), \
             (aUnmatchedData,             unmatchedALongitude, unmatchedALatitude), \
             (bUnmatchedData,             unmatchedBLongitude, unmatchedBLatitude) = \
-                    delta.create_colocated_data_with_lon_lat_colocation(aColocationInfomation, bColocationInformation,
-                                                                        colocatedLongitude, colocatedLatitude,
-                                                                        aData, bData,
-                                                                        missingData=varRunInfo['missing_value'],
-                                                                        altMissingDataInB=varRunInfo['missing_value_alt_in_b'],
-                                                                        # TODO, should missing data be considered?
-                                                                        invalidAMask=invalidA,
-                                                                        invalidBMask=invalidB)
+                    collocation.create_colocated_data_with_lon_lat_colocation(aColocationInfomation, bColocationInformation,
+                                                                              colocatedLongitude, colocatedLatitude,
+                                                                              aData, bData,
+                                                                              missingData=varRunInfo['missing_value'],
+                                                                              altMissingDataInB=varRunInfo['missing_value_alt_in_b'],
+                                                                              # TODO, should missing data be considered?
+                                                                              invalidAMask=invalidA,
+                                                                              invalidBMask=invalidB)
             
             LOG.debug(str(numberOfMultipleMatchesInA) + " data pairs contain A data points used for multiple matches.")
             LOG.debug(str(numberOfMultipleMatchesInB) + " data pairs contain B data points used for multiple matches.")
