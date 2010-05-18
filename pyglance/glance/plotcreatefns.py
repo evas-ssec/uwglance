@@ -52,16 +52,15 @@ def _abstract( ) :
     raise NotImplementedError('Method must be implemented in subclass.')
 
 # figure out the bounding axes for the display given a set of
-# longitude and latitude and possible a mask of invalid values
-# that we should ignore in them
-def get_visible_axes(longitudeData, latitudeData, toIgnoreMask) :
+# longitude and latitude and possible a mask of good values
+def get_visible_axes(longitudeData, latitudeData, goodMask) :
     
     # calculate the bounding range for the display
     # this is in the form [longitude min, longitude max, latitude min, latitude max]
-    visibleAxes = [delta.min_with_mask(longitudeData, toIgnoreMask),
-                   delta.max_with_mask(longitudeData, toIgnoreMask),
-                   delta.min_with_mask(latitudeData,  toIgnoreMask),
-                   delta.max_with_mask(latitudeData,  toIgnoreMask)]
+    visibleAxes = [delta.min_with_mask(longitudeData, goodMask),
+                   delta.max_with_mask(longitudeData, goodMask),
+                   delta.min_with_mask(latitudeData,  goodMask),
+                   delta.max_with_mask(latitudeData,  goodMask)]
     
     return visibleAxes
 
@@ -110,8 +109,8 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, shouldUseSh
         nameMessage = " (" + variableDisplayName + ")"
     
     # figure out the bounding axis
-    aAxis = get_visible_axes(lonLatDataDict['a']['lon'], lonLatDataDict['a']['lat'], ~goodInAMask)
-    bAxis = get_visible_axes(lonLatDataDict['b']['lon'], lonLatDataDict['b']['lat'], ~goodInBMask)
+    aAxis = get_visible_axes(lonLatDataDict['a']['lon'], lonLatDataDict['a']['lat'], goodInAMask)
+    bAxis = get_visible_axes(lonLatDataDict['b']['lon'], lonLatDataDict['b']['lat'], goodInBMask)
     fullAxis = [min(aAxis[0], bAxis[0]), max(aAxis[1], bAxis[1]),
                 min(aAxis[2], bAxis[2]), max(aAxis[3], bAxis[3])]
     

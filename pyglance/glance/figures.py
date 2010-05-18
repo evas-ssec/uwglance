@@ -55,13 +55,13 @@ def _make_range(data_a, invalid_a_mask, num_intervals, offset_to_range=0.0, data
     if the b data is passed, a total range that encompasses both sets of
     data will be used
     """
-    minVal = delta.min_with_mask(data_a, invalid_a_mask)
-    maxVal = delta.max_with_mask(data_a, invalid_a_mask)
+    minVal = delta.min_with_mask(data_a, ~invalid_a_mask)
+    maxVal = delta.max_with_mask(data_a, ~invalid_a_mask)
     
     # if we have a second set of data, include it in the min/max calculations
     if (data_b is not None) :
-        minVal = min(delta.min_with_mask(data_b, invalid_b_mask), minVal)
-        maxVal = max(delta.max_with_mask(data_b, invalid_b_mask), maxVal)
+        minVal = min(delta.min_with_mask(data_b, ~invalid_b_mask), minVal)
+        maxVal = max(delta.max_with_mask(data_b, ~invalid_b_mask), maxVal)
     
     minVal = minVal - offset_to_range
     maxVal = maxVal + offset_to_range

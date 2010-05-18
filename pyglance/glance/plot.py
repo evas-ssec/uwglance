@@ -113,7 +113,7 @@ def plot_and_save_spacial_trouble(longitude, latitude,
     """
     
     # get the bounding axis and make a basemap
-    boundingAxes = plotfns.get_visible_axes(longitude, latitude, spaciallyInvalidMask)
+    boundingAxes = plotfns.get_visible_axes(longitude, latitude, ~spaciallyInvalidMask)
     LOG.debug("Visible axes for lon/lat trouble figure  are: " + str(boundingAxes))
     baseMapInstance, boundingAxes = maps.create_basemap(longitude, latitude, boundingAxes, plotfns.select_projection(boundingAxes))
     

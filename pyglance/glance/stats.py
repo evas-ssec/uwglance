@@ -97,7 +97,7 @@ def _get_numerical_data_stats(a, b, diff_data,  data_is_finite_mask,
     # calculate our various statistics
     num_finite_values_too_different = np.sum(outside_epsilon_mask)
     num_perfect = _get_num_perfect(a, b, ~data_is_finite_mask)
-    r_corr = delta.corr(a, b, data_is_finite_mask)
+    r_corr = delta.compute_correlation(a, b, data_is_finite_mask)
     num_trouble = np.sum(trouble_mask)
     
     # we actually want the total number of _finite_ values rather than all the data
@@ -143,10 +143,10 @@ def _get_general_data_stats(a, b,
     general_stats = {'a_missing_value': a_missing_value,
                      'b_missing_value': b_missing_value,
                      'epsilon': epsilon,
-                     'max_a': delta.max_with_mask(a, bad_in_a),
-                     'max_b': delta.max_with_mask(b, bad_in_b),
-                     'min_a': delta.min_with_mask(a, bad_in_a),
-                     'min_b': delta.min_with_mask(b, bad_in_b),
+                     'max_a': delta.max_with_mask(a, ~bad_in_a),
+                     'max_b': delta.max_with_mask(b, ~bad_in_b),
+                     'min_a': delta.min_with_mask(a, ~bad_in_a),
+                     'min_b': delta.min_with_mask(b, ~bad_in_b),
                      'num_data_points': total_num_values,
                      'shape': a.shape,
                      'spatially_invalid_pts_ignored_in_a': num_ignored_in_a,
