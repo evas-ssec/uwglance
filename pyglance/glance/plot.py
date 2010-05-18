@@ -23,6 +23,7 @@ import numpy as np
 import glance.graphics as maps
 import glance.delta    as delta
 import glance.figures  as figures
+import glance.data     as dataobj
 import glance.plotcreatefns as plotfns
 
 LOG = logging.getLogger(__name__)
@@ -232,10 +233,28 @@ def plot_and_save_comparison_figures (aData, bData,
         spaciallyInvalidMaskB = lonLatDataDict['b']['inv_mask']
     
     # compare the two data sets to get our difference data and trouble info
+    aDataObject = dataobj.DataObject(aData, fillValue=missingValue,       ignoreMask=spaciallyInvalidMaskA)
+    bDataObject = dataobj.DataObject(bData, fillValue=missingValueAltInB, ignoreMask=spaciallyInvalidMaskB)
+    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon) #TODO, needs epsilon percent
+    #TODO, for the moment, unpack these values into local variables
+    rawDiffData = diffInfo.diff_data_object.data
+    goodMask    = diffInfo.diff_data_object.masks.valid_mask
+    goodInAMask = diffInfo.a_data_object.masks.valid_mask
+    goodInBMask = diffInfo.b_data_object.masks.valid_mask
+    troubleMask = diffInfo.diff_data_object.masks.trouble_mask
+    outsideEpsilonMask = diffInfo.diff_data_object.masks.outside_epsilon_mask
+    aNotFiniteMask = diffInfo.a_data_object.masks.non_finite_mask
+    bNotFiniteMask = diffInfo.b_data_object.masks.non_finite_mask
+    aMissingMask   = diffInfo.a_data_object.masks.missing_mask
+    bMissingMask   = diffInfo.b_data_object.masks.missing_mask
+    spaciallyInvalidMaskA = diffInfo.a_data_object.masks.ignore_mask
+    spaciallyInvalidMaskB = diffInfo.b_data_object.masks.ignore_mask
+    """
     rawDiffData, goodMask, (goodInAMask, goodInBMask), troubleMask, outsideEpsilonMask, \
     (aNotFiniteMask, bNotFiniteMask), (aMissingMask, bMissingMask), \
     (spaciallyInvalidMaskA, spaciallyInvalidMaskB) = delta.diff(aData, bData, epsilon, (missingValue, missingValueAltInB),
                                                                 (spaciallyInvalidMaskA, spaciallyInvalidMaskB))
+    """
     absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
     
     # from this point on, we will be forking to create child processes so we can parallelize our image and

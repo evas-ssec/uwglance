@@ -16,115 +16,11 @@ compute_r = pearsonr
 
 LOG = logging.getLogger(__name__)
 
-# Upcasts to be used in difference computation to avoid overflow. Currently only unsigned
-# ints are upcast.
-# FUTURE: handle uint64s as well (there is no int128, so might have to detect overflow)
-datatype_upcasts = {
-    uint8: int16,
-    uint16: int32,
-    uint32: int64
-    }
-
 # TODO, where is this being used?
 def _missing(x, missing_value=None):
     if missing_value is not None:
         return isnan(x) | (x==missing_value)
     return isnan(x)
-
-def diff(aData, bData, epsilon=0.,
-         (a_missing_value, b_missing_value)=(None, None),
-         (ignore_mask_a, ignore_mask_b)=(None, None)):
-    """
-    take two arrays of similar size and composition
-    if an ignoreMask is passed in values in the mask will not be analysed to
-    form the various return masks and the corresponding spots in the
-    "difference" return data array will contain fill values (selected
-    based on data type).
-    
-    return difference array filled with fill data where differences aren't valid,
-    good mask where values are finite in both a and b
-    trouble mask where missing values or nans don't match or delta > epsilon
-    (a-notfinite-mask, b-notfinite-mask)
-    (a-missing-mask, b-missing-mask)
-    """
-    shape = aData.shape
-    assert(bData.shape==shape)
-    assert(can_cast(aData.dtype, bData.dtype) or can_cast(bData.dtype, aData.dtype))
-    
-    # if the ignore masks do not exist, set them to include none of the data
-    if (ignore_mask_a is None) :
-        ignore_mask_a = zeros(shape,dtype=bool)
-    if (ignore_mask_b is None) :
-        ignore_mask_b = zeros(shape,dtype=bool)
-    
-    # deal with the basic masks
-    a_not_finite_mask, b_not_finite_mask = ~isfinite(aData) & ~ignore_mask_a, ~isfinite(bData) & ~ignore_mask_b
-    a_missing_mask, b_missing_mask = zeros(shape,dtype=bool), zeros(shape,dtype=bool)
-    # if we were given missing values, mark where they are in the data
-    if a_missing_value is not None:
-        a_missing_mask[aData == a_missing_value] = True
-        a_missing_mask[ignore_mask_a] = False # don't analyse the ignored values
-    if b_missing_value is not None:
-        b_missing_mask[bData == b_missing_value] = True
-        b_missing_mask[ignore_mask_b] = False # don't analyse the ignored values
-    
-    # build the comparison data that includes the "good" values
-    valid_in_a_mask = ~(a_not_finite_mask | a_missing_mask | ignore_mask_a)
-    valid_in_b_mask = ~(b_not_finite_mask | b_missing_mask | ignore_mask_b)
-    valid_in_both = valid_in_a_mask & valid_in_b_mask
-    
-    # figure out our shared data type
-    sharedType = aData.dtype
-    if (aData.dtype is not bData.dtype) :
-        sharedType = common_type(aData, bData)
-
-    # upcast if needed to avoid overflow in difference operation
-    if sharedType in datatype_upcasts:
-        sharedType = datatype_upcasts[sharedType]
-
-    LOG.debug('Shared data type that will be used for diff comparison: ' + str(sharedType))
-    
-    # construct our diff'ed array
-    raw_diff = zeros(shape, dtype=sharedType) #empty_like(aData)
-    
-    fill_data_value = select_fill_data(sharedType)
-    
-    LOG.debug('current fill data value: ' + str(fill_data_value))
-    
-    raw_diff[~valid_in_both] = fill_data_value # throw away invalid data
-
-    # compute difference, using shared type in computation
-    raw_diff[valid_in_both] = bData[valid_in_both].astype(sharedType) - aData[valid_in_both].astype(sharedType)
-        
-    # the valid data which is too different between the two sets according to the given epsilon
-    outside_epsilon_mask = (abs(raw_diff) > epsilon) & valid_in_both
-    # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
-    trouble_pt_mask = (a_not_finite_mask ^ b_not_finite_mask) | (a_missing_mask ^ b_missing_mask) | outside_epsilon_mask
-    
-    return raw_diff, valid_in_both, (valid_in_a_mask, valid_in_b_mask), trouble_pt_mask, outside_epsilon_mask,  \
-           (a_not_finite_mask, b_not_finite_mask), (a_missing_mask, b_missing_mask), (ignore_mask_a, ignore_mask_b)
-
-def select_fill_data(dTypeValue) :
-    """
-    select a fill data value based on the type of data that is being
-    inspected/changed
-    """
-    
-    fill_value_to_return = None
-    
-    if issubdtype(dTypeValue, np.float) or issubdtype(dTypeValue, np.complex) :
-        fill_value_to_return = nan
-    elif issubdtype(dTypeValue, np.int) :
-        fill_value_to_return = np.iinfo(dTypeValue).min
-    elif issubdtype(dTypeValue, np.bool) :
-        fill_value_to_return = True
-    elif ((dTypeValue is np.uint8)  or
-          (dTypeValue is np.uint16) or
-          (dTypeValue is np.uint32) or
-          (dTypeValue is np.uint64)) :
-        fill_value_to_return = np.iinfo(dTypeValue).max
-    
-    return fill_value_to_return
 
 def corr(x,y,mask):
     "compute correlation coefficient"

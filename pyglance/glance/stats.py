@@ -8,9 +8,8 @@ Created by evas Apr 2010.
 Copyright (c) 2010 University of Wisconsin SSEC. All rights reserved.
 """
 
-#import glance.data  as data
+import glance.data  as dataobj
 import glance.delta as delta
-#from   glance.data import MaskSetObject
 
 import numpy as np
 
@@ -20,22 +19,34 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     """return dictionary of statistics dictionaries
     stats not including 'nan' in name exclude nans in either arrays
     """
-    
+    # diff our two data sets
+    aDataObject = dataobj.DataObject(a, fillValue=a_missing_value, ignoreMask=ignoreInAMask)
+    bDataObject = dataobj.DataObject(b, fillValue=b_missing_value, ignoreMask=ignoreInBMask)
+    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon) #TODO, needs epsilon percent
+    #TODO, for the moment, unpack these values into local variables
+    diffData = diffInfo.diff_data_object.data
+    finite_mask    = diffInfo.diff_data_object.masks.valid_mask
+    finite_a_mask = diffInfo.a_data_object.masks.valid_mask
+    finite_b_mask = diffInfo.b_data_object.masks.valid_mask
+    trouble = diffInfo.diff_data_object.masks.trouble_mask
+    outside_epsilon = diffInfo.diff_data_object.masks.outside_epsilon_mask
+    anfin = diffInfo.a_data_object.masks.non_finite_mask
+    bnfin = diffInfo.b_data_object.masks.non_finite_mask
+    amis   = diffInfo.a_data_object.masks.missing_mask
+    bmis   = diffInfo.b_data_object.masks.missing_mask
+    ignoreInAMask = diffInfo.a_data_object.masks.ignore_mask
+    ignoreInBMask = diffInfo.b_data_object.masks.ignore_mask
+    """
     diffData, finite_mask, (finite_a_mask, finite_b_mask), \
     trouble, outside_epsilon, (anfin, bnfin), \
     (amis, bmis), (ignoreInAMask, ignoreInBMask) = nfo = delta.diff(a, b, epsilon,
                                                                     (a_missing_value, b_missing_value),
                                                                     (ignoreInAMask, ignoreInBMask))
-    '''
-    d, valid_mask, trouble, (anfin, bnfin), (amis, bmis), outside_epsilon = nfo = diff(a,b,
-                                                                                       epsilon,
-                                                                                       (a_missing_value, b_missing_value),
-                                                                                       (ignoreInAMask, ignoreInBMask))
-                                                                                       '''
+    """
     
     general_stats = _get_general_data_stats(a, b, a_missing_value, b_missing_value, epsilon, 
                                             ignoreInAMask, ignoreInBMask, ~finite_a_mask, ~finite_b_mask) 
-    additional_statistics = stats(*nfo) # grab some additional comparison statistics 
+    additional_statistics = stats(diffData, finite_mask) #*nfo) # grab some additional comparison statistics 
     comparison_stats = _get_numerical_data_stats(a, b, diffData, finite_mask, outside_epsilon, trouble, additional_statistics) 
     nan_stats = _get_nan_stats(anfin, bnfin)
     missing_stats = _get_missing_value_stats(amis, bmis)
