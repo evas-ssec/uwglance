@@ -36,13 +36,6 @@ def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), 
     bmis   = diffInfo.b_data_object.masks.missing_mask
     ignoreInAMask = diffInfo.a_data_object.masks.ignore_mask
     ignoreInBMask = diffInfo.b_data_object.masks.ignore_mask
-    """
-    diffData, finite_mask, (finite_a_mask, finite_b_mask), \
-    trouble, outside_epsilon, (anfin, bnfin), \
-    (amis, bmis), (ignoreInAMask, ignoreInBMask) = nfo = delta.diff(a, b, epsilon,
-                                                                    (a_missing_value, b_missing_value),
-                                                                    (ignoreInAMask, ignoreInBMask))
-    """
     
     general_stats = _get_general_data_stats(a, b, a_missing_value, b_missing_value, epsilon, 
                                             ignoreInAMask, ignoreInBMask, ~finite_a_mask, ~finite_b_mask) 

@@ -249,12 +249,7 @@ def plot_and_save_comparison_figures (aData, bData,
     bMissingMask   = diffInfo.b_data_object.masks.missing_mask
     spaciallyInvalidMaskA = diffInfo.a_data_object.masks.ignore_mask
     spaciallyInvalidMaskB = diffInfo.b_data_object.masks.ignore_mask
-    """
-    rawDiffData, goodMask, (goodInAMask, goodInBMask), troubleMask, outsideEpsilonMask, \
-    (aNotFiniteMask, bNotFiniteMask), (aMissingMask, bMissingMask), \
-    (spaciallyInvalidMaskA, spaciallyInvalidMaskB) = delta.diff(aData, bData, epsilon, (missingValue, missingValueAltInB),
-                                                                (spaciallyInvalidMaskA, spaciallyInvalidMaskB))
-    """
+    
     absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
     
     # from this point on, we will be forking to create child processes so we can parallelize our image and

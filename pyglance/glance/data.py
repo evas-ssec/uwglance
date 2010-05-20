@@ -105,7 +105,35 @@ class DataObject (object) :
         self.fill_value = fillValue
         self.masks      = BasicMaskSetObject(ignoreMask)
     
-    # TODO, analyze in issolation?
+    def self_analysis(self) :
+        """
+        Gather some basic information about a data set
+        """
+        
+        # hang onto the shape for convenience
+        shape = self.data.shape
+        
+        # if there isn't an ignore mask, make an empty one
+        if self.masks.ignore_mask is None :
+            self.masks.ignore_mask = np.zeros(shape, dtype=np.bool)
+        
+        # find the non-finite values
+        non_finite_mask = ~np.isfinite(self.data) & ~self.masks.ignore_mask
+        
+        # find and mark the missing values
+        missing_mask    = np.zeros(shape, dtype=np.bool)
+        # if the data has a fill value, mark where the missing data is
+        if self.fill_value is not None :
+            missing_mask[self.data == self.fill_value] = True
+            missing_mask[self.masks.ignore_mask]       = False
+        
+        # define the valid mask as places where the data is not missing,
+        # nonfinite, or ignored
+        valid_mask = ~ (missing_mask | non_finite_mask | self.masks.ignore_mask)
+        
+        # set our masks
+        self.masks = BasicMaskSetObject(self.masks.ignore_mask, valid_mask,
+                                        non_finite_mask, missing_mask)
 
 class DiffInfoObject (object) :
     """
@@ -133,126 +161,106 @@ class DiffInfoObject (object) :
         self.epsilon_value   = epsilonValue
         self.epsilon_percent = epsilonPercent
         
-        # diff the two data sets TODO, this doesn't use epsilon percent yet
-        raw_diff, valid_in_both, (valid_in_a_mask, valid_in_b_mask), trouble_pt_mask, outside_epsilon_mask,  \
-           (a_not_finite_mask, b_not_finite_mask), (a_missing_mask, b_missing_mask), (ignore_mask_a, ignore_mask_b) = \
-                            diff(aDataObject.data, bDataObject.data, epsilonValue,
-                                 (aDataObject.fill_value, bDataObject.fill_value),
-                                 (aDataObject.masks.ignore_mask, bDataObject.masks.ignore_mask))
+        # analyze our data and get the difference object
+        self.diff_data_object = DiffInfoObject.analyze(aDataObject, bDataObject,
+                                                       epsilonValue, epsilonPercent)
+    
+    # Upcasts to be used in difference computation to avoid overflow. Currently only unsigned
+    # ints are upcast.
+    # FUTURE: handle uint64s as well (there is no int128, so might have to detect overflow)
+    DATATYPE_UPCASTS = {
+        np.uint8:  np.int16,
+        np.uint16: np.int32,
+        np.uint32: np.int64
+        }
+    
+    @staticmethod
+    def _get_shared_type_and_fill_value(data1, data2, fill1=None, fill2=None) :
+        """
+        Figure out a shared type that can be used when adding or subtracting
+        the two data sets given (accounting for possible overflow)
+        Also returns a fill value that can be used.
+        """
         
-        # set the various data in our two basic data objects
-        aDataObject.masks = BasicMaskSetObject(ignore_mask_a, valid_in_a_mask, a_not_finite_mask, a_missing_mask)
-        bDataObject.masks = BasicMaskSetObject(ignore_mask_b, valid_in_b_mask, b_not_finite_mask, b_missing_mask)
+        # figure out the shared type
+        type_to_return = data1.dtype
+        if data1.dtype is not data2.dtype:
+            type_to_return = np.common_type(data1, data2)
         
-        # create our diff info object
-        self.diff_data_object = DataObject(raw_diff)
-        self.diff_data_object.masks = DiffMaskSetObject(ignore_mask_a | ignore_mask_b,
-                                                        valid_in_both, trouble_pt_mask, outside_epsilon_mask)
-
-# Upcasts to be used in difference computation to avoid overflow. Currently only unsigned
-# ints are upcast.
-# FUTURE: handle uint64s as well (there is no int128, so might have to detect overflow)
-datatype_upcasts = {
-    np.uint8:  np.int16,
-    np.uint16: np.int32,
-    np.uint32: np.int64
-    }
-
-# TODO, rethink how this works
-def _select_fill_data(dTypeValue) :
-    """
-    select a fill data value based on the type of data that is being
-    inspected/changed
-    """
-    
-    fill_value_to_return = None
-    
-    if np.issubdtype(dTypeValue, np.float) or np.issubdtype(dTypeValue, np.complex) :
-        fill_value_to_return = np.nan
-    elif np.issubdtype(dTypeValue, np.int) :
-        fill_value_to_return = np.iinfo(dTypeValue).min
-    elif np.issubdtype(dTypeValue, np.bool) :
-        fill_value_to_return = True
-    elif ((dTypeValue is np.uint8)  or
-          (dTypeValue is np.uint16) or
-          (dTypeValue is np.uint32) or
-          (dTypeValue is np.uint64)) :
-        fill_value_to_return = np.iinfo(dTypeValue).max
-    
-    return fill_value_to_return
-
-def diff(aData, bData, epsilon=0.,
-         (a_missing_value, b_missing_value)=(None, None),
-         (ignore_mask_a, ignore_mask_b)=(None, None)):
-    """
-    take two arrays of similar size and composition
-    if an ignoreMask is passed in values in the mask will not be analysed to
-    form the various return masks and the corresponding spots in the
-    "difference" return data array will contain fill values (selected
-    based on data type).
-    
-    return difference array filled with fill data where differences aren't valid,
-    good mask where values are finite in both a and b
-    trouble mask where missing values or nans don't match or delta > epsilon
-    (a-notfinite-mask, b-notfinite-mask)
-    (a-missing-mask, b-missing-mask)
-    """
-    shape = aData.shape
-    assert(bData.shape==shape)
-    assert(np.can_cast(aData.dtype, bData.dtype) or np.can_cast(bData.dtype, aData.dtype))
-    
-    # if the ignore masks do not exist, set them to include none of the data
-    if (ignore_mask_a is None) :
-        ignore_mask_a = np.zeros(shape,dtype=bool)
-    if (ignore_mask_b is None) :
-        ignore_mask_b = np.zeros(shape,dtype=bool)
-    
-    # deal with the basic masks
-    a_not_finite_mask, b_not_finite_mask = ~np.isfinite(aData) & ~ignore_mask_a, ~np.isfinite(bData) & ~ignore_mask_b
-    a_missing_mask, b_missing_mask = np.zeros(shape,dtype=bool), np.zeros(shape,dtype=bool)
-    # if we were given missing values, mark where they are in the data
-    if a_missing_value is not None:
-        a_missing_mask[aData == a_missing_value] = True
-        a_missing_mask[ignore_mask_a] = False # don't analyse the ignored values
-    if b_missing_value is not None:
-        b_missing_mask[bData == b_missing_value] = True
-        b_missing_mask[ignore_mask_b] = False # don't analyse the ignored values
-    
-    # build the comparison data that includes the "good" values
-    valid_in_a_mask = ~(a_not_finite_mask | a_missing_mask | ignore_mask_a)
-    valid_in_b_mask = ~(b_not_finite_mask | b_missing_mask | ignore_mask_b)
-    valid_in_both = valid_in_a_mask & valid_in_b_mask
-    
-    # figure out our shared data type
-    sharedType = aData.dtype
-    if (aData.dtype is not bData.dtype) :
-        sharedType = np.common_type(aData, bData)
-
-    # upcast if needed to avoid overflow in difference operation
-    if sharedType in datatype_upcasts:
-        sharedType = datatype_upcasts[sharedType]
-
-    LOG.debug('Shared data type that will be used for diff comparison: ' + str(sharedType))
-    
-    # construct our diff'ed array
-    raw_diff = np.zeros(shape, dtype=sharedType) #empty_like(aData)
-    
-    fill_data_value = _select_fill_data(sharedType)
-    
-    LOG.debug('current fill data value: ' + str(fill_data_value))
-    
-    raw_diff[~valid_in_both] = fill_data_value # throw away invalid data
-
-    # compute difference, using shared type in computation
-    raw_diff[valid_in_both] = bData[valid_in_both].astype(sharedType) - aData[valid_in_both].astype(sharedType)
+        # upcast the type if we need to
+        if type_to_return in DiffInfoObject.DATATYPE_UPCASTS :
+            type_to_return = DiffInfoObject.DATATYPE_UPCASTS[type_to_return]
+            LOG.debug('To prevent overflow, difference data will be upcast from ('
+                      + str(data1.dtype) + '/' + str(data2.dtype) + ') to: ' + str(type_to_return))
         
-    # the valid data which is too different between the two sets according to the given epsilon
-    outside_epsilon_mask = (abs(raw_diff) > epsilon) & valid_in_both
-    # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
-    trouble_pt_mask = (a_not_finite_mask ^ b_not_finite_mask) | (a_missing_mask ^ b_missing_mask) | outside_epsilon_mask
+        # figure out the fill value
+        fill_value_to_return = None
+        
+        # if we're looking at float or complex data, use a nan
+        if (np.issubdtype(type_to_return, np.float) or
+            np.issubdtype(type_to_return, np.complex)) :
+            fill_value_to_return = np.nan
+        
+        # if we're looking at int data, use the minimum value
+        elif np.issubdtype(type_to_return, np.int) :
+            fill_value_to_return = np.iinfo(type_to_return).min
+        
+        # if we're looking at unsigned data, use the maximum value
+        elif ((type_to_return is np.uint8)  or
+              (type_to_return is np.uint16) or
+              (type_to_return is np.uint32) or
+              (type_to_return is np.uint64)) :
+            fill_value_to_return = np.iinfo(type_to_return).max
+        
+        return type_to_return, fill_value_to_return
     
-    return raw_diff, valid_in_both, (valid_in_a_mask, valid_in_b_mask), trouble_pt_mask, outside_epsilon_mask,  \
-           (a_not_finite_mask, b_not_finite_mask), (a_missing_mask, b_missing_mask), (ignore_mask_a, ignore_mask_b)
+    @staticmethod
+    def analyze(aDataObject, bDataObject,
+                epsilonValue=0.0, epsilonPercent=None):
+        """
+        analyze the differences between the two data sets
+        updates the two data objects with additional masks
+        and returns data object containing diff data and masks
+        """
+        shape = aDataObject.data.shape
+        assert(bDataObject.data.shape == shape)
+        assert(np.can_cast(aDataObject.data.dtype, bDataObject.data.dtype) or
+               np.can_cast(bDataObject.data.dtype, aDataObject.data.dtype))
+        
+        # do some basic analysis on the individual data sets
+        aDataObject.self_analysis()
+        bDataObject.self_analysis()
+        
+        # where is the shared valid data?
+        valid_in_both  = aDataObject.masks.valid_mask  & bDataObject.masks.valid_mask
+        ignore_in_both = aDataObject.masks.ignore_mask | bDataObject.masks.ignore_mask
+        
+        # get our shared data type and fill value
+        sharedType, fill_data_value = DiffInfoObject._get_shared_type_and_fill_value(aDataObject.data,
+                                                                                     bDataObject.data,
+                                                                                     aDataObject.fill_value,
+                                                                                     bDataObject.fill_value)
+        
+        # construct our diff'ed data set
+        raw_diff = np.zeros(shape, dtype=sharedType)
+        raw_diff[~valid_in_both] = fill_data_value # throw away invalid data
+        # compute difference, using shared type in computation
+        raw_diff[valid_in_both] = bDataObject.data[valid_in_both].astype(sharedType) -  \
+                                  aDataObject.data[valid_in_both].astype(sharedType)
+        
+        # the valid data which is too different between the two sets according to the given epsilon
+        outside_epsilon_mask = (abs(raw_diff) > epsilonValue) & valid_in_both
+        # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
+        trouble_pt_mask = ( (aDataObject.masks.non_finite_mask ^ bDataObject.masks.non_finite_mask) |
+                            (aDataObject.masks.missing_mask    ^ bDataObject.masks.missing_mask)    |
+                            outside_epsilon_mask )
+        
+        # make our diff data object
+        diff_data_object = DataObject(raw_diff, fillValue=fill_data_value)
+        diff_data_object.masks = DiffMaskSetObject(ignore_in_both, valid_in_both,
+                                                   trouble_pt_mask, outside_epsilon_mask)
+        
+        return diff_data_object
 
 if __name__=='__main__':
     import doctest

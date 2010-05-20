@@ -460,12 +460,7 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     longitudeDiff = diffInfo.diff_data_object.data
     finiteLongitudeMask = diffInfo.diff_data_object.masks.valid_mask
     lon_not_equal_mask  = diffInfo.diff_data_object.masks.trouble_mask
-    """
-    longitudeDiff, finiteLongitudeMask, _, _, lon_not_equal_mask, _, _, _ = delta.diff(longitudeA, longitudeB,
-                                                                                       llepsilon,
-                                                                                       (None, None),
-                                                                                       (ignoreMaskA, ignoreMaskB))
-    """
+    
     aDataObject = dataobj.DataObject(latitudeA, ignoreMask=ignoreMaskA)
     bDataObject = dataobj.DataObject(latitudeB, ignoreMask=ignoreMaskB)
     diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=llepsilon) #TODO, needs epsilon percent
@@ -473,12 +468,6 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     latitudeDiff = diffInfo.diff_data_object.data
     finiteLatitudeMask = diffInfo.diff_data_object.masks.valid_mask
     lat_not_equal_mask = diffInfo.diff_data_object.masks.trouble_mask
-    """
-    latitudeDiff,  finiteLatitudeMask,  _, _, lat_not_equal_mask, _, _, _ = delta.diff(latitudeA,  latitudeB,
-                                                                                       llepsilon,
-                                                                                       (None, None),
-                                                                                       (ignoreMaskA, ignoreMaskB))
-    """
     
     lon_lat_not_equal_mask = lon_not_equal_mask | lat_not_equal_mask
     lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask)

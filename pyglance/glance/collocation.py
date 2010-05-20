@@ -34,20 +34,20 @@ class CollocationMapping :
     """
     
     """
-    number_of_matches       = -1
-    number_unmatchable_in_a = -1
-    number_unmatchable_in_b = -1
+    raw_lon_lat_matches  - the number of points matched, based on the longitude and latitude alone
+    raw_unmatchable_in_a - the number of unmacthed pointes in a, based on longitude and latitude alone
+    raw_unmatchable_in_b - the number of unmacthed pointes in b, based on longitude and latitude alone
     
-    a_point_mapping = None
-    b_point_mapping = None
+    a_point_mapping      - mapping of points in a to points in b; TODO give form
+    b_point_mapping      - mapping of points in b to points in a; TODO give form
     
-    matched_longitude = None
-    matched_latitude  = None
+    matched_longitude    - the list of matched longitude values
+    matched_latitude     - the list of matched latitude  values
     
-    unmatchable_longitude_a = None
-    unmatchable_latitude_a  = None
-    unmatchable_longitude_b = None
-    unmatchable_latitude_b  = None
+    unmatchable_longitude_a - the list of longitude values in a that could not be matched
+    unmatchable_latitude_a  - the list of latitude  values in a that could not be matched
+    unmatchable_longitude_b - the list of longitude values in b that could not be matched
+    unmatchable_latitude_b  - the list of latitude  values in b that could not be matched
     """
     
     def __init__(self,
@@ -71,7 +71,31 @@ class CollocationMapping :
         the match should be accepted
         """
         pass
+    
+    def _create_basic_mapping_from_lon_lat((alongitude, alatitude),
+                                           (blongitude, blatitude),
+                                           lonlatEpsilon,
+                                           invalidAMask=None, invalidBMask=None) :
+        """
+        match points together based on their longitude and latitude values
+        to match points must be within lonlatEpsilon degrees in both longitude and latitude
         
+        if the longitude and latitude variables contain invalid data the invalidAMask and
+        invalidBMask should be passed with the appropriate masking to remove the invalid values
+        
+        the return will be in the form of two dictionaries of points, one from a and one from b,
+        indexed on the index number in the A or B data where they can be found. Each entry will
+        consist of a list of:
+            [longitudeValue, latitudeValue, indexNumber, [list of matching indexes in the other set]]
+        
+        Note: the return will include all pairs of points that match,
+        this means an individual a or b point may be repeated if it matches
+        multiple points within the lonlatEpsilon provided
+        
+        Warning: This algorithm will fail to find all matching points if the lonlatEpsilon is set to a
+        value greater than or equal to 1.0 degrees. This is related to the bin size used for searching
+        thoretically the bin size could be corrected to scale with the lonlatEpsilon in the future. TODO
+        """
 
 def create_colocation_mapping_within_epsilon((alongitude, alatitude),
                                              (blongitude, blatitude),
