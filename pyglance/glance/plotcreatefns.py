@@ -752,6 +752,17 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         assert(tupleIndex < len(aData.shape))
         
         # reorder and reshape our data into the [bin][case][tuple] form
+        reorderMapObject = delta.BinTupleMapping(aData.shape, binIndexNumber=binIndex, tupleIndexNumber=tupleIndex)
+        aData = reorderMapObject.reorder_for_bin_tuple(aData)
+        bData = reorderMapObject.reorder_for_bin_tuple(bData)
+        goodInAMask        = reorderMapObject.reorder_for_bin_tuple(goodInAMask)
+        goodInBMask        = reorderMapObject.reorder_for_bin_tuple(goodInBMask)
+        absDiffData        = reorderMapObject.reorder_for_bin_tuple(absDiffData)
+        rawDiffData        = reorderMapObject.reorder_for_bin_tuple(rawDiffData)
+        goodInBothMask     = reorderMapObject.reorder_for_bin_tuple(goodInBothMask)
+        troubleMask        = reorderMapObject.reorder_for_bin_tuple(troubleMask)
+        outsideEpsilonMask = reorderMapObject.reorder_for_bin_tuple(outsideEpsilonMask)
+        """
         aData,              caseInfo1 = delta.reorder_for_bin_tuple(aData,              binIndex, tupleIndex)
         bData,              caseInfo2 = delta.reorder_for_bin_tuple(bData,              binIndex, tupleIndex)
         goodInAMask,        caseInfo3 = delta.reorder_for_bin_tuple(goodInAMask,        binIndex, tupleIndex)
@@ -772,7 +783,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         assert(caseInfo6 == caseInfo7)
         assert(caseInfo7 == caseInfo8)
         assert(caseInfo8 == caseInfo9)
-        
+        """
         # our list of functions that will later create the plots
         functionsToReturn = { }
         
@@ -807,8 +818,8 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
             tempFiniteMap = np.isfinite(rmsDiffValues)
             
             # figure out the min/max rms diff values
-            minRMSDiff = min(rmsDiffValues[tempFiniteMap])
-            maxRMSDiff = max(rmsDiffValues[tempFiniteMap])
+            minRMSDiff = np.min(rmsDiffValues[tempFiniteMap])
+            maxRMSDiff = np.max(rmsDiffValues[tempFiniteMap])
             
             # sort the cases by their rms diff values
             counts = np.zeros(numHistogramSections)
@@ -836,7 +847,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                 caseNumber  = listOfCases[random.randint(0, len(listOfCases) - 1)]
                 
                 # make lineplot functions for the example cases
-                caseIndexes = delta.determine_case_indecies(caseNumber, caseInfo1)
+                caseIndexes = reorderMapObject.determine_case_indecies(caseNumber)
                 caseNumText = ''
                 for caseIndex in caseIndexes :
                     caseNumText = caseNumText + str(caseIndex)
