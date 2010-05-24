@@ -13,16 +13,85 @@ import glance.delta as delta
 
 import numpy as np
 
+# TODO, finish transitioning to classes
+
+# TODO, I don't like this design, but it's what I could come up
+# with for now. Reconsider this again later.
+class StatisticalData (object) :
+    """
+    This class represents a set of statistical data generated from
+    the examination of two data sets. This data set is relatively
+    abstract. 
+    
+    All Statistics Data objects should have a title and be able to provide
+    a dictionary of their statistics (see dictionary_form function) and
+    a dictionary documenting their statistics.
+    
+    Child classes can include whatever actual statistics they like.
+    """
+    
+    def __init__ (self) :
+        """
+        a minimal constructor that only sets the title
+        """
+        
+        self.title = None
+
+class MissingValueStatistics (StatisticalData) :
+    """
+    A class representing information about where fill values are found
+    in a pair of data sets.
+    
+    includes the following statistics:
+    
+    a_missing_count         -    count of points that are missing in the a data set
+    a_missing_fraction      - fraction of points that are missing in the a data set
+    b_missing_count         -    count of points that are missing in the b data set
+    b_missing_fraction      - fraction of points that are missing in the b data set
+    common_missing_count    -    count of points that are missing in both data sets
+    common_missing_fraction - fraction of points that are missing in both data sets
+    """
+    
+
 # --------------------- general statistics methods ------------------
 
-def summarize(a, b, epsilon=0., (a_missing_value, b_missing_value)=(None,None), ignoreInAMask=None, ignoreInBMask=None):
+def _get_missing_value_stats(a_missing_mask, b_missing_mask) :
+    """
+    Get a list of statistics about missing data values in data sets a and b,
+    given masks describing the positions of the missing data (such masks
+    can be gotten from the diff function), 
+    the return value will be a dictionary of statistics
+    """
+    # calculate information about the missing values
+    num_a_missing = np.sum(a_missing_mask)
+    num_b_missing = np.sum(b_missing_mask)
+    num_common_missing = np.sum(a_missing_mask & b_missing_mask)
+    
+    # make the assumption that a and b are the same size and only use the size of a's mask
+    total_num_values = a_missing_mask.size
+    
+    missing_value_stats = {'a_missing_count': num_a_missing,
+                           'a_missing_fraction': (float(num_a_missing) / float(total_num_values)),
+                           'b_missing_count': num_b_missing,
+                           'b_missing_fraction': (float(num_b_missing) / float(total_num_values)),
+                           'common_missing_count': num_common_missing,
+                           'common_missing_fraction': (float(num_common_missing) / float(total_num_values))
+                           }
+    
+    return missing_value_stats
+
+def summarize(a, b, epsilon=0.,
+              (a_missing_value, b_missing_value)=(None,None),
+              ignoreInAMask=None, ignoreInBMask=None,
+              epsilonPercent=None):
     """return dictionary of statistics dictionaries
     stats not including 'nan' in name exclude nans in either arrays
     """
     # diff our two data sets
     aDataObject = dataobj.DataObject(a, fillValue=a_missing_value, ignoreMask=ignoreInAMask)
     bDataObject = dataobj.DataObject(b, fillValue=b_missing_value, ignoreMask=ignoreInBMask)
-    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon) #TODO, needs epsilon percent
+    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject,
+                                      epsilonValue=epsilon, epsilonPercent=epsilonPercent) 
     #TODO, for the moment, unpack these values into local variables
     diffData = diffInfo.diff_data_object.data
     finite_mask    = diffInfo.diff_data_object.masks.valid_mask
@@ -104,6 +173,7 @@ def _get_numerical_data_stats(a, b, diff_data,  data_is_finite_mask,
         fraction_perfect = num_perfect / float(total_num_finite_values)
     
     comparison = {  'correlation': r_corr,
+                    'r-squared correlation': r_corr * r_corr,
                     'diff_outside_epsilon_count': num_finite_values_too_different,
                     'diff_outside_epsilon_fraction': fraction_too_different,
                     'perfect_match_count': num_perfect,
@@ -176,30 +246,7 @@ def _get_finite_data_stats(a_is_finite_mask, b_is_finite_mask, common_ignore_mas
     
     return finite_value_stats
 
-def _get_missing_value_stats(a_missing_mask, b_missing_mask) :
-    """
-    Get a list of statistics about missing data values in data sets a and b,
-    given masks describing the positions of the missing data (such masks
-    can be gotten from the diff function), 
-    the return value will be a dictionary of statistics
-    """
-    # calculate information about the missing values
-    num_a_missing = np.sum(a_missing_mask)
-    num_b_missing = np.sum(b_missing_mask)
-    num_common_missing = np.sum(a_missing_mask & b_missing_mask)
-    
-    # make the assumption that a and b are the same size and only use the size of a's mask
-    total_num_values = a_missing_mask.size
-    
-    missing_value_stats = {'a_missing_count': num_a_missing,
-                           'a_missing_fraction': (float(num_a_missing) / float(total_num_values)),
-                           'b_missing_count': num_b_missing,
-                           'b_missing_fraction': (float(num_b_missing) / float(total_num_values)),
-                           'common_missing_count': num_common_missing,
-                           'common_missing_fraction': (float(num_common_missing) / float(total_num_values))
-                           }
-    
-    return missing_value_stats
+
 
 def _get_nan_stats(a_nan_mask, b_nan_mask) :
     """
@@ -284,6 +331,7 @@ STATISTICS_DOC = {  'general': "Finite values are non-missing and finite (not Na
                     'perfect_match_count': "number of perfectly matched finite data points between A and B",
                     'perfect_match_fraction': "fraction of finite values perfectly matching between A and B (out of common_finite_count)",
                     'rms_diff': "root mean square (RMS) difference of finite values",
+                    'r-squared correlation': "the square of the r correlation (see correlation)",
                     'std_diff': "standard deviation of difference of finite values",
                     'trouble_points_count': 'number of points that differ in finite/missing status between the input data sets A and B,' +
                                             ' or are unacceptable when compared according to the current epsilon value',

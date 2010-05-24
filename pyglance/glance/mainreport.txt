@@ -177,6 +177,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                             if 'display_name' in tempVarRunInfo :
                                 varDisplayName = tempVarRunInfo['display_name']
                             
+                            rSquaredCorr         = tempVariableInfo['r_squared_correlation']
                             passPercent          = tempVariableInfo['pass_epsilon_percent']
                             finiteSimilarPercent = tempVariableInfo['finite_similar_percent']
                             didPass              = tempVarRunInfo['did_pass']
@@ -194,6 +195,9 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                             <td>
                                 Variable: <a href="${tempVarRunInfo['variable_report_path_escaped']}">${varDisplayName}</a> <br>
                                 Epsilon used: ${tempVarRunInfo['epsilon']} <br>
+                                % if rSquaredCorr is not None :
+                                    R-squared Correlation Coefficient: ${rSquaredCorr}<br>
+                                % endif
                                 Finite values within one epsilon of difference:
                                 ${report.make_formatted_display_string(passPercent, '%.6g')}%<br>
                                 Data that matched in finite-ness between the files:

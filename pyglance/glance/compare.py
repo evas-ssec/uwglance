@@ -48,11 +48,14 @@ glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
 
 # these are the built in default settings for the variable analysis
 glance_analysis_defaults = {'epsilon': 0.0,
+                            'epsilon_percent': None,
                             'missing_value': None,
-                            'epsilon_failure_tolerance': 0.0, 
-                            'nonfinite_data_tolerance':  0.0 
+                            'epsilon_failure_tolerance': 0.0,
+                            'nonfinite_data_tolerance':  0.0,
+                            'minimum_acceptable_squared_correlation_coefficient': None
                             }
 
+# TODO, remove?
 def _cvt_names(namelist, epsilon, missing):
     """"if variable names are of the format name:epsilon, yield name,epsilon, missing
         otherwise yield name,default-epsilon,default-missing
@@ -78,6 +81,7 @@ def _clean_path(string_path) :
         clean_path = string_path
     return clean_path
 
+# TODO comment more clearly
 def _parse_varnames(names, terms, epsilon=0.0, missing=None):
     """filter variable names and substitute default epsilon and missing settings if none provided
     returns name,epsilon,missing triples
@@ -362,8 +366,8 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
         requestedNames = requestedVars or ['.*'] 
         
         # user selected defaults
-        defaultsToUse['epsilon'] = optionsSet['epsilon']
-        defaultsToUse['missing_value'] = optionsSet['missing']
+        defaultsToUse['epsilon']         = optionsSet['epsilon']
+        defaultsToUse['missing_value']   = optionsSet['missing']
         
         # note: there is no way to set the tolerances from the command line
     
@@ -439,7 +443,8 @@ def _get_percentage_from_mask(dataMask) :
 def _check_lon_lat_equality(longitudeA, latitudeA,
                             longitudeB, latitudeB,
                             ignoreMaskA, ignoreMaskB,
-                            llepsilon, doMakeImages, outputPath) :
+                            llepsilon, doMakeImages,
+                            outputPath) :
     """
     check to make sure the longitude and latitude are equal everywhere that's not in the ignore masks
     if they are not and doMakeImages was passed as True, generate appropriate figures to show where
@@ -684,45 +689,67 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     
     also returns information about the fractions of failure
     """
-    didPass = None
     
-    # get our tolerance values
+    passValues = [ ]
     
-    # get the tolerance for failures in comparison compared to epsilon
+    # test the epsilon value tolerance
+    
+    # get the tolerance for failures compared to epsilon
     epsilonTolerance = None
     if ('epsilon_failure_tolerance' in varRunInfo) :
         epsilonTolerance = varRunInfo['epsilon_failure_tolerance']
     else :
         epsilonTolerance = defaultValues['epsilon_failure_tolerance']
-    # get the tolerance for failures in amount of nonfinite data
-    # found in spatially valid areas
+    
+    # did we fail based on the epsilon?
+    failed_fraction = variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']
+    passed_epsilon  = None
+    if epsilonTolerance is not None :
+        passed_epsilon = failed_fraction <= epsilonTolerance
+    passValues.append(passed_epsilon)
+    
+    # test the nonfinite tolerance
+    
+    # get the tolerance for failures in amount of nonfinite data (in spatially valid areas)
     nonfiniteTolerance = None
     if ('nonfinite_data_tolerance'  in varRunInfo) :
         nonfiniteTolerance = varRunInfo['nonfinite_data_tolerance']
     else :
         nonfiniteTolerance = defaultValues['nonfinite_data_tolerance']
     
-    # test to see if we passed or failed
+    # did we fail based on nonfinite data
+    non_finite_diff_fraction = variableStats['Finite Data Statistics']['finite_in_only_one_fraction']
+    passed_nonfinite         = None
+    if nonfiniteTolerance is not None :
+        passed_nonfinite = non_finite_diff_fraction <= nonfiniteTolerance
+    passValues.append(passed_nonfinite)
     
-    # check for our epsilon tolerance
-    failed_fraction = 0.0
-    if not (epsilonTolerance is None) :
-        failed_fraction = variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']
-        didPass = failed_fraction <= epsilonTolerance
+    # test the r-squared correlation coefficent
     
-    # check to see if it failed on nonfinite data
-    non_finite_diff_fraction = 0.0
-    if not (nonfiniteTolerance is None) :
-        non_finite_diff_fraction = variableStats['Finite Data Statistics']['finite_in_only_one_fraction']
-        passedNonFinite = non_finite_diff_fraction <= nonfiniteTolerance
-        
-        # combine the two test results
-        if (didPass is None) :
-            didPass = passedNonFinite
+    # get the minimum acceptable r-squared correlation coefficient
+    min_r_squared = None
+    if ('minimum_acceptable_squared_correlation_coefficient' in varRunInfo) :
+        min_r_squared = varRunInfo['minimum_acceptable_squared_correlation_coefficient']
+    else :
+        min_r_squared = defaultValues['minimum_acceptable_squared_correlation_coefficient']
+    
+    # did we fail based on the r-squared correlation coefficient?
+    r_squared_value  = None
+    passed_r_squared = None
+    if min_r_squared is not None :
+        r_squared_value  = variableStats['Numerical Comparison Statistics']['r-squared correlation']
+        passed_r_squared = r_squared_value >= min_r_squared
+    passValues.append(passed_r_squared)
+    
+    # figure out the overall pass/fail result
+    didPass = None
+    for passValue in passValues :
+        if (passValue is None) or (didPass is None) :
+            didPass = didPass or  passValue
         else :
-            didPass = didPass and passedNonFinite
+            didPass = didPass and passValue
     
-    return didPass, failed_fraction, non_finite_diff_fraction
+    return didPass, failed_fraction, non_finite_diff_fraction, r_squared_value
 
 def _get_run_identification_info( ) :
     """
@@ -1158,11 +1185,14 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                   varRunInfo['epsilon'],
                                                   (varRunInfo['missing_value'],
                                                    varRunInfo['missing_value_alt_in_b']),
-                                                  mask_a_to_use, mask_b_to_use)
+                                                  mask_a_to_use, mask_b_to_use,
+                                                  varRunInfo['epsilon_percent'])
             
             # add a little additional info to our variable run info before we squirrel it away
             varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
-            didPass, epsilon_failed_fraction, non_finite_fail_fraction = _check_pass_or_fail(varRunInfo,
+            didPass, epsilon_failed_fraction, \
+                     non_finite_fail_fraction, \
+                     r_squared_value = _check_pass_or_fail(varRunInfo,
                                                                                      variable_stats,
                                                                                      defaultValues)
             varRunInfo['did_pass'] = didPass
@@ -1263,6 +1293,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 finitePassedPercent  = (1.0 - non_finite_fail_fraction) * 100.0 
                 variableComparisons[displayName] = {'pass_epsilon_percent':   epsilonPassedPercent,
                                                     'finite_similar_percent': finitePassedPercent,
+                                                    'r_squared_correlation':  r_squared_value,
                                                     'variable_run_info':      varRunInfo
                                                     }
                 
