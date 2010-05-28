@@ -249,7 +249,16 @@ class DiffInfoObject (object) :
                                   aDataObject.data[valid_in_both].astype(sharedType)
         
         # the valid data which is too different between the two sets according to the given epsilon
-        outside_epsilon_mask = (abs(raw_diff) > epsilonValue) & valid_in_both # TODO also use epsilon percent
+        outside_epsilon_mask = np.zeros(shape, dtype=np.bool)
+        if (epsilonValue   is not None) :
+            outside_epsilon_mask = outside_epsilon_mask |  \
+                                   (abs(raw_diff) > epsilonValue) & valid_in_both
+        if (epsilonPercent is not None) :
+            # TODO, test this part of the formula
+            outside_epsilon_mask = outside_epsilon_mask |  \
+                                   ((abs(raw_diff) > (aDataObject.data * (float(epsilonPercent) / 100.0))) & valid_in_both)
+        #outside_epsilon_mask = (abs(raw_diff) > epsilonValue) & valid_in_both # TODO also use epsilon percent
+        
         # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
         trouble_pt_mask = ( (aDataObject.masks.non_finite_mask ^ bDataObject.masks.non_finite_mask) |
                             (aDataObject.masks.missing_mask    ^ bDataObject.masks.missing_mask)    |

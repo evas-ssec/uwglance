@@ -157,7 +157,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                      aUData=None, aVData=None,
                                      bUData=None, bVData=None,
                                      binIndex=None, tupleIndex=None,
-                                     binName='bin', tupleName='tuple') :
+                                     binName='bin', tupleName='tuple',
+                                     epsilonPercent=None) :
     """
     Plot images for a set of figures based on the data sets and settings
     passed in. The images will be saved to disk according to the settings.
@@ -235,7 +236,7 @@ def plot_and_save_comparison_figures (aData, bData,
     # compare the two data sets to get our difference data and trouble info
     aDataObject = dataobj.DataObject(aData, fillValue=missingValue,       ignoreMask=spaciallyInvalidMaskA)
     bDataObject = dataobj.DataObject(bData, fillValue=missingValueAltInB, ignoreMask=spaciallyInvalidMaskB)
-    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon) #TODO, needs epsilon percent
+    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon, epsilonPercent=epsilonPercent)
     #TODO, for the moment, unpack these values into local variables
     rawDiffData = diffInfo.diff_data_object.data
     goodMask    = diffInfo.diff_data_object.masks.valid_mask
@@ -293,7 +294,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                        
                                        # only used for line plots 
                                        binIndex=binIndex, tupleIndex=tupleIndex,
-                                       binName=binName, tupleName=tupleName
+                                       binName=binName, tupleName=tupleName,
+                                       epsilonPercent=epsilonPercent
                                        )
         plottingFunctions.update(moreFunctions)
     

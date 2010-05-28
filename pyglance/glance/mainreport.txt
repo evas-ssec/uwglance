@@ -195,6 +195,11 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
                             <td>
                                 Variable: <a href="${tempVarRunInfo['variable_report_path_escaped']}">${varDisplayName}</a> <br>
                                 Epsilon used: ${tempVarRunInfo['epsilon']} <br>
+                                ## if there is an epsilon percent, also show that
+                                % if ('epsilon_percent' in tempVarRunInfo) and (tempVarRunInfo['epsilon_percent'] is not None) :
+                                    Epsilon percent (of file A) used: ${tempVarRunInfo['epsilon_percent']}% <br>
+                                % endif
+                                ## if there's an r squared correlation value, also show that
                                 % if rSquaredCorr is not None :
                                     R-squared Correlation Coefficient: ${rSquaredCorr}<br>
                                 % endif

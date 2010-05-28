@@ -178,7 +178,10 @@ class PlottingFunctionFactory :
                                    
                                    # only used for line plots
                                    binIndex=None, tupleIndex=None,
-                                   binName=None,  tupleName=None
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None
                                    
                                    ) : _abstract
 
@@ -219,7 +222,11 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    
                                    # only used for line plots
                                    binIndex=None, tupleIndex=None,
-                                   binName=None,  tupleName=None
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None
+                                   
                                    ) :
         
         functionsToReturn = { }
@@ -246,6 +253,7 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
             assert(bData.shape    == goodInBothMask.shape)
             assert(goodInBothMask.shape == outsideEpsilonMask.shape)
             
+            # TODO, if there's an epsilon percent, how should the epsilon lines be drawn?
             functionsToReturn['scatter']   = ((lambda : figures.create_scatter_plot(aData[goodInBothMask], bData[goodInBothMask],
                                                                             "Value in File A vs Value in File B",
                                                                             "File A Value", "File B Value",
@@ -292,7 +300,11 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    
                                    # only used for line plots
                                    binIndex=None, tupleIndex=None,
-                                   binName=None,  tupleName=None
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None
+                                   
                                    ) :
         
         # the default for plotting geolocated data
@@ -457,7 +469,11 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    
                                    # only used for line plots
                                    binIndex=None, tupleIndex=None,
-                                   binName=None,  tupleName=None
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None
+                                   
                                    ) :
         
         # the default for plotting geolocated data
@@ -629,7 +645,11 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    
                                    # only used for line plots
                                    binIndex=None, tupleIndex=None,
-                                   binName=None,  tupleName=None
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None
+                                   
                                    ) :
         """
         This method generates line plotting functions for one dimensional data
@@ -727,7 +747,11 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                    
                                    # only used for line plots
                                    binIndex=None, tupleIndex=None,
-                                   binName=None,  tupleName=None
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None
+                                   
                                    ) :
         """
         This method generates histogram and sample line plot functions for complex three dimensional data
@@ -762,28 +786,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         goodInBothMask     = reorderMapObject.reorder_for_bin_tuple(goodInBothMask)
         troubleMask        = reorderMapObject.reorder_for_bin_tuple(troubleMask)
         outsideEpsilonMask = reorderMapObject.reorder_for_bin_tuple(outsideEpsilonMask)
-        """
-        aData,              caseInfo1 = delta.reorder_for_bin_tuple(aData,              binIndex, tupleIndex)
-        bData,              caseInfo2 = delta.reorder_for_bin_tuple(bData,              binIndex, tupleIndex)
-        goodInAMask,        caseInfo3 = delta.reorder_for_bin_tuple(goodInAMask,        binIndex, tupleIndex)
-        goodInBMask,        caseInfo4 = delta.reorder_for_bin_tuple(goodInBMask,        binIndex, tupleIndex)
-        absDiffData,        caseInfo5 = delta.reorder_for_bin_tuple(absDiffData,        binIndex, tupleIndex)
-        rawDiffData,        caseInfo6 = delta.reorder_for_bin_tuple(rawDiffData,        binIndex, tupleIndex)
-        goodInBothMask,     caseInfo7 = delta.reorder_for_bin_tuple(goodInBothMask,     binIndex, tupleIndex)
-        troubleMask,        caseInfo8 = delta.reorder_for_bin_tuple(troubleMask,        binIndex, tupleIndex)
-        outsideEpsilonMask, caseInfo9 = delta.reorder_for_bin_tuple(outsideEpsilonMask, binIndex, tupleIndex)
         
-        # assert that all our case dimensions were originally the same
-        # TODO, should I have just compared the shape of all the data before modifying it?
-        assert(caseInfo1 == caseInfo2)
-        assert(caseInfo2 == caseInfo3)
-        assert(caseInfo3 == caseInfo4)
-        assert(caseInfo4 == caseInfo5)
-        assert(caseInfo5 == caseInfo6)
-        assert(caseInfo6 == caseInfo7)
-        assert(caseInfo7 == caseInfo8)
-        assert(caseInfo8 == caseInfo9)
-        """
         # our list of functions that will later create the plots
         functionsToReturn = { }
         
@@ -901,7 +904,11 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    
                                    # only used for line plots
                                    binIndex=None, tupleIndex=None,
-                                   binName=None,  tupleName=None
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None
+                                   
                                    ) :
         """
         This method generates imshow plotting functions for two dimensional data
@@ -984,7 +991,6 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                               "Trouble.png", compared_fig_list)
         
         return functionsToReturn
-
 
 if __name__=='__main__':
     import doctest

@@ -152,6 +152,11 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         ## display the epsilon
         epsilon value: ${runInfo['epsilon']} <br>
         
+        ## if there is an epsilon percent, also show that
+        % if ('epsilon_percent' in runInfo) and (runInfo['epsilon_percent'] is not None) :
+            epsilon percent: ${runInfo['epsilon_percent']}% <br>
+        % endif
+        
         ## display the missing value
         % if ('missing_value_alt_in_b' in runInfo) and (not (runInfo['missing_value_alt_in_b'] is runInfo['missing_value'])) :
             "missing" data value in A: ${str(runInfo['missing_value'])}<br>

@@ -55,38 +55,27 @@ glance_analysis_defaults = {'epsilon': 0.0,
                             'minimum_acceptable_squared_correlation_coefficient': None
                             }
 
-# TODO, remove?
-def _cvt_names(namelist, epsilon, missing):
-    """"if variable names are of the format name:epsilon, yield name,epsilon, missing
-        otherwise yield name,default-epsilon,default-missing
-    """
-    for name in namelist:
-        if ':' not in name:
-            yield name, epsilon
-        else:
-            n,e,m = name.split(':')
-            if not e: e = epsilon
-            else: e = float(e)
-            if not m: m = missing
-            else: m = float(m)
-            yield n, e, m
-
 def _clean_path(string_path) :
     """
     Return a clean form of the path without any '.', '..', or '~'
     """
+    clean_path = None
     if string_path is not None :
         clean_path = os.path.abspath(os.path.expanduser(string_path))
-    else :
-        clean_path = string_path
+    
     return clean_path
 
-# TODO comment more clearly
 def _parse_varnames(names, terms, epsilon=0.0, missing=None):
     """filter variable names and substitute default epsilon and missing settings if none provided
-    returns name,epsilon,missing triples
+    returns (variable name, epsilon, missing) triples
+    
     >>> _parse_varnames( ['foo','bar', 'baz', 'zoom', 'cat'], ['f..:0.5:-999', 'ba.*:0.001', 'c.t::-9999'], 1e-7 )
     set([('foo', 0.5, -999.0), ('cat', 9.9999999999999995e-08, -9999.0), ('bar', 0.001, None), ('baz', 0.001, None)])
+    
+    names   - all the variable names in the file (ie. names that should be considered valid)
+    terms   - variable selection terms given from the command line
+    epsilon - a default epsilon to be used for all variables that do not have a specific epsilon given
+    missing - a default fill value to be used for all variables that do not have a specific fill value given
     """
     terms = [x.split(':') for x in terms]
     terms = [(re.compile(x[0]).match,x[1:]) for x in terms]
@@ -373,6 +362,29 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     
     return paths, runInfo, defaultsToUse, requestedNames, usedConfigFile
 
+def _get_variable_can_end_program(fileObject, variableName, dataType, canEndProgram=True) :
+    """
+    load a variable, exiting the program if there is an error
+    and canEndProgram is passed as True
+    
+    TODO, instead of exiting, throw an exception
+    """
+    
+    dataToReturn = None
+    
+    # get the data from the file
+    try :
+        dataToReturn = array(fileObject[variableName], dtype=dataType)
+    except CDFError :
+        LOG.warn ('Unable to retrieve ' + variableName + ' data. The variable name ' + 
+                  ' may not exist in this file or an error may have occured while attempting to' +
+                  ' access the data.')
+        if canEndProgram :
+            LOG.warn ('Unable to continue analysis without ' + variableName + ' data. Aborting analysis.')
+            sys.exit(1)
+    
+    return dataToReturn
+
 def _get_and_analyze_lon_lat (fileObject,
                               latitudeVariableName, longitudeVariableName,
                               latitudeDataFilterFn=None, longitudeDataFilterFn=None) :
@@ -381,24 +393,16 @@ def _get_and_analyze_lon_lat (fileObject,
     and analyze them to identify spacially invalid data (ie. data that would fall off the earth)
     """
     # get the data from the file TODO, handle these exits out in the calling method?
+    
+    # get the longitude
     LOG.info ('longitude name: ' + longitudeVariableName)
-    try :
-        longitudeData = array(fileObject[longitudeVariableName], dtype=float)
-    except CDFError :
-        LOG.warn ('Unable to retrieve longitude data. The variable name (' + longitudeVariableName +
-                  ') may not exist in this file or an error may have occured while attempting to' +
-                  ' access the data.')
-        LOG.warn ('Unable to continue analysis without longitude data. Aborting analysis.')
-        sys.exit(1)
+    # TODO, should this dtype be a float?
+    longitudeData = _get_variable_can_end_program(fileObject, longitudeVariableName, float)
+    
+    # get the latitude
     LOG.info ('latitude name: '  + latitudeVariableName)
-    try :
-        latitudeData  = array(fileObject[latitudeVariableName],  dtype=float)
-    except CDFError :
-        LOG.warn ('Unable to retrieve latitude data. The variable name (' + latitudeVariableName +
-                  ') may not exist in this file or an error may have occured while attempting to' +
-                  ' access the data.')
-        LOG.warn ('Unable to continue analysis without latitude data. Aborting analysis.')
-        sys.exit(1)
+    # TODO, should this dtype be a float?
+    latitudeData  = _get_variable_can_end_program(fileObject, latitudeVariableName, float)
     
     # if we have filters, use them
     if not (latitudeDataFilterFn is None) :
@@ -414,7 +418,7 @@ def _get_and_analyze_lon_lat (fileObject,
     assert (latitudeData.shape == longitudeData.shape)
     
     # build a mask of our spacially invalid data TODO, load actual valid range attributes?
-    invalidLatitude = (latitudeData < -90) | (latitudeData > 90) | ~isfinite(latitudeData)
+    invalidLatitude  = (latitudeData < -90)     | (latitudeData > 90)   | ~isfinite(latitudeData)
     invalidLongitude = (longitudeData < -180)   | (longitudeData > 360) | ~isfinite(longitudeData)
     spaciallyInvalidMask = invalidLatitude | invalidLongitude
     
@@ -641,7 +645,7 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
             return { }, { }, error_msg # things have gone wrong
         # update our existing spatial information
         spatialInfo.update(moreSpatialInfo)
-    
+        
         # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
         spaciallyInvalidMask, spatialInfo, longitude_common, latitude_common = \
                                 _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
@@ -1278,10 +1282,11 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                              doPlotSettingsDict = varRunInfo,
                              aUData=aUData, aVData=aVData,
                              bUData=bUData, bVData=bVData,
-                             binIndex=  varRunInfo['binIndex']   if 'binIndex'   in varRunInfo else None,
-                             tupleIndex=varRunInfo['tupleIndex'] if 'tupleIndex' in varRunInfo else None,
-                             binName=   varRunInfo['binName']    if 'binName'    in varRunInfo else 'bin',
-                             tupleName= varRunInfo['tupleName']  if 'tupleName'  in varRunInfo else 'tuple')
+                             binIndex=      varRunInfo['binIndex']        if 'binIndex'        in varRunInfo else None,
+                             tupleIndex=    varRunInfo['tupleIndex']      if 'tupleIndex'      in varRunInfo else None,
+                             binName=       varRunInfo['binName']         if 'binName'         in varRunInfo else 'bin',
+                             tupleName=     varRunInfo['tupleName']       if 'tupleName'       in varRunInfo else 'tuple',
+                             epsilonPercent=varRunInfo['epsilon_percent'] if 'epsilon_percent' in varRunInfo else None)
                 
                 print("\tfinished creating figures for: " + explanationName)
             
@@ -1373,7 +1378,7 @@ def stats_library_call(afn, bfn, var_list=[ ],
     doc_each  = do_document and len(names)==1
     doc_atend = do_document and len(names)!=1
     
-    for name,epsilon,missing in names:
+    for name, epsilon, missing in names:
         aData = aFile[name]
         bData = bFile[name]
         if missing is None:

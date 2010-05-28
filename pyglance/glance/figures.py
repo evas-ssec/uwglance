@@ -264,12 +264,12 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
     # the location is in the form x, y (I think)
     if displayStats :
         # info on the basic stats
-        tempMask = ones(data.shape,dtype=bool)
-        tempStats = statistics.stats(data, tempMask, None)
+        tempMask  = ones(data.shape, dtype=bool)
+        tempStats = statistics.NumericalComparisonStatistics.basic_analysis(data, tempMask)
         medianVal = tempStats['median_diff']
         meanVal   = tempStats['mean_diff']
         stdVal    = tempStats['std_diff']
-        numPts = data.size
+        numPts    = data.size
         
         # info on the display of our statistics
         xbounds = axes.get_xbound()
