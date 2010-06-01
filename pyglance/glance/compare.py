@@ -11,6 +11,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys, logging, re, subprocess, datetime
 import imp as imp
+from pprint import pprint, pformat
 from numpy import *
 import pkg_resources
 from pycdf import CDFError
@@ -19,12 +20,12 @@ from urllib import quote
 
 import glance.io     as io
 import glance.delta  as delta
+import glance.data   as dataobj
 import glance.plot   as plot
 import glance.report as report
 import glance.stats  as statistics
-import glance.data   as dataobj
-import glance.collocation as collocation
 import glance.plotcreatefns as plotcreate
+import glance.collocation   as collocation
 
 LOG = logging.getLogger(__name__)
 
@@ -939,11 +940,11 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
     # handle the longitude and latitude colocation
     LOG.info("Colocating raw longitude and latitude information")
     aColocationInfomation, bColocationInformation, totalNumberOfMatchedPoints = \
-                                collocation.create_colocation_mapping_within_epsilon((lon_lat_data['a']['lon'], lon_lat_data['a']['lat']),
-                                                                                     (lon_lat_data['b']['lon'], lon_lat_data['b']['lat']),
-                                                                                     runInfo['lon_lat_epsilon'],
-                                                                                     invalidAMask=lon_lat_data['a']['inv_mask'],
-                                                                                     invalidBMask=lon_lat_data['b']['inv_mask'])
+                    collocation.create_colocation_mapping_within_epsilon((lon_lat_data['a']['lon'], lon_lat_data['a']['lat']),
+                                                                         (lon_lat_data['b']['lon'], lon_lat_data['b']['lat']),
+                                                                         runInfo['lon_lat_epsilon'],
+                                                                         invalidAMask=lon_lat_data['a']['inv_mask'],
+                                                                         invalidBMask=lon_lat_data['b']['inv_mask'])
     (colocatedLongitude, colocatedLatitude, (numMultipleMatchesInA, numMultipleMatchesInB)), \
     (unmatchedALongitude, unmatchedALatitude), \
     (unmatchedBLongitude, unmatchedBLatitude) = \
@@ -1196,9 +1197,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
             didPass, epsilon_failed_fraction, \
                      non_finite_fail_fraction, \
-                     r_squared_value = _check_pass_or_fail(varRunInfo,
-                                                                                     variable_stats,
-                                                                                     defaultValues)
+                     r_squared_value = _check_pass_or_fail(varRunInfo, variable_stats, defaultValues)
             varRunInfo['did_pass'] = didPass
             
             # based on the settings and whether the variable passsed or failed,
@@ -1387,12 +1386,10 @@ def stats_library_call(afn, bfn, var_list=[ ],
         else:
             amiss,bmiss = missing,missing
         LOG.debug('comparing %s with epsilon %s and missing %s,%s' % (name,epsilon,amiss,bmiss))
-        aval = aData
-        bval = bData
         print >> output_channel, '-'*32
         print >> output_channel, name
         print >> output_channel, '' 
-        lal = list(statistics.summarize(aval,bval,epsilon,(amiss,bmiss)).items()) 
+        lal = list(statistics.summarize(aData, bData, epsilon, (amiss,bmiss)).items()) 
         lal.sort()
         for dictionary_title, dict_data in lal:
             print >> output_channel, '%s' %  dictionary_title
@@ -1748,6 +1745,7 @@ python -m glance
     
     if (not args) or (args[0] not in commands): 
         parser.print_help()
+        # TODO more descriptions?
         help()
         return 9
     else:

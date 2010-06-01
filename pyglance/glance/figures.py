@@ -46,7 +46,7 @@ greenColorMap = colors.LinearSegmentedColormap('greenColorMap', greenColorMapDat
 # todo, the use of the offset here is covering a problem with
 # contourf hiding data exactly at the end of the range and should
 # be removed if a better solution can be found
-def _make_range(data_a, invalid_a_mask, num_intervals, offset_to_range=0.0, data_b=None, invalid_b_mask=None) :
+def _make_range(data_a, valid_a_mask, num_intervals, offset_to_range=0.0, data_b=None, valid_b_mask=None) :
     """
     get an array with numbers representing the bounds of a set of ranges
     that covers all the data present in data_a
@@ -55,13 +55,13 @@ def _make_range(data_a, invalid_a_mask, num_intervals, offset_to_range=0.0, data
     if the b data is passed, a total range that encompasses both sets of
     data will be used
     """
-    minVal = delta.min_with_mask(data_a, ~invalid_a_mask)
-    maxVal = delta.max_with_mask(data_a, ~invalid_a_mask)
+    minVal = delta.min_with_mask(data_a, valid_a_mask)
+    maxVal = delta.max_with_mask(data_a, valid_a_mask)
     
     # if we have a second set of data, include it in the min/max calculations
     if (data_b is not None) :
-        minVal = min(delta.min_with_mask(data_b, ~invalid_b_mask), minVal)
-        maxVal = max(delta.max_with_mask(data_b, ~invalid_b_mask), maxVal)
+        minVal = min(delta.min_with_mask(data_b, valid_b_mask), minVal)
+        maxVal = max(delta.max_with_mask(data_b, valid_b_mask), maxVal)
     
     minVal = minVal - offset_to_range
     maxVal = maxVal + offset_to_range
@@ -318,7 +318,7 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
     # this is controllable with the "dataRanges" parameter for discrete data display
     if not (data is None) :
         if dataRanges is None :
-            dataRanges = _make_range(data, invalidMask, 50, offset_to_range=offsetToRange)
+            dataRanges = _make_range(data, ~invalidMask, 50, offset_to_range=offsetToRange)
         else: # make sure the user range will not discard data TODO, find a better way to handle this
             dataRanges[0] = dataRanges[0] - offsetToRange
             dataRanges[len(dataRanges) - 1] = dataRanges[len(dataRanges) - 1] + offsetToRange
@@ -340,7 +340,7 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
     # show a generic color bar
     doLabelRanges = False
     if not (data is None) :
-        cbar = colorbar(format='%.3f')
+        cbar = colorbar(format='%.3g')
         # if there are specific requested labels, add them
         if not (dataRangeNames is None) :
             
@@ -433,7 +433,7 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colo
         # draw our data
         im = imshow(cleanData, **kwargs)
         # make a color bar
-        cbar = colorbar(format='%.3f')
+        cbar = colorbar(format='%.3g')
     
     # and some informational stuff
     axes.set_title(figureTitle)

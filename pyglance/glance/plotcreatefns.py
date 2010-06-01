@@ -84,6 +84,11 @@ def select_projection(boundingAxes) :
     # a wider range of projections.
     projToUse = 'cyl'
     
+    # TODO, the cylindrical projections now have some sort of bizarre behavior where they
+    # show crazy things in the empty space in soundings data. instead we are moving back to
+    # conics for the moment and additional testing has been added to widen the viewing window
+    #projToUse = 'lcc'
+    
     # how big is the field of view?
     longitudeRange  = abs(boundingAxes[1] - boundingAxes[0])
     latitudeRange   = abs(boundingAxes[3] - boundingAxes[2])
@@ -127,6 +132,51 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, shouldUseSh
     LOG.info('\t\tloading base map data')
     baseMapInstance, fullAxis = maps.create_basemap(lonLatDataDict['common']['lon'], lonLatDataDict['common']['lat'],
                                                     fullAxis, select_projection(fullAxis))
+    
+    """ TODO, this doesn't work, but we will need something eventually
+    if (projection is 'lcc') :
+        # TODO this is a hack to make sure all my data is visible in a lcc projection
+        # otherwise the conic projection may cause part of the data to curve
+        # out of the field of view
+        # at some point in the future this should be integrated in a more elegant way
+        
+        # preprocess a copy of our lon/lat data
+        lonACopy = lonLatDataDict['a']['lon'].copy()
+        lonACopy[~goodInAMask] = maps.badLonLat
+        latACopy = lonLatDataDict['a']['lat'].copy()
+        latACopy[~goodInAMask] = maps.badLonLat
+        lonBCopy = lonLatDataDict['b']['lon'].copy()
+        lonBCopy[~goodInBMask] = maps.badLonLat
+        latBCopy = lonLatDataDict['b']['lat'].copy()
+        latBCopy[~goodInBMask] = maps.badLonLat
+        
+        # find out where the longitude and latitude data would be in x and y
+        xTempA, yTempA = baseMapInstance(lonACopy, latACopy)
+        xTempB, yTempB = baseMapInstance(lonBCopy, latBCopy)
+        maxX = max(max(xTempA[goodInAMask]), max(xTempB[goodInBMask]))
+        minX = min(min(xTempA[goodInAMask]), min(xTempB[goodInBMask]))
+        maxY = max(max(yTempA[goodInAMask]), max(yTempB[goodInBMask]))
+        minY = min(min(yTempA[goodInAMask]), min(yTempB[goodInBMask]))
+        
+        # the corners of a bounding box (starting at the upper right going clockwise)
+        cornerX = [maxX, maxX, minX, minX]
+        cornerY = [maxY, minY, minY, maxY]
+        
+        # now where is this in the lon / lat space?
+        newLon, newLat = baseMapInstance(cornerX, cornerY, inverse=True)
+        newLon = np.array(newLon)
+        newLat = np.array(newLat)
+        # use this to make a new axis that will include all the data
+        borderAxis = get_visible_axes(newLon, newLat, ones(newLon.shape, dtype=bool))
+        fullAxis = borderAxis
+        #fullAxis   = [min(borderAxis[0], fullAxis[0]), max(borderAxis[1], fullAxis[1]),
+        #              min(borderAxis[2], fullAxis[2]), max(borderAxis[3], fullAxis[3])]
+        
+        # make our new and improved basemap
+        baseMapInstance, fullAxis = maps.create_basemap(lonLatDataDict['common']['lon'],
+                                                        lonLatDataDict['common']['lat'],
+                                                        fullAxis, projection)
+    """
     
     # figure out the shared range for A and B's data, by default don't share a range
     sharedRange = None
@@ -316,6 +366,7 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
         assert(goodInAMask    is not None)
         assert(goodInBMask    is not None)
         
+        # TODO, do I also need to encorporate the lon/lat invalid masks with the good masks?
         fullAxis, baseMapInstance, sharedRange = _make_axis_and_basemap(lonLatDataDict,
                                                                         goodInAMask, goodInBMask,
                                                                         shouldUseSharedRangeForOriginal,
@@ -490,7 +541,9 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
         assert(goodInAMask    is not None)
         assert(goodInBMask    is not None)
         
-        fullAxis, baseMapInstance, _ = _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, variableDisplayName=variableDisplayName)
+        # TODO, do I also need to encorporate the lon/lat invalid masks with the good masks?
+        fullAxis, baseMapInstance, _ = _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask,
+                                                              variableDisplayName=variableDisplayName)
         
         # make the plotting functions
         
@@ -776,9 +829,11 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         assert(tupleIndex < len(aData.shape))
         
         # reorder and reshape our data into the [bin][case][tuple] form
-        reorderMapObject = delta.BinTupleMapping(aData.shape, binIndexNumber=binIndex, tupleIndexNumber=tupleIndex)
-        aData = reorderMapObject.reorder_for_bin_tuple(aData)
-        bData = reorderMapObject.reorder_for_bin_tuple(bData)
+        reorderMapObject   = delta.BinTupleMapping(aData.shape,
+                                                   binIndexNumber=binIndex,
+                                                   tupleIndexNumber=tupleIndex)
+        aData              = reorderMapObject.reorder_for_bin_tuple(aData)
+        bData              = reorderMapObject.reorder_for_bin_tuple(bData)
         goodInAMask        = reorderMapObject.reorder_for_bin_tuple(goodInAMask)
         goodInBMask        = reorderMapObject.reorder_for_bin_tuple(goodInBMask)
         absDiffData        = reorderMapObject.reorder_for_bin_tuple(absDiffData)
@@ -804,7 +859,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                                                              goodInBothMask[binNumber][caseNumber])
             
             # make the basic histogram for this binNumber
-            dataForHistogram = rmsDiffValues[isfinite(rmsDiffValues)] # remove any invalid data "nan" values
+            dataForHistogram = rmsDiffValues[np.isfinite(rmsDiffValues)] # remove any invalid data "nan" values
             if ('do_plot_histogram' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_histogram']) :
                 def make_histogram(binNumber=binNumber, dataForHistogram=dataForHistogram):
                     return figures.create_histogram(dataForHistogram, numHistogramSections,

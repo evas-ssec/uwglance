@@ -148,6 +148,15 @@ class DiffInfoObject (object) :
     (if both a value and percent are present, two epsilon tests will be done)
     """
     
+    # Upcasts to be used in difference computation to avoid overflow. Currently only unsigned
+    # ints are upcast.
+    # FUTURE: handle uint64s as well (there is no int128, so might have to detect overflow)
+    DATATYPE_UPCASTS = {
+        np.uint8:  np.int16,
+        np.uint16: np.int32,
+        np.uint32: np.int64
+        }
+    
     def __init__(self, aDataObject, bDataObject,
                  epsilonValue=0.0, epsilonPercent=None) :
         """
@@ -164,15 +173,6 @@ class DiffInfoObject (object) :
         # analyze our data and get the difference object
         self.diff_data_object = DiffInfoObject.analyze(aDataObject, bDataObject,
                                                        epsilonValue, epsilonPercent)
-    
-    # Upcasts to be used in difference computation to avoid overflow. Currently only unsigned
-    # ints are upcast.
-    # FUTURE: handle uint64s as well (there is no int128, so might have to detect overflow)
-    DATATYPE_UPCASTS = {
-        np.uint8:  np.int16,
-        np.uint16: np.int32,
-        np.uint32: np.int64
-        }
     
     @staticmethod
     def _get_shared_type_and_fill_value(data1, data2, fill1=None, fill2=None) :
