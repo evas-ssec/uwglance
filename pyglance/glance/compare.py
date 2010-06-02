@@ -1186,12 +1186,16 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             if not do_not_test_with_lon_lat :
                 mask_a_to_use = lon_lat_data['a']['inv_mask']
                 mask_b_to_use = lon_lat_data['b']['inv_mask']
-            variable_stats = statistics.summarize(aData, bData,
-                                                  varRunInfo['epsilon'],
-                                                  (varRunInfo['missing_value'],
-                                                   varRunInfo['missing_value_alt_in_b']),
-                                                  mask_a_to_use, mask_b_to_use,
-                                                  varRunInfo['epsilon_percent'])
+            variable_stats = statistics.StatisticalAnalysis(aData, bData,
+                                                            varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b'],
+                                                            mask_a_to_use, mask_b_to_use,
+                                                            varRunInfo['epsilon'], varRunInfo['epsilon_percent']).dictionary_form()
+            #variable_stats = statistics.summarize(aData, bData,
+            #                                      varRunInfo['epsilon'],
+            #                                      (varRunInfo['missing_value'],
+            #                                       varRunInfo['missing_value_alt_in_b']),
+            #                                      mask_a_to_use, mask_b_to_use,
+            #                                      varRunInfo['epsilon_percent'])
             
             # add a little additional info to our variable run info before we squirrel it away
             varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
@@ -1342,7 +1346,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         
         # make the glossary
         print ('generating glossary')
-        report.generate_and_save_doc_page(statistics.STATISTICS_DOC, pathsTemp['out'])
+        report.generate_and_save_doc_page(statistics.StatisticalAnalysis.doc_strings(), pathsTemp['out'])
     
     return
 
@@ -1388,15 +1392,17 @@ def stats_library_call(afn, bfn, var_list=[ ],
         LOG.debug('comparing %s with epsilon %s and missing %s,%s' % (name,epsilon,amiss,bmiss))
         print >> output_channel, '-'*32
         print >> output_channel, name
-        print >> output_channel, '' 
-        lal = list(statistics.summarize(aData, bData, epsilon, (amiss,bmiss)).items()) 
+        print >> output_channel, ''
+        variable_stats = statistics.StatisticalAnalysis(aData, bData, amiss, bmiss, epsilon=epsilon)
+        lal = list(variable_stats.dictionary_form().items())
+        #lal = list(statistics.summarize(aData, bData, epsilon, (amiss,bmiss)).items()) 
         lal.sort()
         for dictionary_title, dict_data in lal:
             print >> output_channel, '%s' %  dictionary_title
             dict_data
             for each_stat in sorted(list(dict_data)):
                 print >> output_channel, '  %s: %s' % (each_stat, dict_data[each_stat])
-                if doc_each: print >> output_channel, ('    ' + statistics.STATISTICS_DOC[each_stat])
+                if doc_each: print >> output_channel, ('    ' + statistics.StatisticalAnalysis.doc_strings()[each_stat])
             print >> output_channel, '' 
     if doc_atend:
         print >> output_channel, ('\n\n' + statistics.STATISTICS_DOC_STR)
