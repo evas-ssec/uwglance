@@ -295,7 +295,7 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     requestedConfigFile = optionsSet['configFile']
     usedConfigFile = False
     
-    if (not (requestedConfigFile is None)) and os.path.exists(requestedConfigFile):
+    if (requestedConfigFile is not None) and os.path.exists(requestedConfigFile):
         
         LOG.info ("Using Config File Settings")
         
@@ -467,7 +467,7 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     bDataObject = dataobj.DataObject(longitudeB, ignoreMask=ignoreMaskB)
     diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=llepsilon) #TODO, needs epsilon percent
     #TODO, for the moment, unpack these values into local variables
-    longitudeDiff = diffInfo.diff_data_object.data
+    longitudeDiff       = diffInfo.diff_data_object.data
     finiteLongitudeMask = diffInfo.diff_data_object.masks.valid_mask
     lon_not_equal_mask  = diffInfo.diff_data_object.masks.trouble_mask
     
@@ -475,7 +475,7 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     bDataObject = dataobj.DataObject(latitudeB, ignoreMask=ignoreMaskB)
     diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=llepsilon) #TODO, needs epsilon percent
     #TODO, for the moment, unpack these values into local variables
-    latitudeDiff = diffInfo.diff_data_object.data
+    latitudeDiff       = diffInfo.diff_data_object.data
     finiteLatitudeMask = diffInfo.diff_data_object.masks.valid_mask
     lat_not_equal_mask = diffInfo.diff_data_object.masks.trouble_mask
     
@@ -749,10 +749,12 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     # figure out the overall pass/fail result
     didPass = None
     for passValue in passValues :
-        if (passValue is None) or (didPass is None) :
-            didPass = didPass or  passValue
-        else :
-            didPass = didPass and passValue
+        # if passValue isn't none, we need to update didPass
+        if passValue is not None :
+            if didPass is not None :
+                didPass = passValue and didPass
+            else :
+                didPass = passValue
     
     return didPass, failed_fraction, non_finite_diff_fraction, r_squared_value
 

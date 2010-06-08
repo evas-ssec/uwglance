@@ -303,13 +303,16 @@ def create_colocated_lonlat_with_lon_lat_colocation(listOfColocatedALonLat, list
 def create_colocated_data_with_lon_lat_colocation(listOfColocatedALonLat, listOfColocatedBLonLat,
                                                   colocatedLongitude, colocatedLatitude,
                                                   aData, bData,
-                                                  missingData=None, altMissingDataInB=None,
+                                                  missingData, altMissingDataInB=None,
                                                   invalidAMask=None, invalidBMask=None) :
     """
     given a pre colocated list of A and B lon/lat info from create_colocation_mapping_within_epsilon,
     match up the valid data in two data sets and return the list of valid data, padded with missing
     values so that it will match the original longitude and latitude
     """
+    
+    # Todo other asserts needed?
+    assert(missingData is not None)
     
     if altMissingDataInB is None :
         altMissingDataInB = missingData

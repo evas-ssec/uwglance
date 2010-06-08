@@ -100,13 +100,25 @@ def select_projection(boundingAxes) :
     
     return projToUse
 
-def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, shouldUseSharedRangeForOriginal=False, variableDisplayName=None) :
+def _make_shared_range(aData, goodInAMask, bData, goodInBMask, shouldUseSharedRangeForOriginal=False) :
     """
-    Determine the appropriate axes for the given data (in longitude and latitude) and create the appropriate basemap and shared
-    range information.
+    If a shared range is desired, figure out what the shared range including all the data in
+    both sets is and return it. If it is not desired, return None.
+    """
     
-    fullAxis, baseMapInstance, sharedRange = _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask,
-                                                                                   shouldUseSharedRangeForOriginal=False)
+    # figure out the shared range for A and B's data, by default don't share a range
+    sharedRange = None
+    if (shouldUseSharedRangeForOriginal) :
+        sharedRange = figures._make_range(aData, ~goodInAMask, 50, offset_to_range=figures.offsetToRange,
+                                   data_b=bData, invalid_b_mask=~goodInBMask)
+    
+    return sharedRange
+
+def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, variableDisplayName=None) :
+    """
+    Determine the appropriate axes for the given data (in longitude and latitude) and create the appropriate basemap.
+    
+    fullAxis, baseMapInstance, sharedRange = _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask)
     """
     
     nameMessage = ''
@@ -133,58 +145,7 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, shouldUseSh
     baseMapInstance, fullAxis = maps.create_basemap(lonLatDataDict['common']['lon'], lonLatDataDict['common']['lat'],
                                                     fullAxis, select_projection(fullAxis))
     
-    """ TODO, this doesn't work, but we will need something eventually
-    if (projection is 'lcc') :
-        # TODO this is a hack to make sure all my data is visible in a lcc projection
-        # otherwise the conic projection may cause part of the data to curve
-        # out of the field of view
-        # at some point in the future this should be integrated in a more elegant way
-        
-        # preprocess a copy of our lon/lat data
-        lonACopy = lonLatDataDict['a']['lon'].copy()
-        lonACopy[~goodInAMask] = maps.badLonLat
-        latACopy = lonLatDataDict['a']['lat'].copy()
-        latACopy[~goodInAMask] = maps.badLonLat
-        lonBCopy = lonLatDataDict['b']['lon'].copy()
-        lonBCopy[~goodInBMask] = maps.badLonLat
-        latBCopy = lonLatDataDict['b']['lat'].copy()
-        latBCopy[~goodInBMask] = maps.badLonLat
-        
-        # find out where the longitude and latitude data would be in x and y
-        xTempA, yTempA = baseMapInstance(lonACopy, latACopy)
-        xTempB, yTempB = baseMapInstance(lonBCopy, latBCopy)
-        maxX = max(max(xTempA[goodInAMask]), max(xTempB[goodInBMask]))
-        minX = min(min(xTempA[goodInAMask]), min(xTempB[goodInBMask]))
-        maxY = max(max(yTempA[goodInAMask]), max(yTempB[goodInBMask]))
-        minY = min(min(yTempA[goodInAMask]), min(yTempB[goodInBMask]))
-        
-        # the corners of a bounding box (starting at the upper right going clockwise)
-        cornerX = [maxX, maxX, minX, minX]
-        cornerY = [maxY, minY, minY, maxY]
-        
-        # now where is this in the lon / lat space?
-        newLon, newLat = baseMapInstance(cornerX, cornerY, inverse=True)
-        newLon = np.array(newLon)
-        newLat = np.array(newLat)
-        # use this to make a new axis that will include all the data
-        borderAxis = get_visible_axes(newLon, newLat, ones(newLon.shape, dtype=bool))
-        fullAxis = borderAxis
-        #fullAxis   = [min(borderAxis[0], fullAxis[0]), max(borderAxis[1], fullAxis[1]),
-        #              min(borderAxis[2], fullAxis[2]), max(borderAxis[3], fullAxis[3])]
-        
-        # make our new and improved basemap
-        baseMapInstance, fullAxis = maps.create_basemap(lonLatDataDict['common']['lon'],
-                                                        lonLatDataDict['common']['lat'],
-                                                        fullAxis, projection)
-    """
-    
-    # figure out the shared range for A and B's data, by default don't share a range
-    sharedRange = None
-    if (shouldUseSharedRangeForOriginal) :
-        sharedRange = figures._make_range(aData, ~goodInAMask, 50, offset_to_range=figures.offsetToRange,
-                                   data_b=bData, invalid_b_mask=~goodInBMask)
-    
-    return fullAxis, baseMapInstance, sharedRange
+    return fullAxis, baseMapInstance
 
 # ********************* Section of public classes ***********************
 
@@ -367,10 +328,12 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
         assert(goodInBMask    is not None)
         
         # TODO, do I also need to encorporate the lon/lat invalid masks with the good masks?
-        fullAxis, baseMapInstance, sharedRange = _make_axis_and_basemap(lonLatDataDict,
-                                                                        goodInAMask, goodInBMask,
-                                                                        shouldUseSharedRangeForOriginal,
-                                                                        variableDisplayName)
+        fullAxis, baseMapInstance = _make_axis_and_basemap(lonLatDataDict,
+                                                           goodInAMask, goodInBMask,
+                                                           variableDisplayName)
+        sharedRange = _make_shared_range(aData, goodInAMask,
+                                         bData, goodInBMask,
+                                         shouldUseSharedRangeForOriginal)
         
         # make the plotting functions
         
@@ -542,8 +505,8 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
         assert(goodInBMask    is not None)
         
         # TODO, do I also need to encorporate the lon/lat invalid masks with the good masks?
-        fullAxis, baseMapInstance, _ = _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask,
-                                                              variableDisplayName=variableDisplayName)
+        fullAxis, baseMapInstance = _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask,
+                                                           variableDisplayName=variableDisplayName)
         
         # make the plotting functions
         

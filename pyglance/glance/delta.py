@@ -199,7 +199,7 @@ class BinTupleMapping (object) :
         self.bin_dimension_index   = binIndexNumber
         self.tuple_dimension_index = tupleIndexNumber
         
-        # get the new index ordering for the data # TODO, bring call into class
+        # get the new index ordering for the data
         self.new_index_order     = BinTupleMapping._make_new_index_list(numberOfDimensions,
                                                                         self.bin_dimension_index,
                                                                         self.tuple_dimension_index)

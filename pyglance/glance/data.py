@@ -98,9 +98,6 @@ class DataObject (object) :
         If the fill value is provided it is expected to be of the same
         data type as the data array.
         """
-        
-        # TODO, add some assertions for our expectations
-        
         self.data       = dataArray
         self.fill_value = fillValue
         self.masks      = BasicMaskSetObject(ignoreMask)
@@ -254,10 +251,8 @@ class DiffInfoObject (object) :
             outside_epsilon_mask = outside_epsilon_mask |  \
                                    (abs(raw_diff) > epsilonValue) & valid_in_both
         if (epsilonPercent is not None) :
-            # TODO, test this part of the formula
             outside_epsilon_mask = outside_epsilon_mask |  \
                                    ((abs(raw_diff) > (aDataObject.data * (float(epsilonPercent) / 100.0))) & valid_in_both)
-        #outside_epsilon_mask = (abs(raw_diff) > epsilonValue) & valid_in_both # TODO also use epsilon percent
         
         # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
         trouble_pt_mask = ( (aDataObject.masks.non_finite_mask ^ bDataObject.masks.non_finite_mask) |
