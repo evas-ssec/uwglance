@@ -181,8 +181,10 @@ class DiffInfoObject (object) :
         
         # figure out the shared type
         type_to_return = data1.dtype
+        changed_type   = False
         if data1.dtype is not data2.dtype:
             type_to_return = np.common_type(data1, data2)
+            changed_type   = True
         
         # upcast the type if we need to
         if type_to_return in DiffInfoObject.DATATYPE_UPCASTS :
@@ -193,21 +195,30 @@ class DiffInfoObject (object) :
         # figure out the fill value
         fill_value_to_return = None
         
-        # if we're looking at float or complex data, use a nan
-        if (np.issubdtype(type_to_return, np.float) or
-            np.issubdtype(type_to_return, np.complex)) :
-            fill_value_to_return = np.nan
-        
-        # if we're looking at int data, use the minimum value
-        elif np.issubdtype(type_to_return, np.int) :
-            fill_value_to_return = np.iinfo(type_to_return).min
-        
-        # if we're looking at unsigned data, use the maximum value
-        elif ((type_to_return is np.uint8)  or
-              (type_to_return is np.uint16) or
-              (type_to_return is np.uint32) or
-              (type_to_return is np.uint64)) :
-            fill_value_to_return = np.iinfo(type_to_return).max
+        # if both of the old fill values exist and are the same, use them
+        if (fill1 is not None) and (fill1 == fill2) :
+            
+            fill_value_to_return = fill1
+            if changed_type :
+                fill_value_to_return = type_to_return(fill_value_to_return)
+            
+        else: 
+            
+            # if we're looking at float or complex data, use a nan
+            if (np.issubdtype(type_to_return, np.float) or
+                np.issubdtype(type_to_return, np.complex)) :
+                fill_value_to_return = np.nan
+            
+            # if we're looking at int data, use the minimum value
+            elif np.issubdtype(type_to_return, np.int) :
+                fill_value_to_return = np.iinfo(type_to_return).min
+            
+            # if we're looking at unsigned data, use the maximum value
+            elif ((type_to_return is np.uint8)  or
+                  (type_to_return is np.uint16) or
+                  (type_to_return is np.uint32) or
+                  (type_to_return is np.uint64)) :
+                fill_value_to_return = np.iinfo(type_to_return).max
         
         return type_to_return, fill_value_to_return
     

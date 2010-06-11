@@ -1181,6 +1181,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 LOG.debug("Variable directory (" + variableDir + ") does not exist.")
                 LOG.debug("Creating variable directory.")
                 os.makedirs(variableDir)
+            varRunInfo['doc_path'] = quote(os.path.join(pathsTemp['out'], './' + 'doc.html')) # should this be somewhere else?
             
             # figure out the masks we want, and then do our statistical analysis
             mask_a_to_use = None

@@ -190,7 +190,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
             </dt>
             <dd>
                 % for statName, statValue in sorted(list(dataSet.items())) :
-                    ${statName}<a href="../doc.html">*</a>: ${report.make_formatted_display_string(statValue)} <br>
+                    ${statName}<a href="${runInfo['doc_path']}">*</a>: ${report.make_formatted_display_string(statValue)} <br>
                 % endfor
                 <br>
             <dd>

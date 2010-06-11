@@ -496,11 +496,18 @@ class NumericalComparisonStatistics (StatisticalData) :
         if (include_basic_analysis) :
             basic_dict = NumericalComparisonStatistics.basic_analysis(diffInfoObject.diff_data_object.data,
                                                                       valid_in_both)
-            self.rms_diff      = basic_dict['rms_diff']
-            self.std_diff      = basic_dict['std_diff']
-            self.mean_diff     = basic_dict['mean_diff']
-            self.median_diff   = basic_dict['median_diff']
-            self.max_diff      = basic_dict['max_diff']
+            if len(basic_dict) > 0 :
+                self.rms_diff      = basic_dict['rms_diff']
+                self.std_diff      = basic_dict['std_diff']
+                self.mean_diff     = basic_dict['mean_diff']
+                self.median_diff   = basic_dict['median_diff']
+                self.max_diff      = basic_dict['max_diff']
+            else :
+                self.rms_diff      = np.nan
+                self.std_diff      = np.nan
+                self.mean_diff     = np.nan
+                self.median_diff   = np.nan
+                self.max_diff      = np.nan
             self.temp_analysis = basic_dict
     
     def dictionary_form(self) :
