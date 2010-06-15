@@ -39,12 +39,37 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     % endfor
     
     ## display info on the config file that was used, if one was
-    % if ('config_file_name' in runInfo) and (runInfo['config_file_name'] is not None) :
+    % if ('config_file_path' in runInfo) and (runInfo['config_file_path'] is not None) :
         <p>
             A configuration file was used to control the production report.<br>
-            Please see <a href="${runInfo['config_file_name']}">this copy of the configuration file</a>
+            Please see <a href="${runInfo['config_file_path']}">this copy of the configuration file</a>
             for details.
         </p>
+        
+        <p>
+            ## display information about any data filtering on the lons/lats
+            <% wasFiltered = False %>
+            % if ('data_filter_function_lat_in_a' in runInfo) and (not (runInfo['data_filter_function_lat_in_a'] is None)) :
+                Note: The latitude in file A was filtered.<br>
+                <% wasFiltered = True %>
+            % endif
+            % if ('data_filter_function_lat_in_b' in runInfo) and (not (runInfo['data_filter_function_lat_in_b'] is None)) :
+                Note: The latitude in file B was filtered.<br>
+                <% wasFiltered = True %>
+            % endif
+            % if ('data_filter_function_lon_in_a' in runInfo) and (not (runInfo['data_filter_function_lon_in_a'] is None)) :
+                Note: The longitude in file A was filtered.<br>
+                <% wasFiltered = True %>
+            % endif
+            % if ('data_filter_function_lon_in_b' in runInfo) and (not (runInfo['data_filter_function_lon_in_b'] is None)) :
+                Note: The longitude in file B was filtered.<br>
+                <% wasFiltered = True %>
+            % endif
+            % if wasFiltered :
+                Please see the original configuration file to view any data filtering functions.
+            % endif
+        </p>
+        
     % endif
     
     ## if the lon/lat variables exist, display info on them
@@ -67,29 +92,6 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
             
              % if ('lon_lat_epsilon' in runInfo) and (runInfo['lon_lat_epsilon'] > 0.0) :
                 longitude/latitude comparison epsilon: ${runInfo['lon_lat_epsilon']}<br>
-            % endif
-            
-            <br>
-            ## display information about any data filtering on the lons/lats
-            % if ('data_filter_function_lat_in_a' in runInfo) and (not (runInfo['data_filter_function_lat_in_a'] is None)) :
-                Note: The latitude in file A was filtered.
-                Please see <a href="${runInfo['config_file_name']}">this copy of
-                the original configuration file</a> to view the data filtering function.<br>
-            % endif
-            % if ('data_filter_function_lat_in_b' in runInfo) and (not (runInfo['data_filter_function_lat_in_b'] is None)) :
-                Note: The latitude in file B was filtered.
-                Please see <a href="${runInfo['config_file_name']}">this copy of
-                the original configuration file</a> to view the data filtering function.<br>
-            % endif
-            % if ('data_filter_function_lon_in_a' in runInfo) and (not (runInfo['data_filter_function_lon_in_a'] is None)) :
-                Note: The longitude in file A was filtered.
-                Please see <a href="${runInfo['config_file_name']}">this copy of
-                the original configuration file</a> to view the data filtering function.<br>
-            % endif
-            % if ('data_filter_function_lon_in_b' in runInfo) and (not (runInfo['data_filter_function_lon_in_b'] is None)) :
-                Note: The longitude in file B was filtered.
-                Please see <a href="${runInfo['config_file_name']}">this copy of
-                the original configuration file</a> to view the data filtering function.<br>
             % endif
         </p>
         

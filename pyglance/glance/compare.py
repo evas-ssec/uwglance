@@ -295,45 +295,51 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     requestedConfigFile = optionsSet['configFile']
     usedConfigFile = False
     
-    if (requestedConfigFile is not None) and os.path.exists(requestedConfigFile):
-        
-        LOG.info ("Using Config File Settings")
-        
-        # this will handle relative paths
-        requestedConfigFile = os.path.abspath(os.path.expanduser(requestedConfigFile))
-        
-        # split out the file base name and the file path
-        (filePath, fileName) = os.path.split(requestedConfigFile)
-        splitFileName = fileName.split('.')
-        fileBaseName = fileName[:-3] # remove the '.py' from the end
-        
-        # hang onto info about the config file for later
-        runInfo['config_file_name'] = fileName
-        runInfo['config_file_path'] = requestedConfigFile
-        
-        # load the file
-        LOG.debug ('loading config file: ' + str(requestedConfigFile))
-        glanceRunConfig = imp.load_module(fileBaseName, file(requestedConfigFile, 'U'),
-                                          filePath, ('.py' , 'U', 1))
-        
-        # this is an exception, since it is not advertised to the user we don't expect it to be in the file
-        # (at least not at the moment, it could be added later and if they did happen to put it in the
-        # config file, it would override this line)
-        runInfo['shouldIncludeReport'] = not optionsSet['imagesOnly'] if 'imagesOnly'   in optionsSet else False
-        runInfo['noLonLatVars']        = optionsSet['noLonLatVars']   if 'noLonLatVars' in optionsSet else False
-        
-        # get everything from the config file
-        runInfo.update(glanceRunConfig.settings)
-        if ('noLonLatVars' not in runInfo) or (not runInfo['noLonLatVars']) :
-            runInfo.update(glanceRunConfig.lat_lon_info) # get info on the lat/lon variables
-        
-        # get any requested names
-        requestedNames = glanceRunConfig.setOfVariables.copy()
-        # user selected defaults, if they omit any we'll still be using the program defaults
-        defaultsToUse.update(glanceRunConfig.defaultValues)
-        
-        usedConfigFile = True
-        
+    if (requestedConfigFile is not None) and (requestedConfigFile != "") :
+        if not os.path.exists(requestedConfigFile) :
+            LOG.warn("Could not open config file: \"" + requestedConfigFile + "\"")
+            LOG.warn("Unable to continue analysis without selected configuration file.")
+            sys.exit(1)
+            
+        else :
+            
+            LOG.info ("Using Config File Settings")
+            
+            # this will handle relative paths
+            requestedConfigFile = os.path.abspath(os.path.expanduser(requestedConfigFile))
+            
+            # split out the file base name and the file path
+            (filePath, fileName) = os.path.split(requestedConfigFile)
+            splitFileName = fileName.split('.')
+            fileBaseName = fileName[:-3] # remove the '.py' from the end
+            
+            # hang onto info about the config file for later
+            runInfo['config_file_name'] = fileName
+            runInfo['config_file_path'] = requestedConfigFile
+            
+            # load the file
+            LOG.debug ('loading config file: ' + str(requestedConfigFile))
+            glanceRunConfig = imp.load_module(fileBaseName, file(requestedConfigFile, 'U'),
+                                              filePath, ('.py' , 'U', 1))
+            
+            # this is an exception, since it is not advertised to the user we don't expect it to be in the file
+            # (at least not at the moment, it could be added later and if they did happen to put it in the
+            # config file, it would override this line)
+            runInfo['shouldIncludeReport'] = not optionsSet['imagesOnly'] if 'imagesOnly'   in optionsSet else False
+            runInfo['noLonLatVars']        = optionsSet['noLonLatVars']   if 'noLonLatVars' in optionsSet else False
+            
+            # get everything from the config file
+            runInfo.update(glanceRunConfig.settings)
+            if ('noLonLatVars' not in runInfo) or (not runInfo['noLonLatVars']) :
+                runInfo.update(glanceRunConfig.lat_lon_info) # get info on the lat/lon variables
+            
+            # get any requested names
+            requestedNames = glanceRunConfig.setOfVariables.copy()
+            # user selected defaults, if they omit any we'll still be using the program defaults
+            defaultsToUse.update(glanceRunConfig.defaultValues)
+            
+            usedConfigFile = True
+    
     # if we didn't get the info from the config file for some reason
     # (the user didn't want to, we couldn't, etc...) get it from the command line options
     if not usedConfigFile:
@@ -1182,6 +1188,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 LOG.debug("Creating variable directory.")
                 os.makedirs(variableDir)
             varRunInfo['doc_path'] = quote(os.path.join(pathsTemp['out'], './' + 'doc.html')) # should this be somewhere else?
+            if 'config_file_name' in runInfo :
+                varRunInfo['config_file_path'] = quote(os.path.join(pathsTemp['out'], './' + runInfo['config_file_name']))
             
             # figure out the masks we want, and then do our statistical analysis
             mask_a_to_use = None
