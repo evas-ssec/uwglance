@@ -53,6 +53,7 @@ glance_analysis_defaults = {'epsilon': 0.0,
                             'missing_value': None,
                             'epsilon_failure_tolerance': 0.0,
                             'nonfinite_data_tolerance':  0.0,
+                            'total_data_failure_tolerance': None,
                             'minimum_acceptable_squared_correlation_coefficient': None
                             }
 
@@ -119,6 +120,7 @@ def _setup_file(fileNameAndPath, prefexText='', allowWrite=False) :
     
     return fileObject, fileInfo
 
+# TODO, make this generic for any number of file objects
 def _check_file_names(fileAObject, fileBObject) :
     """
     get information about the names in the two files and how they compare to each other
@@ -734,6 +736,19 @@ def _check_pass_or_fail(varRunInfo, variableStats, defaultValues) :
     if nonfiniteTolerance is not None :
         passed_nonfinite = non_finite_diff_fraction <= nonfiniteTolerance
     passValues.append(passed_nonfinite)
+    
+    # test if the total failed percentage is acceptable
+    
+    # get the total percentage of failed data that is acceptable
+    totalFailTolerance = None
+    if ('total_data_failure_tolerance' in varRunInfo) :
+        totalFailTolerance = varRunInfo['total_data_failure_tolerance']
+    
+    # did we fail based on all data failures?
+    passed_all_percentage = None
+    if totalFailTolerance is not None :
+        passed_all_percentage = (non_finite_diff_fraction + failed_fraction) <= totalFailTolerance
+    passValues.append(passed_all_percentage)
     
     # test the r-squared correlation coefficent
     
@@ -1502,6 +1517,7 @@ python -m glance
             except KeyError :
                 LOG.warn('Unable to open / process file selection: ' + fn)
     
+    # TODO, remove this method?
     def sdr_cris(*args):
         """compare sdr_cris output
         parameters are variable name followed by detector number
