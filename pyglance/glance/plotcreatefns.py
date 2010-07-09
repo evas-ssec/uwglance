@@ -109,8 +109,8 @@ def _make_shared_range(aData, goodInAMask, bData, goodInBMask, shouldUseSharedRa
     # figure out the shared range for A and B's data, by default don't share a range
     sharedRange = None
     if (shouldUseSharedRangeForOriginal) :
-        sharedRange = figures._make_range(aData, ~goodInAMask, 50, offset_to_range=figures.offsetToRange,
-                                   data_b=bData, invalid_b_mask=~goodInBMask)
+        sharedRange = figures._make_range(aData, goodInAMask, 50, offset_to_range=figures.offsetToRange,
+                                   data_b=bData, valid_b_mask=goodInBMask)
     
     return sharedRange
 
@@ -942,6 +942,10 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
         
         functionsToReturn = { }
         
+        sharedRange = _make_shared_range(aData, goodInAMask,
+                                         bData, goodInBMask,
+                                         shouldUseSharedRangeForOriginal)
+        
         # make the original data plots
         if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
             
@@ -949,7 +953,7 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             assert(aData.shape == goodInAMask.shape)
             
             functionsToReturn['originalA'] = ((lambda: figures.create_simple_figure(aData, variableDisplayName + "\nin File A",
-                                                                            invalidMask=~goodInAMask)),
+                                                                            invalidMask=~goodInAMask, colorbarLimits=sharedRange)),
                                               variableDisplayName + " in file a",
                                               "A.png",  original_fig_list)
             
@@ -957,7 +961,7 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             assert(bData.shape == goodInBMask.shape)
             
             functionsToReturn['originalB'] = ((lambda: figures.create_simple_figure(bData, variableDisplayName + "\nin File B",
-                                                                            invalidMask=~goodInBMask)),
+                                                                            invalidMask=~goodInBMask, colorbarLimits=sharedRange)),
                                               variableDisplayName + " in file b",
                                               "B.png",  original_fig_list)
         

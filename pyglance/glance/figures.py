@@ -407,7 +407,7 @@ def create_quiver_mapped_figure(data, latitude, longitude, baseMapInstance, boun
     
     return figure
 
-def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colorMap=None) :
+def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colorMap=None, colorbarLimits=None) :
     """
     create a simple figure showing the data given masked by the invalid mask
     any tagData passed in will be interpreted as trouble points on the image and plotted as a
@@ -432,6 +432,10 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colo
     if (data is not None) and (sum(invalidMask) < invalidMask.size) :
         # draw our data
         im = imshow(cleanData, **kwargs)
+        
+        # if our colorbar has limits set those
+        if colorbarLimits is not None :
+            clim(vmin=colorbarLimits[0], vmax=colorbarLimits[-1])
         # make a color bar
         cbar = colorbar(format='%.3g')
     
