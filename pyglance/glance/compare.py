@@ -1065,6 +1065,142 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
     
     return
 
+def reportGen_raw_data_simple_call (aData, bData, variableDisplayName,
+                                    epsilon=0.0, missingValue=None,
+                                    useThreads=True, includeImages=True,
+                                    outputDirectory="./") :
+    """
+    Generate a report for a single variable given raw data and
+    some minimal control settings. This method will also generate
+    images for the report if includeImages is True.
+    """
+    
+    LOG.info("Setting up basic information")
+    
+    aData = array(aData)
+    bData = array(bData)
+    
+    # set up the run info
+    runInfo = { }
+    runInfo.update(glance_setting_defaults)
+    runInfo['shouldIncludeImages'] = True
+    runInfo['shouldIncludeReport'] = True
+    runInfo['doFork']              = False
+    runInfo['useThreadsToControlMemory'] = useThreads
+    
+    # set up the variable specific info
+    variableSettings = { }
+    variableSettings = glance_analysis_defaults.copy()
+    variableSettings['epsilon']                = epsilon
+    variableSettings['missing_value']          = missingValue
+    variableSettings['missing_value_alt_in_b'] = missingValue
+    variableSettings['variable_name']          = variableDisplayName
+    
+    # hang onto identification info
+    runInfo.update(_get_run_identification_info( ))
+    
+    # deal with the output directories
+    outputDirectory = _clean_path(outputDirectory)
+    _setup_dir_if_needed(outputDirectory, "output")
+    
+    LOG.info("Analyzing " + variableDisplayName)
+    
+    # if things are the same shape, analyze them and make our images
+    if aData.shape == bData.shape :
+        
+        # setup some values in the variable settings for use in the report
+        variableSettings['variable_dir'] = outputDirectory
+        variableSettings['variable_report_path_escaped'] = quote(os.path.join(variableDisplayName, 'index.html'))
+        variableSettings['doc_path'] = quote(os.path.join(outputDirectory, './' + 'doc.html')) 
+        
+        # calculate the variable statistics
+        variable_stats = statistics.StatisticalAnalysis(aData, bData,
+                                                        missingValue, missingValue,
+                                                        None, None,
+                                                        epsilon, None).dictionary_form()
+        
+        # add a little additional info
+        variableSettings['time'] = datetime.datetime.ctime(datetime.datetime.now())
+        didPass, epsilon_failed_fraction, \
+            non_finite_fail_fraction, r_squared_value = _check_pass_or_fail(variableSettings, variable_stats, glance_setting_defaults)
+        variableSettings['did_pass'] = didPass
+        
+        # to hold the names of any images created
+        image_names = {
+                        'original': [ ],
+                        'compared': [ ]
+                        }
+        
+        # if we need the images, make them now
+        if includeImages :
+            
+            LOG.info("Plotting images for " + variableDisplayName)
+            
+            plotFunctionGenerationObjects = [ ]
+            
+            # add the function to make the histogram and scatter plot
+            plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
+            
+            # add the function to do basic imshow images
+            plotFunctionGenerationObjects.append(plotcreate.IMShowPlotFunctionFactory())
+            
+            # plot our lon/lat related info
+            image_names['original'], image_names['compared'] = \
+                plot.plot_and_save_comparison_figures \
+                        (aData, bData,
+                         plotFunctionGenerationObjects,
+                         outputDirectory,
+                         variableDisplayName,
+                         epsilon,
+                         missingValue,
+                         lonLatDataDict=None,
+                         makeSmall=True,
+                         doFork=False,
+                         shouldClearMemoryWithThreads=useThreads,
+                         shouldUseSharedRangeForOriginal=True)
+            
+            print("\tfinished creating figures for: " + variableDisplayName)
+        
+        # create a temporary files object
+        files = {'file A': {'path': "raw data input",
+                            'lastModifiedTime': "unknown",
+                            'md5sum': "n/a"
+                            },
+                 'file B': {'path': "raw data input",
+                            'lastModifiedTime': "unknown",
+                            'md5sum': "n/a"
+                            }
+                    }
+        
+        # create our report 
+        print ('Generating report for: ' + variableDisplayName) 
+        report.generate_and_save_variable_report(files,
+                                                 variableSettings, runInfo,
+                                                 variable_stats,
+                                                 { },
+                                                 image_names,
+                                                 outputDirectory, "index.html")
+        
+        # make the glossary page
+        print ('Generating glossary page')
+        report.generate_and_save_doc_page(statistics.StatisticalAnalysis.doc_strings(), outputDirectory)
+        
+    else :
+        message = (variableDisplayName + ' ' + 
+                'could not be compared. This may be because the data for this variable does not match in shape ' +
+                'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
+                + str(bData.shape) + ').')
+        LOG.warn(message)
+
+def _setup_dir_if_needed(dirPath, descriptionName) :
+    """
+    create the directory if that is needed, if not don't
+    """
+    if not (os.path.isdir(dirPath)) :
+        LOG.info("Specified " + descriptionName + " directory (" + dirPath + ") does not exist.")
+        LOG.info("Creating " + descriptionName + " directory.")
+        os.makedirs(dirPath)
+
 def reportGen_library_call (a_path, b_path, var_list=[ ],
                             options_set={ },
                             # todo, this doesn't yet do anything
@@ -1216,12 +1352,6 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                             varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b'],
                                                             mask_a_to_use, mask_b_to_use,
                                                             varRunInfo['epsilon'], varRunInfo['epsilon_percent']).dictionary_form()
-            #variable_stats = statistics.summarize(aData, bData,
-            #                                      varRunInfo['epsilon'],
-            #                                      (varRunInfo['missing_value'],
-            #                                       varRunInfo['missing_value_alt_in_b']),
-            #                                      mask_a_to_use, mask_b_to_use,
-            #                                      varRunInfo['epsilon_percent'])
             
             # add a little additional info to our variable run info before we squirrel it away
             varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
