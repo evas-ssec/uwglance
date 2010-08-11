@@ -13,13 +13,14 @@ matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
 
 from pylab import *
 
+import matplotlib.cm     as cm
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-from matplotlib.ticker import FormatStrFormatter
+from   matplotlib.ticker import FormatStrFormatter
 
 import logging
 import numpy as np
-from numpy import ma 
+from   numpy import ma 
 
 import glance.graphics as maps
 import glance.delta    as delta
@@ -222,6 +223,34 @@ def create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsil
     # make a key to explain our plot
     # as long as things have been plotted with proper labels they should show up here
     axes.legend(loc=0, markerscale=3.0) # Note: at the moment markerscale doesn't seem to work
+    
+    # and some informational stuff
+    axes.set_title(title)
+    plt.xlabel(xLabel)
+    plt.ylabel(yLabel)
+    
+    # format our axes so they display gracefully
+    yFormatter = FormatStrFormatter("%4.4g")
+    axes.yaxis.set_major_formatter(yFormatter)
+    xFormatter = FormatStrFormatter("%4.4g")
+    axes.xaxis.set_major_formatter(xFormatter)
+    
+    return figure
+
+# build a hexbin plot of the x,y points and show the density of the point distribution
+def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel) :
+    
+    # make the figure
+    figure = plt.figure()
+    axes = figure.add_subplot(111)
+    
+    # the hexbin plot of the good data 
+    plt.hexbin(dataX, dataY, bins='log', cmap=cm.jet)
+    plt.axis([dataX.min(), dataX.max(), dataY.min(), dataY.max()])
+    
+    # create a color bar
+    cb = plt.colorbar()
+    cb.set_label('log10 (count + 1)')
     
     # and some informational stuff
     axes.set_title(title)

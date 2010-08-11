@@ -8,6 +8,7 @@ Copyright (c) 2010 University of Wisconsin SSEC. All rights reserved.
 """
 
 import logging
+import os, subprocess, datetime
 import numpy as np
 
 import glance.delta as delta
@@ -276,6 +277,78 @@ class DiffInfoObject (object) :
                                                    trouble_pt_mask, outside_epsilon_mask)
         
         return diff_data_object
+
+class FileInfo (object) :
+    """
+    This class represents information about a file object. It may or may not include the actual file object.
+    
+    The following member variables are available from this class:
+    
+    path          - the file path to reach the original file on disk
+    md5_sum       - an md5 sum calculated from the original file
+    last_modified - the time that the file was last modified (TODO, what form should this be in?)
+    file_object   - the file object that can be used to access the data in the file, may be None
+    """
+    
+    def __init__(self, pathToFile, md5sum=None, lastModifiedTime=None, fileObject=None) :
+        """
+        Create the file info object using the values given.
+        
+        If the md5 sum and last modified time aren't given, the initialization will figure them out.
+        Note: if the md5 sum is not given, the file object will also be loaded.
+        """
+        
+        self.path = pathToFile
+        
+        # if the file doesn't exist, stop
+        # TODO, is this the right strategy?
+        if not os.path.exists(self.path) :
+            LOG.warn("Requested file " + self.path + " could not be opened because it does not exist.")
+            self.md5_sum       = None
+            self.last_modified = None
+            self.file_object   = None
+            return
+        
+        # if the md5 sum isn't given, load the file and figure it out
+        if md5sum is None:
+            
+            # open the file
+            LOG.info("Opening " + self.path)
+            tempPath       = os.path.abspath(os.path.expanduser(self.path))
+            LOG.debug("Provided path after normalization and symbol expansion: " + tempPath)
+            fileObject     = io.open(tempPath, allowWrite=allowWrite)
+            
+            # figure out the md5 sum
+            tempSubProcess = subprocess.Popen("md5sum \'" + tempPath + "\'", shell=True, stdout=subprocess.PIPE)
+            md5sum         = tempSubProcess.communicate()[0].split()[0]
+            LOG.info("File md5sum: " + str(md5sum))
+            
+        self.md5_sum       = md5sum
+        self.file_object   = fileObject
+        
+        # if the last modified time isn't given, figure it out
+        if lastModifiedTime is None :
+            
+            statsForFile     = os.stat(os.path.abspath(os.path.expanduser(self.path)))
+            lastModifiedTime = datetime.datetime.fromtimestamp(statsForFile.st_mtime).ctime() # should time zone be forced?
+            LOG.info ("File was last modified: " + lastModifiedTime)
+            
+        self.last_modified = lastModifiedTime
+    
+    def get_version_without_file_object (self) :
+        """
+        get a version of this object without a file object
+        (this method is useful if you want file information but do not need access and want to save space)
+        """
+        toReturn = None
+        
+        if self.file_object is None:
+            toReturn = self
+        else:
+            toReturn = FileInfo(self.path, self.md5_sum, self.last_modified)
+        
+        return toReturn
+
 
 if __name__=='__main__':
     import doctest

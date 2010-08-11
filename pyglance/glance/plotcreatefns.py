@@ -273,6 +273,18 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                               "scatter plot of file a values vs file b values for " + variableDisplayName,
                                               "Scatter.png", compared_fig_list)
         
+        # make a hexplot, which is like a scatter plot with density
+        if ('do_plot_hex' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_hex']) :
+            
+            assert(aData.shape == bData.shape)
+            assert(bData.shape == goodInBothMask.shape)
+            
+            functionsToReturn['scatterD']  = ((lambda : figures.create_hexbin_plot(aData[goodInBothMask], bData[goodInBothMask],
+                                                                                   "Value in File A vs Value in File B",
+                                                                                   "File A Value", "File B Value")),
+                                              "density of file a values vs file b values for " + variableDisplayName,
+                                              "Hex.png", compared_fig_list)
+        
         return functionsToReturn
 
 """
