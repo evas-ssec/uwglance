@@ -1338,7 +1338,14 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 LOG.debug("Variable directory (" + variableDir + ") does not exist.")
                 LOG.debug("Creating variable directory.")
                 os.makedirs(variableDir)
-            varRunInfo['doc_path'] = quote(os.path.join(pathsTemp['out'], './' + 'doc.html')) # should this be somewhere else?
+            
+            # form the doc path relative to where the variable is
+            docPath = './'
+            for number in range(len(displayName.split('/'))) : # TODO this is not general to windows
+                docPath = os.path.join(docPath, '../')
+            varRunInfo['doc_path'] = quote(os.path.join(docPath, 'doc.html')) # should this be somewhere else?
+            
+            # hang onto the config file path as well
             if 'config_file_name' in runInfo :
                 varRunInfo['config_file_path'] = quote(os.path.join(pathsTemp['out'], './' + runInfo['config_file_name']))
             

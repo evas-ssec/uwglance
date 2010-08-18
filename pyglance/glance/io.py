@@ -14,7 +14,7 @@ try:
     import h5py
     from h5py import h5d
 except ImportError:
-    pass
+    print ('***** unable to load hdf5 library *****')
 from pycdf import CDF, NC, strerror
 
 import numpy as np
