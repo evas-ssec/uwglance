@@ -891,9 +891,20 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                                            variableDisplayName + " in both files" + "\n" + "for "
                                                            + binName + " # " + str(binNumber + 1) + " and case # "
                                                            + caseNumberText)
+                dataDiff = aData[binNumber][caseNumber] - bData[binNumber][caseNumber]
+                maskDiff = ~goodInAMask[binNumber][caseNumber] | ~goodInBMask[binNumber][caseNumber]
+                def make_diffplot(data=dataDiff, badMask=maskDiff, binNumber=binNumber, caseNumberText=caseNumText):
+                    return figures.create_line_plot_figure([(data, badMask, 'm', 'A - B', None)],
+                                                           "Value of " + variableDisplayName + " in File A - the value in File B\n" +
+                                                           "for " + binName + " # " + str(binNumber + 1) + " and case # " + caseNumberText)
+                    
                 functionsToReturn[str(binNumber + 1) + 'sample' + str(section + 1) + '.AB.png'] = (make_lineplot,
                                                                                            variableDisplayName + " sample in both files",
                                                                                            str(binNumber + 1) + 'sample' + str(section + 1) + '.AB.png',
+                                                                                           new_list)
+                functionsToReturn[str(binNumber + 1) + 'sample' + str(section + 1) + 'ABdiff.png] '] = (make_diffplot,
+                                                                                           variableDisplayName + " difference between files",
+                                                                                           str(binNumber + 1) + 'sample' + str(section + 1) + '.ABdiff.png',
                                                                                            new_list)
         
         return functionsToReturn

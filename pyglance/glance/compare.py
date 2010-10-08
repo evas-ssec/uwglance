@@ -1375,16 +1375,16 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 
                 plotFunctionGenerationObjects = [ ]
                 
+                # if the data is the same size, we can always make our basic statistical comparison plots
+                if (aData.shape == bData.shape) :
+                    plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
+                
                 # if the bin and tuple are defined, try to analyze the data as complex
                 # multidimentional information requiring careful sampling
                 if ('binIndex' in varRunInfo) and ('tupleIndex' in varRunInfo) :
                     plotFunctionGenerationObjects.append(plotcreate.BinTupleAnalysisFunctionFactory())
                     
-                else :
-                    
-                    # if the data is the same size, we can always make our basic statistical comparison plots
-                    if (aData.shape == bData.shape) :
-                        plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
+                else : # if it's not bin/tuple, there are lots of other posibilities
                     
                     # if it's vector data with longitude and latitude, quiver plot it on the Earth
                     if isVectorData and (not do_not_test_with_lon_lat) :
