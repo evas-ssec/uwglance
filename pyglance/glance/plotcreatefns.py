@@ -821,7 +821,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         functionsToReturn = { }
         
         # for each of the bins, make the rms histogram data
-        numHistogramSections = 7 # TODO at some point make this controlable via the doPlotSettingsDict
+        numHistogramSections = 7 # TODO at some point make this a user controlled setting
         for binNumber in range(rawDiffData.shape[0]) :
             
             new_list = [ ]

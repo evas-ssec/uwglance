@@ -213,11 +213,16 @@ class BinTupleMapping (object) :
         self.original_case_shape = temp_data_shape[1:-1]
         
         # figure out the new size with the flattened cases
-        number_of_cases     = np.multiply.accumulate(self.original_case_shape)[-1]
-        self.new_data_shape = (temp_data_shape[0], number_of_cases, temp_data_shape[-1])
+        number_of_cases     = 0
+        self.new_data_shape = (temp_data_shape[0], temp_data_shape[-1])
+        if len(self.original_case_shape) > 0 :
+            number_of_cases = np.multiply.accumulate(self.original_case_shape)[-1]
+            self.new_data_shape = (temp_data_shape[0], number_of_cases, temp_data_shape[-1])
         
         # build the reverse index for looking up flat case indexes
-        self.reverse_case_index = np.arange(number_of_cases).reshape(self.original_case_shape)
+        self.reverse_case_index     = None
+        if len(self.original_case_shape) > 0 :
+            self.reverse_case_index = np.arange(number_of_cases).reshape(self.original_case_shape)
     
     @staticmethod
     def _make_new_index_list(numberOfIndexes, firstIndexNumber, lastIndexNumber) :
@@ -276,6 +281,9 @@ class BinTupleMapping (object) :
         TODO, find a better way of doing this? does numpy guarantee reshaping strategy?
         TODO, can I find information on reshape and do this with pure math?
         """
+        
+        if self.reverse_case_index is None :
+            return None
         
         # find the flat index in our reverse case index
         positionOfIndex = np.where(self.reverse_case_index == flatIndex)

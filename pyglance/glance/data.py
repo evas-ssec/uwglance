@@ -12,6 +12,7 @@ import os, subprocess, datetime
 import numpy as np
 
 import glance.delta as delta
+import glance.io    as io
 
 LOG = logging.getLogger(__name__)
 
@@ -290,7 +291,7 @@ class FileInfo (object) :
     file_object   - the file object that can be used to access the data in the file, may be None
     """
     
-    def __init__(self, pathToFile, md5sum=None, lastModifiedTime=None, fileObject=None) :
+    def __init__(self, pathToFile, md5sum=None, lastModifiedTime=None, fileObject=None, allowWrite=False) :
         """
         Create the file info object using the values given.
         
@@ -348,7 +349,23 @@ class FileInfo (object) :
             toReturn = FileInfo(self.path, self.md5_sum, self.last_modified)
         
         return toReturn
-
+    
+    def get_old_info_dictionary (self) :
+        """
+        get a dictionary of information about this file in the older format
+        
+        note: this is being used for compatability with the old code and should
+        eventually be removed FUTURE
+        """
+        
+        fileInfo = {'path': self.path}
+        
+        if self.md5_sum is not None :
+            fileInfo['md5sum'] = self.md5_sum
+        if self.last_modified is not None:
+            fileInfo['lastModifiedTime'] = self.last_modified
+        
+        return fileInfo
 
 if __name__=='__main__':
     import doctest

@@ -103,23 +103,24 @@ def _log_spawn_and_wait_if_needed (imageDescription, childPids,
     
     return
 
-def plot_and_save_spacial_trouble(longitude, latitude,
-                                  spacialTroubleMask, spaciallyInvalidMask,
+def plot_and_save_spacial_trouble(longitudeObject, latitudeObject, spacialTroubleMask,
                                   fileNameDiscriminator, title, fileBaseName, outputPath, makeSmall=False) :
     """
     given information on spatially placed trouble points in A and B, plot only those points in a very obvious way
     on top of a background plot of a's data shown in grayscale, save this plot to the output path given
     if makeSmall is passed as true a smaller version of the image will also be saved
     """
+    spaciallyInvalidMask = longitudeObject.masks.ignore_mask | latitudeObject.masks.ignore_mask
     
     # get the bounding axis and make a basemap
-    boundingAxes = plotfns.get_visible_axes(longitude, latitude, ~spaciallyInvalidMask)
+    boundingAxes = plotfns.get_visible_axes(longitudeObject.data, latitudeObject.data, ~spaciallyInvalidMask)
     LOG.debug("Visible axes for lon/lat trouble figure  are: " + str(boundingAxes))
-    baseMapInstance, boundingAxes = maps.create_basemap(longitude, latitude, boundingAxes, plotfns.select_projection(boundingAxes))
+    baseMapInstance, boundingAxes = maps.create_basemap(longitudeObject.data, latitudeObject.data,
+                                                        boundingAxes, plotfns.select_projection(boundingAxes))
     
     # make the figure
     LOG.info("Creating spatial trouble image")
-    spatialTroubleFig = figures.create_mapped_figure(None, latitude, longitude, baseMapInstance, boundingAxes,
+    spatialTroubleFig = figures.create_mapped_figure(None, latitudeObject.data, longitudeObject.data, baseMapInstance, boundingAxes,
                                                     title, invalidMask=spaciallyInvalidMask, tagData=spacialTroubleMask)
     # save the figure
     LOG.info("Saving spatial trouble image")

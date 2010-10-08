@@ -117,7 +117,7 @@ defaultValues = {'epsilon': 0.0,                        # the acceptable differe
 # If you wish to analyze all variables that match your longitude and latitude
 # variables in size, do not place any entries in the setOfVariables (ie. just
 # leave it as an empty dictionary)
-setOfVariables = {}
+setOfVariables = { }
 
 setOfVariables['Total Totals'] = {           # the key of your variable entry will be used as the display name for your variable
                                   

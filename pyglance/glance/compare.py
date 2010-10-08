@@ -88,39 +88,6 @@ def _parse_varnames(names, terms, epsilon=0.0, missing=None):
     sel = [ ((x,)+_cvt_em(*em)) for x in names for (t,em) in terms if t(x) ]
     return set(sel)
 
-def _setup_file(fileNameAndPath, prefexText='', allowWrite=False) :
-    '''
-    open the provided file name/path and extract information on the md5sum and last modification time
-    optional prefext text may be passed in for informational output formatting
-    '''
-    
-    # some info to return
-    fileInfo = {'path': fileNameAndPath}
-    
-    # check to see if the path exists to be opened
-    if not (os.path.exists(fileNameAndPath)) :
-        LOG.warn("Requested file " + fileNameAndPath + " could not be opened because it does not exist.")
-        return None, fileInfo
-    
-    # open the file
-    LOG.info(prefexText + " opening " + fileNameAndPath)
-    fileNameAndPath = os.path.abspath(os.path.expanduser(fileNameAndPath))
-    LOG.debug("User provided path after normalization and user expansion: " + fileNameAndPath)
-    fileObject = io.open(fileNameAndPath, allowWrite=allowWrite)
-    
-    # get the file md5sum
-    tempSubProcess = subprocess.Popen("md5sum \'" + fileNameAndPath + "\'", shell=True, stdout=subprocess.PIPE)
-    fileInfo['md5sum'] = tempSubProcess.communicate()[0].split()[0]
-    LOG.info(prefexText + " file md5sum: " + str(fileInfo['md5sum']))
-    
-    # get the last modified stamp
-    statsForFile = os.stat(fileNameAndPath)
-    fileInfo['lastModifiedTime'] = datetime.datetime.fromtimestamp(statsForFile.st_mtime).ctime() # should time zone be forced?
-    LOG.info (prefexText + " file was last modified: " + fileInfo['lastModifiedTime'])
-    
-    return fileObject, fileInfo
-
-# TODO, make this generic for any number of file objects
 def _check_file_names(fileAObject, fileBObject) :
     """
     get information about the names in the two files and how they compare to each other
@@ -289,8 +256,8 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     paths['out'] = optionsSet['outputpath']
     
     # the colocation selection can only come from the command line options
-    # TODO since this is really only coming from the user's selection of the call,
-    # this is ok for the moment, may want to reconsider later
+    # note: since this is really only coming from the user's selection of the call,
+    # this is ok for the moment, may want to reconsider later (FUTURE)
     runInfo['doColocate'] = ('doColocate' in optionsSet) and (optionsSet['doColocate'])
     
     # check to see if the user wants to use a config file and if the path exists
@@ -371,26 +338,43 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     
     return paths, runInfo, defaultsToUse, requestedNames, usedConfigFile
 
-def _get_variable_can_end_program(fileObject, variableName, dataType, canEndProgram=True) :
+class VariableLoadError(Exception):
     """
-    load a variable, exiting the program if there is an error
-    and canEndProgram is passed as True
+    The exception raised when a variable could not be loaded.
     
-    TODO, instead of exiting, throw an exception
+        msg  -- explanation of which variable could be loaded (and, if possible, why)
+    """
+    def __init__(self, msg):
+        self.msg = msg
+    def __str__(self):
+        return self.msg
+
+def _get_variable_from_file(fileObject, variableName, dataType, filter=None) :
+    """
+    load a variable, using the given data type and applying a filter if one is given
+    
+    This may throw a VariableLoadError if the variable cannot be loaded.
     """
     
     dataToReturn = None
+    exceptionToRaise = None
     
     # get the data from the file
-    try :
-        dataToReturn = array(fileObject[variableName], dtype=dataType)
-    except CDFError :
-        LOG.warn ('Unable to retrieve ' + variableName + ' data. The variable name ' + 
-                  ' may not exist in this file or an error may have occured while attempting to' +
-                  ' access the data.')
-        if canEndProgram :
-            LOG.warn ('Unable to continue analysis without ' + variableName + ' data. Aborting analysis.')
-            sys.exit(1)
+    if fileObject.file_object is None :
+        exceptionToRaise = VariableLoadError("File was not properly opened so variable '" + variableName + "' could not be loaded.")
+    else :
+        try :
+            dataToReturn = array(fileObject.file_object[variableName], dtype=dataType)
+        except CDFError :
+            exceptionToRaise = VariableLoadError('Unable to retrieve ' + variableName + ' data. The variable name ' + 
+                      ' may not exist in this file or an error may have occured while attempting to' +
+                      ' access the data. Details of file access error observed: ' + str(CDFError))
+    
+    if (exceptionToRaise is not None) :
+        raise exceptionToRaise
+    
+    if (filter is not None) and (dataToReturn is not None) :
+        dataToReturn = filter(dataToReturn)
     
     return dataToReturn
 
@@ -400,33 +384,28 @@ def _get_and_analyze_lon_lat (fileObject,
     """
     get the longitude and latitude data from the given file, assuming they are in the given variable names
     and analyze them to identify spacially invalid data (ie. data that would fall off the earth)
+    
+    This may result in a VariableLoadError if the variable cannot be loaded.
     """
-    # get the data from the file TODO, handle these exits out in the calling method?
+    # get the data from the file
     
     # get the longitude
     LOG.info ('longitude name: ' + longitudeVariableName)
     # TODO, should this dtype be a float?
-    longitudeData = _get_variable_can_end_program(fileObject, longitudeVariableName, float)
-    
+    longitudeData = _get_variable_from_file(fileObject, longitudeVariableName,
+                                            float, filter=longitudeDataFilterFn)
     # get the latitude
     LOG.info ('latitude name: '  + latitudeVariableName)
     # TODO, should this dtype be a float?
-    latitudeData  = _get_variable_can_end_program(fileObject, latitudeVariableName, float)
-    
-    # if we have filters, use them
-    if not (latitudeDataFilterFn is None) :
-        latitudeData = latitudeDataFilterFn(latitudeData)
-        LOG.debug ('latitude size after application of filter: '  + str(latitudeData.shape))
-    if not (longitudeDataFilterFn is None) :
-        longitudeData = longitudeDataFilterFn(longitudeData)
-        LOG.debug ('longitude size after application of filter: ' + str(longitudeData.shape))
+    latitudeData  = _get_variable_from_file(fileObject, latitudeVariableName,
+                                            float, filter=latitudeDataFilterFn)
     
     # we are going to have issues with our comparision if they aren't the same shape
     LOG.debug('latitude  shape: ' + str(latitudeData.shape))
     LOG.debug('longitude shape: ' + str(longitudeData.shape))
     assert (latitudeData.shape == longitudeData.shape)
     
-    # build a mask of our spacially invalid data TODO, load actual valid range attributes?
+    # build a mask of our spacially invalid data
     invalidLatitude  = (latitudeData < -90)     | (latitudeData > 90)   | ~isfinite(latitudeData)
     invalidLongitude = (longitudeData < -180)   | (longitudeData > 360) | ~isfinite(longitudeData)
     spaciallyInvalidMask = invalidLatitude | invalidLongitude
@@ -434,10 +413,12 @@ def _get_and_analyze_lon_lat (fileObject,
     # analyze our spacially invalid data
     percentageOfSpaciallyInvalidPts, numberOfSpaciallyInvalidPts = _get_percentage_from_mask(spaciallyInvalidMask)
     
-    return longitudeData, latitudeData, spaciallyInvalidMask, {
-                                                               'totNumInvPts': numberOfSpaciallyInvalidPts,
-                                                               'perInvPts':    percentageOfSpaciallyInvalidPts
-                                                               }
+    spatialStatInfo = {
+                       'totNumInvPts': numberOfSpaciallyInvalidPts,
+                       'perInvPts':    percentageOfSpaciallyInvalidPts
+                       }
+    
+    return dataobj.DataObject(longitudeData, ignoreMask=invalidLongitude), dataobj.DataObject(latitudeData, ignoreMask=invalidLatitude), spatialStatInfo
 
 def _get_percentage_from_mask(dataMask) :
     """
@@ -446,48 +427,40 @@ def _get_percentage_from_mask(dataMask) :
     """
     numMarkedDataPts = sum(dataMask)
     totalDataPts = dataMask.size
+    
     # avoid dividing by 0
     if totalDataPts is 0 :
         return 0.0, 0
+    
     percentage = 100.0 * float(numMarkedDataPts) / float(totalDataPts)
     
     return percentage, numMarkedDataPts
 
-def _check_lon_lat_equality(longitudeA, latitudeA,
-                            longitudeB, latitudeB,
-                            ignoreMaskA, ignoreMaskB,
-                            llepsilon, doMakeImages,
-                            outputPath) :
+# TODO, this comparison needs to encorporate epsilon percent as well
+def _check_lon_lat_equality(longitudeADataObject, latitudeADataObject,
+                            longitudeBDataObject, latitudeBDataObject,
+                            llepsilon, doMakeImages, outputPath) :
     """
     check to make sure the longitude and latitude are equal everywhere that's not in the ignore masks
     if they are not and doMakeImages was passed as True, generate appropriate figures to show where
     return the number of points where they are not equal (0 would mean they're the same)
+    
+    If the latitude or longitude cannot be compared, this may raise a VariableComparisonError.
     """
     # first of all, if the latitude and longitude are not the same shape, then things can't ever be "equal"
-    if (longitudeA.shape != longitudeB.shape) | (latitudeA.shape != latitudeB.shape) :
-        return None
-    
-    lon_lat_not_equal_points_count = 0
-    lon_lat_not_equal_points_percent = 0.0
+    if (longitudeADataObject.data.shape != longitudeBDataObject.data.shape) :
+        raise VariableComparisonError ("Unable to compare longitue variables due to different sizes (" + str(longitudeADataObject.data.shape) +
+                                       ") and (" + str(longitudeBDataObject.data.shape) +").")
+    if (latitudeADataObject.data.shape  !=  latitudeBDataObject.data.shape) :
+        raise VariableComparisonError ("Unable to compare latitude variables due to different sizes (" + str(latitudeADataObject.data.shape) +
+                                       ") and (" + str(latitudeBDataObject.data.shape) +").")
     
     # get information about how the latitude and longitude differ
-    aDataObject = dataobj.DataObject(longitudeA, ignoreMask=ignoreMaskA)
-    bDataObject = dataobj.DataObject(longitudeB, ignoreMask=ignoreMaskB)
-    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=llepsilon) #TODO, needs epsilon percent
-    #TODO, for the moment, unpack these values into local variables
-    longitudeDiff       = diffInfo.diff_data_object.data
-    finiteLongitudeMask = diffInfo.diff_data_object.masks.valid_mask
-    lon_not_equal_mask  = diffInfo.diff_data_object.masks.trouble_mask
+    longitudeDiffInfo = dataobj.DiffInfoObject(longitudeADataObject, longitudeBDataObject, epsilonValue=llepsilon)
+    latitudeDiffInfo  = dataobj.DiffInfoObject(latitudeADataObject,  latitudeBDataObject,  epsilonValue=llepsilon)
     
-    aDataObject = dataobj.DataObject(latitudeA, ignoreMask=ignoreMaskA)
-    bDataObject = dataobj.DataObject(latitudeB, ignoreMask=ignoreMaskB)
-    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=llepsilon) #TODO, needs epsilon percent
-    #TODO, for the moment, unpack these values into local variables
-    latitudeDiff       = diffInfo.diff_data_object.data
-    finiteLatitudeMask = diffInfo.diff_data_object.masks.valid_mask
-    lat_not_equal_mask = diffInfo.diff_data_object.masks.trouble_mask
-    
-    lon_lat_not_equal_mask = lon_not_equal_mask | lat_not_equal_mask
+    # how much difference is there between the two sets?
+    lon_lat_not_equal_mask = longitudeDiffInfo.diff_data_object.masks.trouble_mask | latitudeDiffInfo.diff_data_object.masks.trouble_mask
     lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask)
     lon_lat_not_equal_points_percent = (float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)) * 100.0
     
@@ -500,18 +473,16 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
         if (doMakeImages) :
             
             if (len(longitudeA[~ignoreMaskA]) > 0) and (len(latitudeA[~ignoreMaskA]) > 0) :
-                plot.plot_and_save_spacial_trouble(longitudeA, latitudeA,
+                plot.plot_and_save_spacial_trouble(longitudeADataObject, latitudeADataObject,
                                                    lon_lat_not_equal_mask,
-                                                   ignoreMaskA,
                                                    "A", "Lon./Lat. Points Mismatched between A and B\n" +
                                                    "(Shown in A)",
                                                    "LonLatMismatch",
                                                    outputPath, True)
             
             if (len(longitudeB[~ignoreMaskB]) > 0) and (len(latitudeB[~ignoreMaskB]) > 0) :
-                plot.plot_and_save_spacial_trouble(longitudeB, latitudeB,
+                plot.plot_and_save_spacial_trouble(longitudeBDataObject, latitudeBDataObject,
                                                    lon_lat_not_equal_mask,
-                                                   ignoreMaskB,
                                                    "B", "Lon./Lat. Points Mismatched between A and B\n" +
                                                    "(Shown in B)",
                                                    "LonLatMismatch",
@@ -519,27 +490,28 @@ def _check_lon_lat_equality(longitudeA, latitudeA,
     
     # setup our return data
     returnInfo = {}
-    returnInfo['lon_lat_not_equal_points_count'] = lon_lat_not_equal_points_count
+    returnInfo['lon_lat_not_equal_points_count']   = lon_lat_not_equal_points_count
     returnInfo['lon_lat_not_equal_points_percent'] = lon_lat_not_equal_points_percent
     
     return returnInfo
 
-def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_info,
-                                longitude_a, longitude_b, latitude_a, latitude_b,
-                                do_include_images, output_path) :
-    """
+def _compare_spatial_invalidity(longitude_a_object, longitude_b_object,
+                                latitude_a_object,  latitude_b_object,
+                                spatial_info, do_include_images, output_path) :
+    """ 
     Given information about where the two files are spatially invalid, figure
     out what invalidity they share and save information or plots for later use
     also build a shared longitude/latitude based on A but also including valid
     points in B
     """
-    
-    # for convenience,
-    # make a combined mask
+    # make our common invalid masks
+    invalid_in_a_mask = longitude_a_object.masks.ignore_mask | latitude_a_object.masks.ignore_mask
+    invalid_in_b_mask = longitude_b_object.masks.ignore_mask | latitude_b_object.masks.ignore_mask
     invalid_in_common_mask = invalid_in_a_mask | invalid_in_b_mask
-    # make a "common" latitude based on A
-    longitude_common = longitude_a
-    latitude_common = latitude_a
+    
+    # make a "common" longitude/latitude based on A
+    longitude_common = longitude_a_object.data.copy()
+    latitude_common  =  latitude_a_object.data.copy()
     
     # compare our spacialy invalid info
     spatial_info['perInvPtsInBoth'] = spatial_info['file A']['perInvPts']
@@ -557,49 +529,59 @@ def _compare_spatial_invalidity(invalid_in_a_mask, invalid_in_b_mask, spatial_in
         # so how many do they have together?
         spatial_info['perInvPtsInBoth'] = _get_percentage_from_mask(invalid_in_common_mask)[0]
         # make a "clean" version of the lon/lat
-        longitude_common[valid_only_in_mask_a] = longitude_a[valid_only_in_mask_a]
-        longitude_common[valid_only_in_mask_b] = longitude_b[valid_only_in_mask_b]
-        latitude_common [valid_only_in_mask_a] = latitude_a [valid_only_in_mask_a]
-        latitude_common [valid_only_in_mask_b] = latitude_b [valid_only_in_mask_b]
+        longitude_common[valid_only_in_mask_a] = longitude_a_object.data[valid_only_in_mask_a]
+        longitude_common[valid_only_in_mask_b] = longitude_b_object.data[valid_only_in_mask_b]
+        latitude_common [valid_only_in_mask_a] =  latitude_a_object.data[valid_only_in_mask_a]
+        latitude_common [valid_only_in_mask_b] =  latitude_b_object.data[valid_only_in_mask_b]
         
         # plot the points that are only valid one file and not the other
         if ((spatial_info['file A']['numInvPts'] > 0) and (do_include_images) and
-            (len(longitude_a[~invalid_in_a_mask]) > 0) and (len(latitude_a[~invalid_in_a_mask]) > 0)) :
-            plot.plot_and_save_spacial_trouble(longitude_a, latitude_a,
+            (len(longitude_a_object.data[~invalid_in_a_mask]) > 0) and
+            (len( latitude_a_object.data[~invalid_in_a_mask]) > 0)) :
+            plot.plot_and_save_spacial_trouble(longitude_a_object.data, latitude_a_object.data,
                                                valid_only_in_mask_a,
-                                               invalid_in_a_mask,
                                                "A", "Points only valid in\nFile A\'s longitude & latitude",
                                                "SpatialMismatch",
                                                output_path, True)
         if ((spatial_info['file B']['numInvPts'] > 0) and (do_include_images) and
-            (len(longitude_b[~invalid_in_b_mask]) > 0) and (len(latitude_b[~invalid_in_b_mask]) > 0)
+            (len(longitude_b_object.data[~invalid_in_b_mask]) > 0) and
+            (len( latitude_b_object.data[~invalid_in_b_mask]) > 0)
             ) :
-            plot.plot_and_save_spacial_trouble(longitude_b, latitude_b,
+            plot.plot_and_save_spacial_trouble(longitude_b_object.data, latitude_b_object.data,
                                                valid_only_in_mask_b,
-                                               invalid_in_b_mask,
                                                "B", "Points only valid in\nFile B\'s longitude & latitude",
                                                "SpatialMismatch",
                                                output_path, True)
     
     return invalid_in_common_mask, spatial_info, longitude_common, latitude_common
 
+class VariableComparisonError(Exception):
+    """
+    The exception raised when a variable could not be compared.
+    
+        msg  -- explanation of which variable could be compared (and, if possible, why)
+    """
+    def __init__(self, msg):
+        self.msg = msg
+    def __str__(self):
+        return self.msg
+
 def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output_path,
                           should_make_images=False, should_check_equality=True) :
     """
     Manage loading and comparing longitude and latitude information for two files
     
-    Note: if the error message is returned as anything but None, something uncrecoverable
-    occured while trying to get the lon/lat info. TODO, replace this with a proper thrown exception
+    This may result in a VariableLoadError if the longitude or latitude cannot be loaded.
+    This may result in a VariableComparisonError if the longitude or latitude cannot be compared due to size.
+    
     """
     # a place to save some general stats about our lon/lat data
     spatialInfo = { }
-    # a place to put possible error messages TODO remove this in favor of an exception
-    error_msg = None
     
     # if there is no lon/lat specified, stop now
     if ( ('longitude' not in lon_lat_settings) or ('latitude' not in lon_lat_settings)
         or (('noLonLatVars' in lon_lat_settings) and lon_lat_settings['noLonLatVars']) ) :
-        return { }, spatialInfo, error_msg
+        return { }, spatialInfo
     
     # if we should not be comparing against the logitude and latitude, stop now
     print ('lon_lat_settings: ' + str(lon_lat_settings))
@@ -622,53 +604,47 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
     file_for_a_lon_lat = a_file_object
     if ('a_lon_lat_from_alt_file' in lon_lat_settings) :
         LOG.info("Loading alternate file (" + lon_lat_settings['a_lon_lat_from_alt_file'] + ") for file a longitude/latitude.")
-        file_for_a_lon_lat, _ = _setup_file(lon_lat_settings['a_lon_lat_from_alt_file'], "\t")
+        file_for_a_lon_lat = dataobj.FileInfo(lon_lat_settings['a_lon_lat_from_alt_file'])
     
     # for the b file, do we have an alternate?
     file_for_b_lon_lat = b_file_object
     if ('b_lon_lat_from_alt_file' in lon_lat_settings) :
         LOG.info("Loading alternate file (" + lon_lat_settings['b_lon_lat_from_alt_file'] + ") for file b longitude/latitude.")
-        file_for_b_lon_lat, _ = _setup_file(lon_lat_settings['b_lon_lat_from_alt_file'], "\t")
+        file_for_b_lon_lat = dataobj.FileInfo(lon_lat_settings['b_lon_lat_from_alt_file'])
     
     # load our longitude and latitude and do some analysis on them
-    longitude_a, latitude_a, spaciallyInvalidMaskA, spatialInfo['file A'] = \
+    longitude_a_object, latitude_a_object, spatialInfo['file A'] = \
         _get_and_analyze_lon_lat (file_for_a_lon_lat, a_latitude_name, a_longitude_name, 
                                   lon_lat_settings['data_filter_function_lat_in_a'], lon_lat_settings['data_filter_function_lon_in_a'])
-    longitude_b, latitude_b, spaciallyInvalidMaskB, spatialInfo['file B'] = \
+    longitude_b_object, latitude_b_object, spatialInfo['file B'] = \
         _get_and_analyze_lon_lat (file_for_b_lon_lat, b_latitude_name, b_longitude_name,
                                   lon_lat_settings['data_filter_function_lat_in_b'], lon_lat_settings['data_filter_function_lon_in_b'])
     
     # if we need to, test the level of equality of the "valid" values in our lon/lat
     if should_check_equality :
-        moreSpatialInfo = _check_lon_lat_equality(longitude_a, latitude_a, longitude_b, latitude_b,
-                                                  spaciallyInvalidMaskA, spaciallyInvalidMaskB,
+        
+        moreSpatialInfo = _check_lon_lat_equality(longitude_a_object, latitude_a_object,
+                                                  longitude_b_object, latitude_b_object,
                                                   lon_lat_settings['lon_lat_epsilon'],
                                                   should_make_images, output_path)
-        # if we got the worst type of error result from the comparison this data is too dissimilar to continue
-        if moreSpatialInfo is None :
-            error_msg = ("Unable to reconcile sizes of longitude and latitude for variables "
-                     + str(lon_lat_settings['longitude']) + str(longitude_a.shape) + "/"
-                     + str(lon_lat_settings['latitude'])  + str(latitude_a.shape) + " in file A and variables "
-                     + str(b_longitude_name) + str(longitude_b.shape) + "/"
-                     + str(b_latitude_name)  + str(latitude_b.shape) + " in file B. Aborting attempt to compare files.")
-            return { }, { }, error_msg # things have gone wrong
         # update our existing spatial information
         spatialInfo.update(moreSpatialInfo)
         
         # compare our spatially invalid info to see if the two files have invalid longitudes and latitudes in the same places
         spaciallyInvalidMask, spatialInfo, longitude_common, latitude_common = \
-                                _compare_spatial_invalidity(spaciallyInvalidMaskA, spaciallyInvalidMaskB, spatialInfo,
-                                                            longitude_a, longitude_b, latitude_a, latitude_b,
-                                                            should_make_images, output_path)
+                                _compare_spatial_invalidity(longitude_a_object, longitude_b_object,
+                                                            latitude_a_object,  latitude_b_object,
+                                                            spatialInfo, should_make_images, output_path)
     else:
         spaciallyInvalidMask = None
         longitude_common     = None
         latitude_common      = None
     
-    return {'a':      {"lon": longitude_a,      "lat": latitude_a,      "inv_mask": spaciallyInvalidMaskA},
-            'b':      {"lon": longitude_b,      "lat": latitude_b,      "inv_mask": spaciallyInvalidMaskB},
-            'common': {"lon": longitude_common, "lat": latitude_common, "inv_mask": spaciallyInvalidMask}   }, \
-           spatialInfo, error_msg
+    # FUTURE, return the lon/lat objects instead?
+    return {'a':      {"lon": longitude_a_object.data,      "lat": latitude_a_object.data,      "inv_mask": longitude_a_object.masks.ignore_mask},
+            'b':      {"lon": longitude_b_object.data,      "lat": latitude_b_object.data,      "inv_mask": longitude_b_object.masks.ignore_mask},
+            'common': {"lon": longitude_common,             "lat": latitude_common,             "inv_mask": spaciallyInvalidMask}   }, \
+           spatialInfo
 
 def _open_and_process_files (args, numFilesExpected):
     """
@@ -937,28 +913,35 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
     
     # open the files
     LOG.info("Processing File A:")
-    aFile, _ = _setup_file(pathsTemp['a'], "\t", allowWrite = True)
+    aFile = dataobj.FileInfo(pathsTemp['a'], allowWrite=True)
     if aFile is None:
         LOG.warn("Unable to continue with comparison because file a (" + pathsTemp['a'] + ") could not be opened.")
         sys.exit(1)
     LOG.info("Processing File B:")
-    bFile, _ = _setup_file(pathsTemp['b'], "\t", allowWrite = True)
+    bFile = dataobj.FileInfo(pathsTemp['b'], allowWrite=True)
     if bFile is None:
         LOG.warn("Unable to continue with comparison because file b (" + pathsTemp['b'] + ") could not be opened.")
         sys.exit(1)
     
     # get information about the names the user requested
-    finalNames, nameStats = _resolve_names(aFile, bFile,
+    finalNames, nameStats = _resolve_names(aFile.file_object, bFile.file_object,
                                            defaultValues,
                                            requestedNames, usedConfigFile)
     
     # return for lon_lat_data variables will be in the form 
     #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
     # or { } if there is no lon/lat info
-    lon_lat_data, _, fatalErrorMsg = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'], should_check_equality=False)
-    if fatalErrorMsg is not None :
-        LOG.warn(fatalErrorMsg)
-        sys.exit(1)
+    lon_lat_data = { }
+    try :
+        lon_lat_data, _ = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'], should_check_equality=False)
+    except VariableLoadError, vle :
+        LOG.warn("Error while loading longitude or latitude: ")
+        LOG.warn(vle.msg)
+        exit(1)
+    except VariableComparisonError, vce :
+        LOG.warn("Error while comparing longitude or latitude: ")
+        LOG.warn(vce.msg)
+        exit(1)
     
     # handle the longitude and latitude colocation
     LOG.info("Colocating raw longitude and latitude information")
@@ -998,12 +981,12 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
         print('analyzing: ' + explanationName + ')')
         
         # load the variable data
-        aData = _load_variable_data(aFile, technical_name,
+        aData = _load_variable_data(aFile.file_object, technical_name,
                                     dataFilter = varRunInfo['data_filter_function_a'] if 'data_filter_function_a' in varRunInfo else None,
                                     variableToFilterOn = varRunInfo['variable_to_filter_on_a'] if 'variable_to_filter_on_a' in varRunInfo else None,
                                     variableBasedFilter = varRunInfo['variable_based_filter_a'] if 'variable_based_filter_a' in varRunInfo else None,
                                     fileDescriptionForDisplay = "file A")
-        bData = _load_variable_data(bFile, b_variable_technical_name,
+        bData = _load_variable_data(bFile.file_object, b_variable_technical_name,
                                     dataFilter = varRunInfo['data_filter_function_b'] if 'data_filter_function_b' in varRunInfo else None,
                                     variableToFilterOn = varRunInfo['variable_to_filter_on_b'] if 'variable_to_filter_on_b' in varRunInfo else None,
                                     variableBasedFilter = varRunInfo['variable_based_filter_b'] if 'variable_based_filter_b' in varRunInfo else None,
@@ -1037,20 +1020,20 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
             # save the colocated data information in the output files
             
             # all the a file information
-            aFile.create_new_variable(technical_name + '-colocated', # TODO, how should this suffix be handled?
+            aFile.file_object.create_new_variable(technical_name + '-colocated', # TODO, how should this suffix be handled?
                                       missingvalue = varRunInfo['missing'] if 'missing' in varRunInfo else None,
                                       data = aData,
                                       variabletocopyattributesfrom = technical_name)
-            aFile.add_attribute_data_to_variable(technical_name + '-colocated', 'number of multiple matches', numberOfMultipleMatchesInA)
-            aFile.add_attribute_data_to_variable(technical_name + '-colocated', 'number of unmatched points', len(aUnmatchedData))
+            aFile.file_object.add_attribute_data_to_variable(technical_name + '-colocated', 'number of multiple matches', numberOfMultipleMatchesInA)
+            aFile.file_object.add_attribute_data_to_variable(technical_name + '-colocated', 'number of unmatched points', len(aUnmatchedData))
             
             # all the b file information
-            bFile.create_new_variable(b_variable_technical_name + '-colocated', # TODO, how should this suffix be handled?
+            bFile.file_object.create_new_variable(b_variable_technical_name + '-colocated', # TODO, how should this suffix be handled?
                                       missingvalue = varRunInfo['missing_value_alt_in_b'] if 'missing_value_alt_in_b' in varRunInfo else None,
                                       data = bData,
                                       variabletocopyattributesfrom = b_variable_technical_name)
-            bFile.add_attribute_data_to_variable(b_variable_technical_name + '-colocated', 'number of multiple matches', numberOfMultipleMatchesInB)
-            bFile.add_attribute_data_to_variable(b_variable_technical_name + '-colocated', 'number of unmatched points', len(bUnmatchedData))
+            bFile.file_object.add_attribute_data_to_variable(b_variable_technical_name + '-colocated', 'number of multiple matches', numberOfMultipleMatchesInB)
+            bFile.file_object.add_attribute_data_to_variable(b_variable_technical_name + '-colocated', 'number of unmatched points', len(bUnmatchedData))
             
             # TODO, any additional statistics
             
@@ -1060,8 +1043,8 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
     # the end of the loop to examine all the variables
     
     # we're done with the files, so close them up
-    aFile.close()
-    bFile.close()
+    aFile.file_object.close()
+    bFile.file_object.close()
     
     return
 
@@ -1245,18 +1228,20 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     # open the files
     files = {}
     LOG.info("Processing File A:")
-    aFile, files['file A'] = _setup_file(pathsTemp['a'], "\t")
-    if aFile is None:
+    aFile = dataobj.FileInfo(pathsTemp['a'])
+    files['file A'] = aFile.get_old_info_dictionary() # FUTURE move to actually using the file object to generate the report
+    if aFile.file_object is None:
         LOG.warn("Unable to continue with comparison because file a (" + pathsTemp['a'] + ") could not be opened.")
         sys.exit(1)
     LOG.info("Processing File B:")
-    bFile, files['file B'] = _setup_file(pathsTemp['b'], "\t")
-    if bFile is None:
+    bFile = dataobj.FileInfo(pathsTemp['b']) 
+    files['file B'] = bFile.get_old_info_dictionary() # FUTURE move to actually using the file object to generate the report
+    if bFile.file_object is None:
         LOG.warn("Unable to continue with comparison because file b (" + pathsTemp['b'] + ") could not be opened.")
         sys.exit(1)
     
     # get information about the names the user requested
-    finalNames, nameStats = _resolve_names(aFile, bFile,
+    finalNames, nameStats = _resolve_names(aFile.file_object, bFile.file_object,
                                            defaultValues,
                                            requestedNames, usedConfigFile)
     
@@ -1265,13 +1250,19 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     # return for lon_lat_data variables will be in the form 
     #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
     # or { } if there is no lon/lat info
-    lon_lat_data, spatialInfo, fatalErrorMsg = _handle_lon_lat_info (runInfo, 
-                                                                     aFile, bFile,
-                                                                     pathsTemp['out'],
-                                                                     should_make_images = runInfo["shouldIncludeImages"])
-    if fatalErrorMsg is not None :
-        LOG.warn(fatalErrorMsg)
-        sys.exit(1)
+    lon_lat_data = { }
+    spatialInfo  = { }
+    try :
+        lon_lat_data, spatialInfo = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'],
+                                                          should_make_images = runInfo["shouldIncludeImages"])
+    except VariableLoadError, vle :
+        LOG.warn("Error while loading longitude or latitude: ")
+        LOG.warn(vle.msg)
+        exit(1)
+    except VariableComparisonError, vce :
+        LOG.warn("Error while comparing longitude or latitude: ")
+        LOG.warn(vce.msg)
+        exit(1)
     
     # if there is an approved lon/lat shape, hang on to that for future checks
     good_shape_from_lon_lat = None
@@ -1299,12 +1290,12 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         print('analyzing: ' + explanationName + ')')
         
         # load the variable data
-        aData = _load_variable_data(aFile, technical_name,
+        aData = _load_variable_data(aFile.file_object, technical_name,
                                     dataFilter = varRunInfo['data_filter_function_a'] if 'data_filter_function_a' in varRunInfo else None,
                                     variableToFilterOn = varRunInfo['variable_to_filter_on_a'] if 'variable_to_filter_on_a' in varRunInfo else None,
                                     variableBasedFilter = varRunInfo['variable_based_filter_a'] if 'variable_based_filter_a' in varRunInfo else None,
                                     fileDescriptionForDisplay = "file A")
-        bData = _load_variable_data(bFile, b_variable_technical_name,
+        bData = _load_variable_data(bFile.file_object, b_variable_technical_name,
                                     dataFilter = varRunInfo['data_filter_function_b'] if 'data_filter_function_b' in varRunInfo else None,
                                     variableToFilterOn = varRunInfo['variable_to_filter_on_b'] if 'variable_to_filter_on_b' in varRunInfo else None,
                                     variableBasedFilter = varRunInfo['variable_based_filter_b'] if 'variable_based_filter_b' in varRunInfo else None,
@@ -1380,7 +1371,6 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                             }
             
             # create the images for this variable
-            # TODO, will need to handle averaged/sliced 3D data at some point
             if (include_images_for_this_variable) :
                 
                 plotFunctionGenerationObjects = [ ]
@@ -1416,12 +1406,12 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                             plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
                 
                 # if there's magnitude and direction data, figure out the u and v, otherwise these will be None
-                aUData, aVData = _get_UV_info_from_magnitude_direction_info (aFile,
+                aUData, aVData = _get_UV_info_from_magnitude_direction_info (aFile.file_object,
                                                                              varRunInfo['magnitudeName'] if ('magnitudeName') in varRunInfo else None,
                                                                              varRunInfo['directionName'] if ('directionName') in varRunInfo else None,
                                                                              lon_lat_data['a']['inv_mask']
                                                                              if ('a' in lon_lat_data) and ('inv_mask' in lon_lat_data['a']) else None)
-                bUData, bVData = _get_UV_info_from_magnitude_direction_info (bFile,
+                bUData, bVData = _get_UV_info_from_magnitude_direction_info (bFile.file_object,
                                                                              varRunInfo['magnitudeBName'] if ('magnitudeBName') in varRunInfo else None,
                                                                              varRunInfo['directionBName'] if ('directionBName') in varRunInfo else None,
                                                                              lon_lat_data['b']['inv_mask']
@@ -1584,6 +1574,9 @@ python -m glance compare reportGen A.hdf B.hdf
 python -m glance 
 
 """
+    
+    # the following represent options available to the user on the command line:
+    
     parser = optparse.OptionParser(usage)
     parser.add_option('-t', '--test', dest="self_test",
                     action="store_true", default=False, help="run internal unit tests")            
@@ -1621,13 +1614,14 @@ python -m glance
     parser.add_option('-d', '--nolonlat', dest='noLonLatVars',
                       action="store_true", default=False, help="do not try to find or analyze logitude and latitude")
     
-                    
+    # parse the uers options from the command line
     options, args = parser.parse_args()
     if options.self_test:
         import doctest
         doctest.testmod()
         sys.exit(2)
-
+    
+    # set up the logging level based on the options the user selected on the command line
     lvl = logging.WARNING
     if options.debug: lvl = logging.DEBUG
     elif options.verbose: lvl = logging.INFO
@@ -1641,6 +1635,10 @@ python -m glance
     commands = {}
     prior = None
     prior = dict(locals())
+    
+    """
+    The following functions represent available menu selections in glance.
+    """
     
     def info(*args):
         """list information about a list of files
@@ -1810,48 +1808,6 @@ python -m glance
         b_path = _clean_path(args[1])
         
         colocateToFile_library_call(a_path, b_path, args[2:], tempOptions)
-    
-    """
-    # This was used to modify files for testing and should not be uncommented
-    # unless you intend to use it only temporarily for testing purposes
-    # at the moment it is not written very generally (only works with hdf4),
-    # requires you to use 'from pyhdf.SD import SD, SDS' and change io to load
-    # files in write mode rather than read only
-    def make_renamed_variable_copy(*args) :
-        '''
-        make a copy of a variable in a file using the new name given by the user
-        '''
-        file_path = args[0]
-        old_var_name = args[1]
-        new_var_name = args[2]
-        
-        print ("Copying variable \'" + old_var_name + "\' to \'" + new_var_name
-               + "\' in file " + file_path)
-        
-        # open the file and get the old variable
-        LOG.info("\topening " + file_path)
-        file_object = io.open(file_path)
-        LOG.info("\tgetting " + old_var_name)
-        variable_object_old = file_object.get_variable_object(old_var_name)
-        temp, old_rank, old_shape, old_type, old_num_attributes = SDS.info(variable_object_old)
-        old_attributes = SDS.attributes(variable_object_old)
-        
-        # make a copy of the variable with the new name
-        LOG.info("\tsaving " + new_var_name)
-        variable_object_new = SD.create(file_object, new_var_name, old_type, old_shape)
-        SDS.set(variable_object_new, variable_object_old[:])
-        '''  TODO, attribute copying is not working yet
-        for attribute_name in old_attributes :
-            variable_object_new[attribute_name] = variable_object_old[attribute_name]
-        '''
-        
-        # close up all our access objects
-        SDS.endaccess(variable_object_old)
-        SDS.endaccess(variable_object_new)
-        SD.end(file_object)
-        
-        return
-    """
 
     # def build(*args):
     #     """build summary
@@ -1886,15 +1842,18 @@ python -m glance
     # def test():
     #     "run tests"
     #     test1()
-    #     
+    #
+    
+    # all the local public functions are considered part of glance, collect them up
     commands.update(dict(x for x in locals().items() if x[0] not in prior))    
     
+    # if what the user asked for is not one of our existing functions, print the help
     if (not args) or (args[0] not in commands): 
         parser.print_help()
-        # TODO more descriptions?
         help()
         return 9
     else:
+        # call the function the user named, given the arguments from the command line  
         locals()[args[0]](*args[1:])
 
     return 0
