@@ -21,6 +21,14 @@ import numpy as np
 
 LOG = logging.getLogger(__name__)
 
+try:
+    import dmv as dmvlib
+    LOG.info('loaded dmv module for AERI data file access')
+except ImportError:
+    LOG.info('no AERI dmv data file format module')
+    dmvlib = None
+
+
 fillValConst1 = '_FillValue'
 fillValConst2 = 'missing_value'
 
@@ -422,8 +430,96 @@ class h5(object):
         
         return
 
+
+
+
+class aeri(object):
+    """wrapper for AERI RNC/SUM/CXS/etc datasets
+    """
+    _dmv = None
+    _vectors = { }
+    _scalars = { }
+    
+    @staticmethod
+    def _meta_mapping(fp):
+        ids = fp.metaIDs()
+        names = [fp.queryMetaDescString(1, id_, fp.SHORTNAME) for id_ in ids]
+        assert len(ids) == len(names)
+        return (dict((n, i) for n, i in zip(names, ids)))
+    
+    def _inventory(self):
+        fp = self._dmv
+        assert(fp is not None)
+        # get list of vectors and scalars
+        self._vectors = dict( (fp.queryVectorDescString(n,fp.SHORTNAME), n) for n in fp.vectorIDs() )
+        self._scalars = self._meta_mapping(fp)
+
+    def __init__(self, filename, allowWrite=False):
+        assert(allowWrite==False)
+        if dmvlib is None:
+            LOG.error('cannot open AERI files without dmv module being available')
+            return
+        self._dmv = dmvlib.dmv()
+        rc = self._dmv.openFile(filename)
+        if rc!=0:
+            LOG.error("unable to open file, rc=%d" % rc)
+            self._dmv = None        
+        else:
+            self._inventory()
+    
+    def __call__(self):
+        return list(self._vectors.keys()) + list(self._scalars.keys())
+        
+    def __getitem__(self, name):
+        fp = self._dmv
+        assert(fp is not None)
+        if 'DMV_RECORDS' in os.environ:
+            nrecs = int(os.environ['DMV_RECORDS'])
+            LOG.warning('overriding dmv record count to %d' % nrecs)
+        else:
+            nrecs = self._dmv.recordCount()
+        recrange = range(1, nrecs+1)
+        if name in self._vectors:
+            vid = self._vectors[name]
+            vdata = [ fp.vectorDepValues(rec, vid) for rec in recrange ]
+            return np.array(vdata)
+        elif name in self._scalars:
+            vdata = fp.metaValueMatrix(recrange, [self._scalars[name]])
+            return np.array(vdata)
+        else:
+            raise LookupError('cannot find variable %s' % name)
+       
+    def get_variable_object(self,name):
+        return None
+    
+    def missing_value(self, name):
+        return float('nan')
+    
+    def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
+        """
+        create a new variable with the given name
+        optionally set the missing value (fill value) and data to those given
+        
+        the created variable will be returned, or None if a variable could not
+        be created
+        """                
+        return None
+    
+    def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
+        """
+        if the attribute exists for the given variable, set it to the new value
+        if the attribute does not exist for the given variable, create it and set it to the new value
+        """
+        
+        return
+
+# handle the variety of file suffixes by building aliases to aeri class
+cxs = rnc = cxv = csv = spc = sum = uvs = aeri
+
+
+
 def open(pathname, allowWrite=False):
-    cls = globals()[os.path.splitext(pathname)[1][1:]]
+    cls = globals()[os.path.splitext(pathname)[1][1:].lower()]
     return cls(pathname, allowWrite=allowWrite)
 
 
