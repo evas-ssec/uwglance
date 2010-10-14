@@ -1330,15 +1330,13 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                 LOG.debug("Creating variable directory.")
                 os.makedirs(variableDir)
             
-            # form the doc path relative to where the variable is
-            docPath = './'
+            # form the doc and config paths relative to where the variable is
+            upwardPath = './'
             for number in range(len(displayName.split('/'))) : # TODO this is not general to windows
-                docPath = os.path.join(docPath, '../')
-            varRunInfo['doc_path'] = quote(os.path.join(docPath, 'doc.html')) # should this be somewhere else?
-            
-            # hang onto the config file path as well
+                upwardPath = os.path.join(upwardPath, '../')
+            varRunInfo['doc_path'] = quote(os.path.join(upwardPath, 'doc.html'))
             if 'config_file_name' in runInfo :
-                varRunInfo['config_file_path'] = quote(os.path.join(pathsTemp['out'], './' + runInfo['config_file_name']))
+                varRunInfo['config_file_path'] = quote(os.path.join(upwardPath, runInfo['config_file_name']))
             
             # figure out the masks we want, and then do our statistical analysis
             mask_a_to_use = None

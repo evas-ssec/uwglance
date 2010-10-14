@@ -14,6 +14,7 @@ matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
 from pylab import *
 
 import matplotlib.colors as colors
+import matplotlib.cm     as colormapinfo
 
 import logging
 import random as random
@@ -281,7 +282,7 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
             
             functionsToReturn['scatterD']  = ((lambda : figures.create_hexbin_plot(aData[goodInBothMask], bData[goodInBothMask],
                                                                                    "Value in File A vs Value in File B",
-                                                                                   "File A Value", "File B Value")),
+                                                                                   "File A Value", "File B Value", epsilon)),
                                               "density of file a values vs file b values for " + variableDisplayName,
                                               "Hex.png", compared_fig_list)
         
@@ -820,6 +821,24 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         # our list of functions that will later create the plots
         functionsToReturn = { }
         
+        
+        # create the scatter plot with colors for each section
+        scatterPlotList = [ ]
+        tempColorMap = colormapinfo.get_cmap('jet', rawDiffData.shape[0])
+        for binNumber in range(rawDiffData.shape[0]) :
+            tempColor = tempColorMap(binNumber)
+            if len(tempColor) > 3 :
+                tempColor = tempColor[:3]
+            scatterPlotList.append(((aData[binNumber][goodInBothMask[binNumber]]).ravel(),
+                                    (bData[binNumber][goodInBothMask[binNumber]]).ravel(), None,
+                                    colors.rgb2hex(tempColor), None, 'bin ' + str(binNumber + 1), None))
+        functionsToReturn['multi-scatter'] = ((lambda : figures.create_complex_scatter_plot(scatterPlotList,
+                                                                        "Value in File A vs Value in File B, Colored by Bin",
+                                                                        "File A Value", "File B Value",
+                                                                        epsilon)),
+                                          "scatter plot of file a values vs file b values for " + variableDisplayName + " by bin",
+                                          "MultiScatter.png", compared_fig_list)
+        
         # for each of the bins, make the rms histogram data
         numHistogramSections = 7 # TODO at some point make this a user controlled setting
         for binNumber in range(rawDiffData.shape[0]) :
@@ -865,7 +884,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                 for limitIndex in range(histogramSectionLimits.size - 1) :
                     
                     # if it falls in this section, add it's case number index to the list for this section
-                    if ( (rmsDiffValues[caseNumber] > histogramSectionLimits[limitIndex]) and
+                    if ( (rmsDiffValues[caseNumber] >  histogramSectionLimits[limitIndex]) and
                          (rmsDiffValues[caseNumber] <= histogramSectionLimits[limitIndex + 1]) ) :
                         
                         if limitIndex not in histogramSections :

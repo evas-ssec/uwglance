@@ -180,45 +180,66 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
 
 # build a scatter plot of the x,y points
 def create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsilon=None) :
+    """
+    build a scatter plot of the data
+    if a bad mask is given the points selected by that mask will be plotted in a different color
+    if an epsilon is given the lines for +/- epsilon will be drawn on the plot
+    
+    by default this plot uses blue for data points and red for data marked by the bad mask
+    """
+    
+    return create_complex_scatter_plot ([(dataX, dataY, badMask,
+                                          'b', 'r',
+                                          'within\nepsilon', 'outside\nepsilon')],
+                                        title, xLabel, yLabel, epsilon=epsilon)
+
+def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None) :
+    """
+    build a scatter plot with multiple data sets in different colors
+    the dataList parameter should be in the form:
+    [(set1), (set2), ... , (setN)]
+    
+    where a set looks like:
+    (x data, y data, mask of bad points or None, matlab color code for display, matlab color code for 'bad' points, good label, bad label)
+    
+    if a mask of bad points is given, it will be applyed to both the x and y data
+    
+    at least one data set must be given or no image will be created.
+    """
     
     # make the figure
     figure = plt.figure()
     axes = figure.add_subplot(111)
     
-    # if we have "bad" data to plot, pull it out
-    badX = None
-    badY = None
-    if (badMask != None) :
-        badX = dataX[badMask]
-        badY = dataY[badMask]
-        dataX = dataX[~badMask]
-        dataY = dataY[~badMask]
+    # if we have no data, stop now
+    if (dataList is None) or (len(dataList) <= 0) :
+        return figure;
     
-    # the scatter plot of the good data 
-    axes.plot(dataX, dataY, 'b,', label='within\nepsilon')
+    # look at the stuff in each of the data sets and plot that set
+    for dataX, dataY, badMask, goodColor, badColor, goodLabel, badLabel in dataList :
+        
+        # if we have "bad" data to plot, pull it out
+        badX = None
+        badY = None
+        if (badMask != None) :
+            badX  = dataX[badMask]
+            badY  = dataY[badMask]
+            dataX = dataX[~badMask]
+            dataY = dataY[~badMask]
+        
+        # the scatter plot of the good data
+        axes.plot(dataX, dataY, ',', color=goodColor, label=goodLabel)
+        
+        # plot the bad data
+        numTroublePts = 0
+        if (badX is not None) and (badY is not None) and (badMask is not None) :
+            numTroublePts = badX.size
+            LOG.debug('\t\tplotting ' + str(numTroublePts) + ' trouble points in scatter plot.' )
+            if numTroublePts > 0 :
+                axes.plot(badX, badY, ',', color=badColor, label=badLabel)
     
-    # plot the bad data
-    numTroublePts = 0
-    if (badX is not None) and (badY is not None) and (badMask is not None) :
-        numTroublePts = badX.shape[0]
-        LOG.debug('\t\tnumber of trouble points in scatter plot: ' + str(badX.shape[0]))
-        if numTroublePts > 0 :
-            axes.plot(badX, badY, 'r,', label='outside\nepsilon')
-    
-    # draw the line for the "perfect fit" 
-    xbounds = axes.get_xbound()
-    xrange = xbounds[1] - xbounds[0]
-    ybounds = axes.get_ybound()
-    yrange = ybounds[1] - ybounds[0]
-    perfect = [max(xbounds[0], ybounds[0]), min(xbounds[1], ybounds[1])]
-    axes.plot(perfect, perfect, 'k--', label='A = B')
-    
-    # now draw the epsilon bound lines if they are visible and the lines won't be the same as A = B
-    if (not (epsilon is None)) and (epsilon > 0.0) and (epsilon < xrange) and (epsilon < yrange):
-        # plot the top line
-        axes.plot([perfect[0], perfect[1] - epsilon], [perfect[0] + epsilon, perfect[1]], '--', color='#00FF00', label='+/-epsilon')
-        # plot the bottom line
-        axes.plot([perfect[0] + epsilon, perfect[1]], [perfect[0], perfect[1] - epsilon], '--', color='#00FF00')
+    # draw some extra informational lines
+    _draw_x_equals_y_line(axes, epsilon=epsilon)
     
     # make a key to explain our plot
     # as long as things have been plotted with proper labels they should show up here
@@ -238,7 +259,7 @@ def create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsil
     return figure
 
 # build a hexbin plot of the x,y points and show the density of the point distribution
-def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel) :
+def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None) :
     
     # make the figure
     figure = plt.figure()
@@ -252,6 +273,9 @@ def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel) :
     cb = plt.colorbar()
     cb.set_label('log10 (count + 1)')
     
+    # draw some extra informational lines
+    _draw_x_equals_y_line(axes, color='w', epsilon=epsilon, epsilonColor='k')
+    
     # and some informational stuff
     axes.set_title(title)
     plt.xlabel(xLabel)
@@ -264,6 +288,36 @@ def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel) :
     axes.xaxis.set_major_formatter(xFormatter)
     
     return figure
+
+def _draw_x_equals_y_line(axes, color='k', style='--', epsilon=None, epsilonColor='#00FF00', epsilonStyle='--') :
+    """
+    Draw the x = y line using the axes and color/style given
+    If epsilon is not None, also draw the +/- epsilon lines,
+    if they fall in the graph
+    """
+    
+    # get the bounds for our calculations and so we can reset the viewing window later
+    xbounds = axes.get_xbound()
+    ybounds = axes.get_ybound()
+    
+    # figure out the size of the ranges
+    xrange = xbounds[1] - xbounds[0]
+    yrange = ybounds[1] - ybounds[0]
+    
+    # draw the x=y line
+    perfect = [max(xbounds[0], ybounds[0]), min(xbounds[1], ybounds[1])]
+    axes.plot(perfect, perfect, style, color=color, label='A = B')
+    
+    # now draw the epsilon bound lines if they are visible and the lines won't be the same as A = B
+    if (not (epsilon is None)) and (epsilon > 0.0) and (epsilon < xrange) and (epsilon < yrange):
+        # plot the top line
+        axes.plot([perfect[0], perfect[1] - epsilon], [perfect[0] + epsilon, perfect[1]], epsilonStyle, color=epsilonColor, label='+/-epsilon')
+        # plot the bottom line
+        axes.plot([perfect[0] + epsilon, perfect[1]], [perfect[0], perfect[1] - epsilon], epsilonStyle, color=epsilonColor)
+    
+    # reset the bounds
+    axes.set_xbound(xbounds)
+    axes.set_ybound(ybounds)
 
 # build a histogram figure of the given data with the given title and number of bins
 def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
