@@ -57,6 +57,8 @@ glance_analysis_defaults = {'epsilon': 0.0,
                             'minimum_acceptable_squared_correlation_coefficient': None
                             }
 
+UNITS_CONSTANT = "units"
+
 def _clean_path(string_path) :
     """
     Return a clean form of the path without any '.', '..', or '~'
@@ -144,6 +146,10 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                 finalNames[name]['missing_value'] = missing 
                 finalNames[name]['missing_value_alt_in_b'] = missing_b
                 
+                # get any information about the units listed in the files
+                finalNames[name]['units_a'] = fileAObject.get_attribute(name, UNITS_CONSTANT)
+                finalNames[name]['units_b'] = fileBObject.get_attribute(name, UNITS_CONSTANT)
+                
         # otherwise just do the ones the user asked for
         else : 
             # check each of the names the user asked for to see if it is either in the list of common names
@@ -180,6 +186,10 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                                     _get_missing_values_if_needed((fileAObject, fileBObject), name, name_b,
                                                                   missing, missing_b)
                         
+                        # get any information about the units listed in the files
+                        finalNames[dispName]['units_a'] = fileAObject.get_attribute(name,   UNITS_CONSTANT)
+                        finalNames[dispName]['units_b'] = fileBObject.get_attribute(name_b, UNITS_CONSTANT)
+                        
                 else :
                     LOG.warn('No technical variable name was given for the entry described as "' + dispName + '". ' +
                              'Skipping this variable.')
@@ -202,6 +212,10 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                                                                missing_value_A=missing, missing_value_B=missing)
             finalNames[name]['missing_value'] = missing 
             finalNames[name]['missing_value_alt_in_b'] = missing_b
+            
+            # get any information about the units listed in the files
+            finalNames[name]['units_a'] = fileAObject.get_attribute(name, UNITS_CONSTANT)
+            finalNames[name]['units_b'] = fileBObject.get_attribute(name, UNITS_CONSTANT)
     
     LOG.debug("Final selected set of variables to analyze:")
     LOG.debug(str(finalNames))

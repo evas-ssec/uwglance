@@ -179,6 +179,14 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
         % else :
             "missing" data value: ${str(runInfo['missing_value'])}<br>
         % endif
+        
+        ## if there are units available, display those
+        % if ('units_a' in runInfo) and (runInfo['units_a'] is not None) :
+            units in A: ${str(runInfo['units_a'])}<br>
+        % endif
+        % if ('units_b' in runInfo) and (runInfo['units_b'] is not None) :
+            units in B: ${str(runInfo['units_b'])}<br>
+        % endif
     </p>
     
     <h3>Statistical Summary</h3>

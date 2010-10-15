@@ -32,6 +32,17 @@ except ImportError:
 fillValConst1 = '_FillValue'
 fillValConst2 = 'missing_value'
 
+class IOUnimplimentedError(Exception):
+    """
+    The exception raised when a requested io operation is not yet available.
+    
+        msg  -- explanation of the problem
+    """
+    def __init__(self, msg):
+        self.msg = msg
+    def __str__(self):
+        return self.msg
+
 class hdf(SD):
     """wrapper for HDF4 dataset for comparison
     __call__ yields sequence of variable names
@@ -134,7 +145,7 @@ class hdf(SD):
         be created
         """
         
-        # TODO
+        raise IOUnimplimentedError('Unable to create variable in hdf file, this functionality is not yet available.')
         
         return None
     
@@ -143,9 +154,24 @@ class hdf(SD):
         if the attribute exists for the given variable, set it to the new value
         if the attribute does not exist for the given variable, create it and set it to the new value
         """
-        # TODO
+        
+        raise IOUnimplimentedError('Unable add attribute to hdf file, this functionality is not yet available.')
         
         return
+    
+    def get_attribute(self, variableName, attributeName) :
+        """
+        returns the value of the attribute if it is available for this variable, or None
+        """
+        toReturn = None
+        
+        variable_object = self.get_variable_object(variableName)
+        temp_attributes = variable_object.attributes()
+        
+        if attributeName in temp_attributes :
+            toReturn = temp_attributes[attributeName]
+        
+        return toReturn
 
 class nc(CDF):
     """wrapper for NetCDF3/4/opendap dataset for comparison
@@ -300,6 +326,20 @@ class nc(CDF):
         self.enddef()
         
         return
+    
+    def get_attribute(self, variableName, attributeName) :
+        """
+        returns the value of the attribute if it is available for this variable, or None
+        """
+        toReturn = None
+        
+        variable_object = self.get_variable_object(variableName)
+        temp_attributes = variable_object.attributes()
+        
+        if attributeName in temp_attributes :
+            toReturn = temp_attributes[attributeName]
+        
+        return toReturn
 
 
 nc4 = nc
@@ -417,7 +457,7 @@ class h5(object):
         be created
         """
         
-        # TODO
+        raise IOUnimplimentedError('Unable to create variable in hdf 5 file, this functionality is not yet available.')
         
         return None
     
@@ -426,9 +466,22 @@ class h5(object):
         if the attribute exists for the given variable, set it to the new value
         if the attribute does not exist for the given variable, create it and set it to the new value
         """
-        # TODO
+        
+        raise IOUnimplimentedError('Unable to add attribute to hdf 5 file, this functionality is not yet available.')
         
         return
+    
+    def get_attribute(self, variableName, attributeName) :
+        """
+        returns the value of the attribute if it is available for this variable, or None
+        """
+        toReturn = None
+        
+        variable_object = self.get_variable_object(variableName)
+        if (attributeName in variable_object.attrs) :
+            toReturn = variable_object.attrs[attributeName]
+        
+        return toReturn
 
 
 
@@ -502,7 +555,10 @@ class aeri(object):
         
         the created variable will be returned, or None if a variable could not
         be created
-        """                
+        """
+        
+        raise IOUnimplimentedError('Unable to create variable in aeri file, this functionality is not yet available.')
+        
         return None
     
     def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
@@ -511,7 +567,20 @@ class aeri(object):
         if the attribute does not exist for the given variable, create it and set it to the new value
         """
         
+        raise IOUnimplimentedError('Unable to add attribute to aeri file, this functionality is not yet available.')
+        
         return
+    
+    def get_attribute(self, variableName, attributeName) :
+        """
+        returns the value of the attribute if it is available for this variable, or None
+        """
+        toReturn = None
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in AERI files. None will be used.')
+        
+        return toReturn
 
 # handle the variety of file suffixes by building aliases to aeri class
 cxs = rnc = cxv = csv = spc = sum = uvs = aeri
