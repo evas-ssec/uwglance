@@ -35,7 +35,8 @@ thumbSizeDPI = 50
 
 def _handle_fig_creation_task(child_figure_function, log_message,
                               outputPath, fullFigName,
-                              shouldMakeSmall, doFork) :
+                              shouldMakeSmall, doFork,
+                              fullDPI=fullSizeDPI, thumbDPI=thumbSizeDPI) :
     """
     fork to do something.
     the parent will return the child pid
@@ -54,11 +55,11 @@ def _handle_fig_creation_task(child_figure_function, log_message,
     else :
         figure = child_figure_function() 
         LOG.info(log_message)
-        figure.savefig(os.path.join(outputPath, fullFigName), dpi=fullSizeDPI)
+        figure.savefig(os.path.join(outputPath, fullFigName), dpi=fullDPI)
         if (shouldMakeSmall) :
             
             tempImage = Image.open(os.path.join(outputPath, fullFigName))
-            scaleFactor = float(thumbSizeDPI) / float(fullSizeDPI)
+            scaleFactor = float(thumbDPI) / float(fullDPI)
             originalSize = tempImage.size
             newSize = (int(originalSize[0] * scaleFactor), int(originalSize[1] * scaleFactor))
             tempImage = tempImage.resize(newSize, Image.ANTIALIAS)
@@ -78,7 +79,8 @@ def _handle_fig_creation_task(child_figure_function, log_message,
 
 def _log_spawn_and_wait_if_needed (imageDescription, childPids, 
                                    taskFunction, taskOutputPath, taskFigName,
-                                   doMakeThumb=True, doFork=False, shouldClearMemoryWithThreads=False) :
+                                   doMakeThumb=True, doFork=False, shouldClearMemoryWithThreads=False,
+                                   fullDPI=fullSizeDPI, thumbDPI=thumbSizeDPI) :
     """
     create a figure generation task, spawning a process as needed
     save the childPid to the list of pids if the process will remain outstanding after this method ends
@@ -90,7 +92,8 @@ def _log_spawn_and_wait_if_needed (imageDescription, childPids,
     pid = _handle_fig_creation_task(taskFunction,
                                     "saving image of " + imageDescription,
                                     taskOutputPath, taskFigName,
-                                    doMakeThumb, doFork or shouldClearMemoryWithThreads)
+                                    doMakeThumb, doFork or shouldClearMemoryWithThreads,
+                                    fullDPI=fullDPI, thumbDPI=thumbDPI)
     
     # wait based on the state of the pid we received and why we would have forked
     childPid = None
@@ -104,7 +107,8 @@ def _log_spawn_and_wait_if_needed (imageDescription, childPids,
     return
 
 def plot_and_save_spacial_trouble(longitudeObject, latitudeObject, spacialTroubleMask,
-                                  fileNameDiscriminator, title, fileBaseName, outputPath, makeSmall=False) :
+                                  fileNameDiscriminator, title, fileBaseName, outputPath, makeSmall=False,
+                                  fullDPI=fullSizeDPI, thumbDPI=thumbSizeDPI) :
     """
     given information on spatially placed trouble points in A and B, plot only those points in a very obvious way
     on top of a background plot of a's data shown in grayscale, save this plot to the output path given
@@ -124,12 +128,12 @@ def plot_and_save_spacial_trouble(longitudeObject, latitudeObject, spacialTroubl
                                                     title, invalidMask=spaciallyInvalidMask, tagData=spacialTroubleMask)
     # save the figure
     LOG.info("Saving spatial trouble image")
-    spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=fullSizeDPI) 
+    spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=fullDPI) 
     
     # we may also save a smaller versions of the figure
     if (makeSmall) :
         
-        spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=thumbSizeDPI)
+        spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=thumbDPI)
     
     # get rid of the figure
     spatialTroubleFig.clf()
@@ -159,7 +163,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                      bUData=None, bVData=None,
                                      binIndex=None, tupleIndex=None,
                                      binName='bin', tupleName='tuple',
-                                     epsilonPercent=None) :
+                                     epsilonPercent=None,
+                                     fullDPI=None, thumbDPI=None) :
     """
     Plot images for a set of figures based on the data sets and settings
     passed in. The images will be saved to disk according to the settings.
@@ -312,7 +317,7 @@ def plot_and_save_comparison_figures (aData, bData,
         # only plot the compared images if we aren't short circuiting them
         if (outputInfoList is not compared_images) or (not shortCircuitComparisons) :
             _log_spawn_and_wait_if_needed(figLongDesc, childPids, figFunction, outputPath, figFileName,
-                                          makeSmall, doFork, shouldClearMemoryWithThreads)
+                                          makeSmall, doFork, shouldClearMemoryWithThreads, fullDPI=fullDPI, thumbDPI=thumbDPI)
             # if we made an attempt to make the file, hang onto the name
             outputInfoList.append(figFileName)
     

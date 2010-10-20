@@ -35,7 +35,9 @@ glance_setting_defaults = {'shouldIncludeReport':       True,
                            'doFork':                    False,
                            'useThreadsToControlMemory': False,
                            'useSharedRangeForOriginal': False,
-                           'noLonLatVars':              False}
+                           'noLonLatVars':              False,
+                           'detail_DPI':                150,
+                           'thumb_DPI':                 50}
 
 # these are the built in longitude/latitude defaults
 glance_lon_lat_defaults = {'longitude': 'pixel_longitude',
@@ -453,7 +455,8 @@ def _get_percentage_from_mask(dataMask) :
 # TODO, this comparison needs to encorporate epsilon percent as well
 def _check_lon_lat_equality(longitudeADataObject, latitudeADataObject,
                             longitudeBDataObject, latitudeBDataObject,
-                            llepsilon, doMakeImages, outputPath) :
+                            llepsilon, doMakeImages, outputPath,
+                            fullDPI=None, thumbDPI=None) :
     """
     check to make sure the longitude and latitude are equal everywhere that's not in the ignore masks
     if they are not and doMakeImages was passed as True, generate appropriate figures to show where
@@ -486,21 +489,25 @@ def _check_lon_lat_equality(longitudeADataObject, latitudeADataObject,
         # if we are making images, make two showing the invalid lons/lats
         if (doMakeImages) :
             
-            if (len(longitudeA[~ignoreMaskA]) > 0) and (len(latitudeA[~ignoreMaskA]) > 0) :
+            if ((len(longitudeADataObject.data[~longitudeADataObject.masks.ignore_mask]) > 0) and
+                (len( latitudeADataObject.data[~ latitudeADataObject.masks.ignore_mask]) > 0)) :
                 plot.plot_and_save_spacial_trouble(longitudeADataObject, latitudeADataObject,
                                                    lon_lat_not_equal_mask,
                                                    "A", "Lon./Lat. Points Mismatched between A and B\n" +
                                                    "(Shown in A)",
                                                    "LonLatMismatch",
-                                                   outputPath, True)
+                                                   outputPath, True,
+                                                   fullDPI=fullDPI, thumbDPI=thumbDPI)
             
-            if (len(longitudeB[~ignoreMaskB]) > 0) and (len(latitudeB[~ignoreMaskB]) > 0) :
+            if ((len(longitudeBDataObject.data[~longitudeBDataObject.masks.ignore_mask]) > 0) and
+                (len( latitudeBDataObject.data[~ latitudeBDataObject.masks.ignore_mask]) > 0)) :
                 plot.plot_and_save_spacial_trouble(longitudeBDataObject, latitudeBDataObject,
                                                    lon_lat_not_equal_mask,
                                                    "B", "Lon./Lat. Points Mismatched between A and B\n" +
                                                    "(Shown in B)",
                                                    "LonLatMismatch",
-                                                   outputPath, True)
+                                                   outputPath, True,
+                                                   fullDPI=fullDPI, thumbDPI=thumbDPI)
     
     # setup our return data
     returnInfo = {}
@@ -511,7 +518,8 @@ def _check_lon_lat_equality(longitudeADataObject, latitudeADataObject,
 
 def _compare_spatial_invalidity(longitude_a_object, longitude_b_object,
                                 latitude_a_object,  latitude_b_object,
-                                spatial_info, do_include_images, output_path) :
+                                spatial_info, do_include_images, output_path,
+                                fullDPI=None, thumbDPI=None) :
     """ 
     Given information about where the two files are spatially invalid, figure
     out what invalidity they share and save information or plots for later use
@@ -552,20 +560,22 @@ def _compare_spatial_invalidity(longitude_a_object, longitude_b_object,
         if ((spatial_info['file A']['numInvPts'] > 0) and (do_include_images) and
             (len(longitude_a_object.data[~invalid_in_a_mask]) > 0) and
             (len( latitude_a_object.data[~invalid_in_a_mask]) > 0)) :
-            plot.plot_and_save_spacial_trouble(longitude_a_object.data, latitude_a_object.data,
+            plot.plot_and_save_spacial_trouble(longitude_a_object, latitude_a_object,
                                                valid_only_in_mask_a,
                                                "A", "Points only valid in\nFile A\'s longitude & latitude",
                                                "SpatialMismatch",
-                                               output_path, True)
+                                               output_path, True,
+                                               fullDPI=fullDPI, thumbDPI=thumbDPI)
         if ((spatial_info['file B']['numInvPts'] > 0) and (do_include_images) and
             (len(longitude_b_object.data[~invalid_in_b_mask]) > 0) and
             (len( latitude_b_object.data[~invalid_in_b_mask]) > 0)
             ) :
-            plot.plot_and_save_spacial_trouble(longitude_b_object.data, latitude_b_object.data,
+            plot.plot_and_save_spacial_trouble(longitude_b_object, latitude_b_object,
                                                valid_only_in_mask_b,
                                                "B", "Points only valid in\nFile B\'s longitude & latitude",
                                                "SpatialMismatch",
-                                               output_path, True)
+                                               output_path, True,
+                                               fullDPI=fullDPI, thumbDPI=thumbDPI)
     
     return invalid_in_common_mask, spatial_info, longitude_common, latitude_common
 
@@ -581,7 +591,8 @@ class VariableComparisonError(Exception):
         return self.msg
 
 def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output_path,
-                          should_make_images=False, should_check_equality=True) :
+                          should_make_images=False, should_check_equality=True,
+                          fullDPI=None, thumbDPI=None) :
     """
     Manage loading and comparing longitude and latitude information for two files
     
@@ -640,7 +651,8 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
         moreSpatialInfo = _check_lon_lat_equality(longitude_a_object, latitude_a_object,
                                                   longitude_b_object, latitude_b_object,
                                                   lon_lat_settings['lon_lat_epsilon'],
-                                                  should_make_images, output_path)
+                                                  should_make_images, output_path,
+                                                  fullDPI=fullDPI, thumbDPI=thumbDPI)
         # update our existing spatial information
         spatialInfo.update(moreSpatialInfo)
         
@@ -648,7 +660,8 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
         spaciallyInvalidMask, spatialInfo, longitude_common, latitude_common = \
                                 _compare_spatial_invalidity(longitude_a_object, longitude_b_object,
                                                             latitude_a_object,  latitude_b_object,
-                                                            spatialInfo, should_make_images, output_path)
+                                                            spatialInfo, should_make_images, output_path,
+                                                            fullDPI=fullDPI, thumbDPI=thumbDPI)
     else:
         spaciallyInvalidMask = None
         longitude_common     = None
@@ -947,7 +960,8 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
     # or { } if there is no lon/lat info
     lon_lat_data = { }
     try :
-        lon_lat_data, _ = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'], should_check_equality=False)
+        lon_lat_data, _ = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'], should_check_equality=False,
+                                                fullDPI=runInfo['detail_DPI'], thumbDPI=runInfo['thumb_DPI'])
     except VariableLoadError, vle :
         LOG.warn("Error while loading longitude or latitude: ")
         LOG.warn(vle.msg)
@@ -1268,7 +1282,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     spatialInfo  = { }
     try :
         lon_lat_data, spatialInfo = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'],
-                                                          should_make_images = runInfo["shouldIncludeImages"])
+                                                          should_make_images = runInfo["shouldIncludeImages"],
+                                                          fullDPI=runInfo['detail_DPI'], thumbDPI=runInfo['thumb_DPI'])
     except VariableLoadError, vle :
         LOG.warn("Error while loading longitude or latitude: ")
         LOG.warn(vle.msg)
@@ -1454,7 +1469,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                              tupleIndex=    varRunInfo['tupleIndex']      if 'tupleIndex'      in varRunInfo else None,
                              binName=       varRunInfo['binName']         if 'binName'         in varRunInfo else 'bin',
                              tupleName=     varRunInfo['tupleName']       if 'tupleName'       in varRunInfo else 'tuple',
-                             epsilonPercent=varRunInfo['epsilon_percent'] if 'epsilon_percent' in varRunInfo else None)
+                             epsilonPercent=varRunInfo['epsilon_percent'] if 'epsilon_percent' in varRunInfo else None,
+                             fullDPI=       runInfo['detail_DPI'],
+                             thumbDPI=      runInfo['thumb_DPI'])
                 
                 print("\tfinished creating figures for: " + explanationName)
             

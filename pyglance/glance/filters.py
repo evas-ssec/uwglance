@@ -259,5 +259,16 @@ def organize_ipopp_data_into_image(original_ipopp_data, wave_number=None, missin
     
     return new_data_image
 
+def get_sounding_profile_at_index(profile_data_3d, index_desired) :
+    """
+    Select a level of the sounding profile data at the index given.
+    For example, if you wanted to select 300 hPa in the pressure profile, you would
+    enter an index of 64.
+    """
+    
+    assert(len(profile_data_3d.shape) > 1)
+    
+    return profile_data_3d[index_desired].copy()
+
 if __name__=='__main__':
     sys.exit(main())
