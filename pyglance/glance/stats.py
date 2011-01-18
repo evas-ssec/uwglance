@@ -411,8 +411,8 @@ class NumericalComparisonStatistics (StatisticalData) :
     diff_outside_epsilon_fraction - the fraction of points that fall outside the acceptable epsilon settings
     perfect_match_count           - the number   of points that match perfectly between the sets
     perfect_match_fraction        - the fraction of points that match perfectly between the sets
-    trouble_points_count          - the number   of points that have possible issues according to the current analysis
-    trouble_points_fraction       - the fraction of points that have possible issues according to the current analysis
+    mismatch_points_count         - the number   of points that have possible issues according to the current analysis
+    mismatch_points_fraction      - the fraction of points that have possible issues according to the current analysis
     
     It may also contain additional statistics. This is indicated by the does_include_simple boolean.
     The possible additional statistics include:
@@ -442,9 +442,9 @@ class NumericalComparisonStatistics (StatisticalData) :
                     'rms_diff': "root mean square (RMS) difference of finite values",
                     'r-squared correlation': "the square of the r correlation (see correlation)",
                     'std_diff': "standard deviation of difference of finite values",
-                    'trouble_points_count': 'number of points that differ in finite/missing status between the input data sets A and B,' +
+                    'mismatch_points_count': 'number of points that differ in finite/missing status between the input data sets A and B,' +
                                             ' or are unacceptable when compared according to the current epsilon definitions',
-                    'trouble_points_fraction': 'fraction of points that differ in finite/missing status between the input data sets A and B,' +
+                    'mismatch_points_fraction': 'fraction of points that differ in finite/missing status between the input data sets A and B,' +
                                             ' or are unacceptable when compared according to the current epsilon definitions',
                     }
     
@@ -461,13 +461,13 @@ class NumericalComparisonStatistics (StatisticalData) :
         # pull out some info we will use later
         valid_in_both        = diffInfoObject.diff_data_object.masks.valid_mask
         outside_epsilon_mask = diffInfoObject.diff_data_object.masks.outside_epsilon_mask
-        trouble_mask         = diffInfoObject.diff_data_object.masks.trouble_mask
+        mismatch_mask        = diffInfoObject.diff_data_object.masks.mismatch_mask
         aData                = diffInfoObject.a_data_object.data
         bData                = diffInfoObject.b_data_object.data
         
         assert (valid_in_both.shape        == outside_epsilon_mask.shape)
-        assert (outside_epsilon_mask.shape == trouble_mask.shape)
-        assert (trouble_mask.shape         == aData.shape)
+        assert (outside_epsilon_mask.shape == mismatch_mask.shape)
+        assert (mismatch_mask.shape        == aData.shape)
         assert (aData.shape                == bData.shape)
         
         # fill in some simple statistics
@@ -476,13 +476,13 @@ class NumericalComparisonStatistics (StatisticalData) :
                                                                                          goodMask=valid_in_both)
         self.correlation                = delta.compute_correlation(aData, bData, valid_in_both)
         self.r_squared_correlation      = self.correlation * self.correlation
-        self.trouble_points_count       = np.sum(trouble_mask)
+        self.mismatch_points_count      = np.sum(mismatch_mask)
         
         # we actually want the total number of _finite_ values rather than all the data
         total_num_finite_values = np.sum(valid_in_both)
         
         # calculate some more complex statistics
-        self.trouble_points_fraction = float(self.trouble_points_count) / float(aData.size)
+        self.mismatch_points_fraction = float(self.mismatch_points_count) / float(aData.size)
         # be careful not to divide by zero if we don't have finite data
         if total_num_finite_values > 0 :
             self.diff_outside_epsilon_fraction = float(self.diff_outside_epsilon_count) / float(total_num_finite_values)
@@ -522,8 +522,8 @@ class NumericalComparisonStatistics (StatisticalData) :
                     'diff_outside_epsilon_fraction': self.diff_outside_epsilon_fraction,
                     'perfect_match_count':           self.perfect_match_count,
                     'perfect_match_fraction':        self.perfect_match_fraction,
-                     'trouble_points_count':         self.trouble_points_count, 
-                     'trouble_points_fraction':      self.trouble_points_fraction
+                    'mismatch_points_count':         self.mismatch_points_count, 
+                    'mismatch_points_fraction':      self.mismatch_points_fraction
                     }
         toReturn.update(self.temp_analysis)
         

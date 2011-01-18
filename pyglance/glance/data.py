@@ -61,15 +61,15 @@ class DiffMaskSetObject (BasicMaskSetObject) :
     masks are used to capture information about where data should be
     ignored/valid/non-finite in the compared data.
     
-    Additionally, masks describing trouble points and points outside
+    Additionally, masks describing mismatch points and points outside
     of the epsilon analysis tolerances are included.
     
-    trouble_mask - a mask of data points which may indicate issues in the data
+    mismatch_mask - a mask of data points which may indicate issues in the data
     outside_epsilon_mask - a mask of points which did not pass the epsilon
                            tolerance testing
     """
     
-    def __init__(self, ignoreMask, validInBothMask, troubleMask, epsilonMask) :
+    def __init__(self, ignoreMask, validInBothMask, mismatchMask, epsilonMask) :
         """
         create a more complex mask, including additional difference information
         """
@@ -77,7 +77,7 @@ class DiffMaskSetObject (BasicMaskSetObject) :
         
         self.ignore_mask          = ignoreMask
         self.valid_mask           = validInBothMask
-        self.trouble_mask         = troubleMask
+        self.mismatch_mask        = mismatchMask
         self.outside_epsilon_mask = epsilonMask
 
 class DataObject (object) :
@@ -265,15 +265,15 @@ class DiffInfoObject (object) :
         if (epsilonPercent is not None) :
             outside_epsilon_mask |= (abs(raw_diff) > abs(aDataObject.data * (float(epsilonPercent) / 100.0))) & valid_in_both
         
-        # trouble points = mismatched nans, mismatched missing-values, differences that are too large 
-        trouble_pt_mask = ( (aDataObject.masks.non_finite_mask ^ bDataObject.masks.non_finite_mask) |
+        # mismatch points = mismatched nans, mismatched missing-values, differences that are too large 
+        mismatch_pt_mask = ( (aDataObject.masks.non_finite_mask ^ bDataObject.masks.non_finite_mask) |
                             (aDataObject.masks.missing_mask    ^ bDataObject.masks.missing_mask)    |
                             outside_epsilon_mask )
         
         # make our diff data object
         diff_data_object = DataObject(raw_diff, fillValue=fill_data_value)
         diff_data_object.masks = DiffMaskSetObject(ignore_in_both, valid_in_both,
-                                                   trouble_pt_mask, outside_epsilon_mask)
+                                                   mismatch_pt_mask, outside_epsilon_mask)
         
         return diff_data_object
 

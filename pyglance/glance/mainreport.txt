@@ -9,7 +9,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
     import glance.report as report
 %>
 
-<title>Spacial File Comparison</title>
+<title>File Comparison</title>
 </head>
 <body>
     

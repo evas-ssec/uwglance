@@ -80,21 +80,21 @@ def _plot_tag_data_simple(tagData) :
     -1 if no valid tagData was given.
     """
     
-    numTroublePoints = -1
+    numMismatchPoints = -1
     
     # if there are "tag" masks, plot them over the existing map
     if not (tagData is None) :
         
-        numTroublePoints = sum(tagData)
+        numMismatchPoints = sum(tagData)
         
-        # if we have trouble points, we need to show them
-        if numTroublePoints > 0:
+        # if we have mismatch points, we need to show them
+        if numMismatchPoints > 0:
             
             # figure out how many bad points there are
             totalNumPoints = tagData.size # the number of points
-            percentBad = (float(numTroublePoints) / float(totalNumPoints)) * 100.0
-            LOG.debug('\t\tnumber of trouble points: ' + str(numTroublePoints))
-            LOG.debug('\t\tpercent of trouble points: ' + str(percentBad))
+            percentBad = (float(numMismatchPoints) / float(totalNumPoints)) * 100.0
+            LOG.debug('\t\tnumber  of mismatch points: ' + str(numMismatchPoints))
+            LOG.debug('\t\tpercent of mismatch points: ' + str(percentBad))
             
             new_kwargs = {}
             new_kwargs['cmap'] = greenColorMap
@@ -102,14 +102,14 @@ def _plot_tag_data_simple(tagData) :
             p = contourf(cleanTagData, **new_kwargs)
             # TODO, need to incorporate plot for small numbers of pts
         
-        # display the number of trouble points on the report if we were passed a set of tag data
-        troublePtString = '\n\nShowing ' + str(numTroublePoints) + ' Trouble Points'
+        # display the number of mismatch points on the report if we were passed a set of tag data
+        mismatchPtString = '\n\nShowing ' + str(numMismatchPoints) + ' Mismatch Points'
         # if our plot is more complex, add clarification
-        if numTroublePoints > 0 :
-            troublePtString = troublePtString + ' in Green'
-        plt.xlabel(troublePtString)
+        if numMismatchPoints > 0 :
+            mismatchPtString = mismatchPtString + ' in Green'
+        plt.xlabel(mismatchPtString)
     
-    return numTroublePoints
+    return numMismatchPoints
 
 def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
     """
@@ -122,19 +122,19 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
     The return will be the number of points plotted or
     -1 if no valid tagData was given.
     
-    numTroublePoints = _plot_tag_data_mapped(bMap, tagData, x, y)
+    numMismatchPoints = _plot_tag_data_mapped(bMap, tagData, x, y)
     """
     
-    numTroublePoints = -1
+    numMismatchPoints = -1
     
     # if there are "tag" masks, plot them over the existing map
     if (tagData is not None) and (tagData.size > 0) :
         
-        # look at how many trouble points we have
-        numTroublePoints = sum(tagData)
+        # look at how many mismatch points we have
+        numMismatchPoints = sum(tagData)
         neededHighlighting = False
         
-        if numTroublePoints > 0 :
+        if numMismatchPoints > 0 :
             
             # pick out the cooridinates of the points we want to plot
             newX = np.array(x[tagData])
@@ -142,9 +142,9 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
             
             # figure out how many bad points there are
             totalNumPoints = x.size # the number of points
-            percentBad = (float(numTroublePoints) / float(totalNumPoints)) * 100.0
-            LOG.debug('\t\tnumber of trouble points: ' + str(numTroublePoints))
-            LOG.debug('\t\tpercent of trouble points: ' + str(percentBad))
+            percentBad = (float(numMismatchPoints) / float(totalNumPoints)) * 100.0
+            LOG.debug('\t\tnumber  of mismatch points: ' + str(numMismatchPoints))
+            LOG.debug('\t\tpercent of mismatch points: ' + str(percentBad))
             
             # if there are very few points, make them easier to notice
             # by plotting some colored circles underneath them
@@ -155,8 +155,8 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
                 neededHighlighting = True
                 p = bMap.plot(newX, newY, 'o', color='#993399', markersize=3)
             
-            # if there are way too many trouble points, we can't use plot for this
-            if (numTroublePoints > 1000000) :
+            # if there are way too many mismatch points, we can't use plot for this
+            if (numMismatchPoints > 1000000) :
                 new_kwargs = {}
                 new_kwargs['cmap'] = greenColorMap
                 p = maps.show_x_y_data(x, y, bMap, data=tagData, **new_kwargs)
@@ -165,21 +165,21 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
                 p = bMap.plot(newX, newY, '.', color='#00FF00', markersize=1)
         
         if addExplinationLabel :
-            # display the number of trouble points on the report if we were passed a set of tag data
+            # display the number of mismatch points on the report if we were passed a set of tag data
             # I'm not thrilled with this solution for getting it below the labels drawn by the basemap
             # but I don't think there's a better one at the moment given matplotlib's workings
-            troublePtString = '\n\nShowing ' + str(numTroublePoints) + ' Trouble Points'
+            mismatchPtString = '\n\nShowing ' + str(numMismatchPoints) + ' Mismatch Points'
             # if our plot is more complex, add clarification
-            if numTroublePoints > 0 :
-                troublePtString = troublePtString + ' in Green'
+            if numMismatchPoints > 0 :
+                mismatchPtString = mismatchPtString + ' in Green'
                 if neededHighlighting :
-                    troublePtString = troublePtString + '\nwith Purple Circles for Visual Clarity'
-            plt.xlabel(troublePtString)
+                    mismatchPtString = mismatchPtString + '\nwith Purple Circles for Visual Clarity'
+            plt.xlabel(mismatchPtString)
     
-    return numTroublePoints
+    return numMismatchPoints
 
 # build a scatter plot of the x,y points
-def create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsilon=None) :
+def create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsilon=None, units_x=None, units_y=None) :
     """
     build a scatter plot of the data
     if a bad mask is given the points selected by that mask will be plotted in a different color
@@ -191,9 +191,9 @@ def create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsil
     return create_complex_scatter_plot ([(dataX, dataY, badMask,
                                           'b', 'r',
                                           'within\nepsilon', 'outside\nepsilon')],
-                                        title, xLabel, yLabel, epsilon=epsilon)
+                                        title, xLabel, yLabel, epsilon=epsilon, units_x=units_x, units_y=units_y)
 
-def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None) :
+def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None, units_x=None, units_y=None) :
     """
     build a scatter plot with multiple data sets in different colors
     the dataList parameter should be in the form:
@@ -231,11 +231,11 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None) :
         axes.plot(dataX, dataY, ',', color=goodColor, label=goodLabel)
         
         # plot the bad data
-        numTroublePts = 0
+        numMismatchPts = 0
         if (badX is not None) and (badY is not None) and (badMask is not None) :
-            numTroublePts = badX.size
-            LOG.debug('\t\tplotting ' + str(numTroublePts) + ' trouble points in scatter plot.' )
-            if numTroublePts > 0 :
+            numMismatchPts = badX.size
+            LOG.debug('\t\tplotting ' + str(numMismatchPts) + ' mismatch points in scatter plot.' )
+            if numMismatchPts > 0 :
                 axes.plot(badX, badY, ',', color=badColor, label=badLabel)
     
     # draw some extra informational lines
@@ -245,10 +245,18 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None) :
     # as long as things have been plotted with proper labels they should show up here
     axes.legend(loc=0, markerscale=3.0) # Note: at the moment markerscale doesn't seem to work
     
+    # add the units to the x and y labels
+    tempXLabel = xLabel
+    tempYLabel = yLabel
+    if str.lower(str(units_x)) != "none" :
+        tempXLabel = tempXLabel + " in " + units_x
+    if str.lower(str(units_y)) != "none" :
+        tempYLabel = tempYLabel + " in " + units_y
+    
     # and some informational stuff
     axes.set_title(title)
-    plt.xlabel(xLabel)
-    plt.ylabel(yLabel)
+    plt.xlabel(tempXLabel)
+    plt.ylabel(tempYLabel)
     
     # format our axes so they display gracefully
     yFormatter = FormatStrFormatter("%4.4g")
@@ -259,11 +267,16 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None) :
     return figure
 
 # build a hexbin plot of the x,y points and show the density of the point distribution
-def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None) :
+def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None, units_x=None, units_y=None) :
     
     # make the figure
     figure = plt.figure()
     axes = figure.add_subplot(111)
+    
+    # for some reason, if you give the hexplot a data set that's all the same number it dies horribly
+    if ( ((dataX is None) or (len(dataX) <= 0)) or ((dataY is None) or (len(dataY) <= 0)) or
+         ((dataX.max() == dataX.min()) and (dataY.max() == dataY.min())) ):
+        return figure
     
     # the hexbin plot of the good data 
     plt.hexbin(dataX, dataY, bins='log', cmap=cm.jet)
@@ -276,10 +289,18 @@ def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None) :
     # draw some extra informational lines
     _draw_x_equals_y_line(axes, color='w', epsilon=epsilon, epsilonColor='k')
     
+    # add the units to the x and y labels
+    tempXLabel = xLabel
+    tempYLabel = yLabel
+    if str.lower(str(units_x)) != "none" :
+        tempXLabel = tempXLabel + " in " + units_x
+    if str.lower(str(units_y)) != "none" :
+        tempYLabel = tempYLabel + " in " + units_y
+    
     # and some informational stuff
     axes.set_title(title)
-    plt.xlabel(xLabel)
-    plt.ylabel(yLabel)
+    plt.xlabel(tempXLabel)
+    plt.ylabel(tempYLabel)
     
     # format our axes so they display gracefully
     yFormatter = FormatStrFormatter("%4.4g")
@@ -320,7 +341,7 @@ def _draw_x_equals_y_line(axes, color='k', style='--', epsilon=None, epsilonColo
     axes.set_ybound(ybounds)
 
 # build a histogram figure of the given data with the given title and number of bins
-def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
+def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, units=None) :
     
     # make the figure
     figure = plt.figure()
@@ -330,7 +351,7 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
         return figure
     
     # the histogram of the data
-    n, bins, patches = plt.hist(data, bins)
+    n, outBins, patches = plt.hist(data, bins)
     
     # format our axes so they display gracefully
     yFormatter = FormatStrFormatter("%3.3g")
@@ -338,9 +359,14 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
     xFormatter = FormatStrFormatter("%.4g")
     axes.xaxis.set_major_formatter(xFormatter)
     
+    # add the units to the x and y labels
+    tempXLabel = xLabel
+    if str.lower(str(units)) != "none" :
+        tempXLabel = tempXLabel + " in " + units
+    
     # and some informational stuff
     axes.set_title(title)
-    plt.xlabel(xLabel)
+    plt.xlabel(tempXLabel)
     plt.ylabel(yLabel)
     
     # if stats were passed in, put some of the information on the graph
@@ -356,7 +382,7 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
         
         # info on the display of our statistics
         xbounds = axes.get_xbound()
-        numBinsToUse = len(bins)
+        numBinsToUse = bins
         xrange = xbounds[1] - xbounds[0]
         binSize = xrange / float(numBinsToUse)
         
@@ -365,8 +391,8 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
         statText = statText + '\n' + 'mean: ' + report.make_formatted_display_string(meanVal)
         statText = statText + '\n' + 'median: ' + report.make_formatted_display_string(medianVal)
         statText = statText + '\n' + 'std: ' + report.make_formatted_display_string(stdVal)
-        statText = statText + '\n\n' + 'bins: ' + report.make_formatted_display_string(numBinsToUse)
-        statText = statText + '\n' + 'bin size ' + report.make_formatted_display_string(binSize)
+        statText = statText + '\n\n' + 'intervals: ' + report.make_formatted_display_string(numBinsToUse)
+        statText = statText + '\n' + 'interval size ' + report.make_formatted_display_string(binSize)
         
         # figure out where to place the text and put it on the figure
         centerOfDisplay = xbounds[0] + (float(xrange) / 2.0)
@@ -384,7 +410,7 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False) :
 # set on the existing image
 def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxes, title,
                           invalidMask=None, colorMap=None, tagData=None,
-                          dataRanges=None, dataRangeNames=None, dataRangeColors=None, **kwargs) :
+                          dataRanges=None, dataRangeNames=None, dataRangeColors=None, units=None, **kwargs) :
     
     # make a clean version of our lon/lat
     latitudeClean  = ma.array(latitude,  mask=~invalidMask)
@@ -422,7 +448,7 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
     axes.set_title(title)
     # show a generic color bar
     doLabelRanges = False
-    if not (data is None) :
+    if data is not None :
         cbar = colorbar(format='%.3g')
         # if there are specific requested labels, add them
         if not (dataRangeNames is None) :
@@ -434,12 +460,16 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
             else : # we will want to label the ranges themselves
                 cbar.ax.set_yticklabels(dataRangeNames) # todo, this line is temporary
                 doLabelRanges = True
+        else :
+            # add the units to the colorbar
+            if str.lower(str(units)) != "none" :
+                cbar.set_label(units)
     
-    numTroublePoints = _plot_tag_data_mapped(bMap, tagData, x, y)
+    numMismatchPoints = _plot_tag_data_mapped(bMap, tagData, x, y)
     
-    print ('number of trouble points: ' + str(numTroublePoints))
+    LOG.debug ('number of mismatch points: ' + str(numMismatchPoints))
     
-    # if we still need to label the ranges, do it now that our fake axis won't mess the trouble points up
+    # if we still need to label the ranges, do it now that our fake axis won't mess the mismatch points up
     if doLabelRanges :
         """ TODO get this working properly
         fakeAx = plt.axes ([0.77, 0.05, 0.2, 0.9], frameon=False)
@@ -457,8 +487,9 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
 # if any masks are passed in the tagData list they will be plotted as an overlays
 # set on the existing image
 # TODO, this method has not been throughly tested
+# TODO, this method needs an input colormap so the mismatch plot can be the right color
 def create_quiver_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxes, title,
-                          invalidMask=None, tagData=None, uData=None, vData=None,  **kwargs) :
+                          invalidMask=None, tagData=None, uData=None, vData=None, units=None,  **kwargs) :
     
     # make a clean version of our lon/lat/data
     latitudeClean  =  latitude[~invalidMask]
@@ -486,14 +517,23 @@ def create_quiver_mapped_figure(data, latitude, longitude, baseMapInstance, boun
     # show the title
     axes.set_title(title)
     
-    numTroublePoints = _plot_tag_data_mapped(bMap, tagDataClean, x, y)
+    # make a color bar if we have color data
+    """ todo, currently this crashes glance because of an error in matplot lib
+    if colorData is not None :
+        cbar = plt.colorbar(format='%.3g')
+        # add the units to the colorbar
+        if str.lower(str(units)) != "none" :
+            cbar.set_label(units)
+    """
+    
+    numMismatchPoints = _plot_tag_data_mapped(bMap, tagDataClean, x, y)
     
     return figure
 
-def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colorMap=None, colorbarLimits=None) :
+def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colorMap=None, colorbarLimits=None, units=None) :
     """
     create a simple figure showing the data given masked by the invalid mask
-    any tagData passed in will be interpreted as trouble points on the image and plotted as a
+    any tagData passed in will be interpreted as mismatch points on the image and plotted as a
     filled contour overlay in green on the image
     if a colorMap is given it will be used to plot the data,
     if not the default colorMap for imshow will be used
@@ -521,11 +561,14 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colo
             clim(vmin=colorbarLimits[0], vmax=colorbarLimits[-1])
         # make a color bar
         cbar = colorbar(format='%.3g')
+        # add the units to the colorbar
+        if str.lower(str(units)) != "none" :
+            cbar.set_label(units)
     
     # and some informational stuff
     axes.set_title(figureTitle)
     
-    numTroublePoints = _plot_tag_data_simple(tagData)
+    numMismatchPoints = _plot_tag_data_simple(tagData)
     
     return figure
 
@@ -535,7 +578,7 @@ def create_line_plot_figure(dataList, figureTitle) :
     if tagData is given, under-label those points with green circles
     
     Each entry in the dataList should be a tupple containing:
-            (data, invalidMask, colorString, labelName, tagData)
+            (data, invalidMask, colorString, labelName, tagData, units)
     
     The color string describes a color for plotting in matplotlib.
     The label names will be used for the legend, which will be shown if there is
@@ -544,6 +587,8 @@ def create_line_plot_figure(dataList, figureTitle) :
     will be masked and a default label of "data#" (where # is an arbitrary
     unique counter) will be used.
     tagData may also be passed as None if tagging is not desired in the output.
+    units describes the units used to measure the data (such as mm or degrees)
+    and will be used to label the plot. units may be passed as None.
     """
     
     # build the plot
@@ -555,7 +600,7 @@ def create_line_plot_figure(dataList, figureTitle) :
     minTagPts  = -1
     maxTagPts  = -1
     plottedTagData = False
-    for dataSet, invalidMask, colorString, labelName, tagData in dataList :
+    for dataSet, invalidMask, colorString, labelName, tagData, units in dataList :
         
         # if we don't have these, set them to defaults
         if invalidMask is None :
@@ -579,34 +624,37 @@ def create_line_plot_figure(dataList, figureTitle) :
             if tagData is not None :
                 
                 plottedTagData = True
-                numTroublePoints = sum(tagData)
-                LOG.debug('\t\tnumber of trouble points: ' + str(numTroublePoints))
-                if numTroublePoints < minTagPts:
-                    minTagPts = numTroublePoints
-                if numTroublePoints > maxTagPts :
-                    maxTagPts = numTroublePoints
+                numMismatchPoints = sum(tagData)
+                LOG.debug('\t\tnumber of mismatch points: ' + str(numMismatchPoints))
+                if numMismatchPoints < minTagPts:
+                    minTagPts = numMismatchPoints
+                if numMismatchPoints > maxTagPts :
+                    maxTagPts = numMismatchPoints
                 
-                # if we have trouble points, we need to show them
-                if numTroublePoints > 0:
+                # if we have mismatch points, we need to show them
+                if numMismatchPoints > 0:
                     
                     cleanTagData = ma.array(dataSet, mask=~tagData | invalidMask)
-                    axes.plot(indexData, cleanTagData, 'yo', label='trouble point')
+                    axes.plot(indexData, cleanTagData, 'yo', label='mismatch point')
+            
+            if str.lower(str(units)) !="none" :
+                labelName = labelName + " in " + units
             
             axes.plot(indexData, cleanData, '-' + colorString, label=labelName)
     
-    # display the number of trouble points on the report if we were passed
+    # display the number of mismatch points on the report if we were passed
     # a set of tag data and we were able to compare it to some actual data
     if (plottedTagData and (minTagPts >= 0) and (maxTagPts >=0)) :
         
-        troublePtString = '\nMarking '
+        mismatchPtString = '\nMarking '
         
         if (minTagPts == maxTagPts) :
-            troublePtString = troublePtString + str(minTagPts) + ' Trouble Points with Yellow Circles'
+            mismatchPtString = mismatchPtString + str(minTagPts) + ' Mismatch Points with Yellow Circles'
         else :
-            troublePtString = (troublePtString + 'between ' + str(minTagPts) + ' and ' + str(maxTagPts) + ' Trouble Points'
+            mismatchPtString = (mismatchPtString + 'between ' + str(minTagPts) + ' and ' + str(maxTagPts) + ' Mismatch Points'
                                + '\non the various data sets (using Yellow Circles)')
         
-        plt.xlabel(troublePtString)
+        plt.xlabel(mismatchPtString)
     
     if (len(dataList) > 1) or plottedTagData :
         # make a key to explain our plot

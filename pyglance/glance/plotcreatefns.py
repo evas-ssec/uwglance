@@ -182,7 +182,7 @@ class PlottingFunctionFactory :
                                    # point by point
                                    absDiffData=None, rawDiffData=None,
                                    goodInBothMask=None,
-                                   troubleMask=None, outsideEpsilonMask=None,
+                                   mismatchMask=None, outsideEpsilonMask=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -193,7 +193,9 @@ class PlottingFunctionFactory :
                                    binName=None,  tupleName=None,
                                    
                                    # the optional epsilon for comparison of a percent of A
-                                   epsilonPercent=None
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
                                    
                                    ) : _abstract
 
@@ -226,7 +228,7 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    # point by point
                                    absDiffData=None, rawDiffData=None,
                                    goodInBothMask=None,
-                                   troubleMask=None, outsideEpsilonMask=None,
+                                   mismatchMask=None, outsideEpsilonMask=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -237,7 +239,9 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    binName=None,  tupleName=None,
                                    
                                    # the optional epsilon for comparison of a percent of A
-                                   epsilonPercent=None
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
                                    
                                    ) :
         
@@ -255,7 +259,7 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                                                          ("Difference in\n" + variableDisplayName),
                                                                          ('Value of (Data File B - Data File A) at a Data Point'),
                                                                          ('Number of Data Points with a Given Difference'),
-                                                                         True)),
+                                                                         True, units=units_a)),
                                               "histogram of the amount of difference in " + variableDisplayName,
                                               "Hist.png", compared_fig_list)
         # make the scatter plot
@@ -270,7 +274,7 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                                                             "Value in File A vs Value in File B",
                                                                             "File A Value", "File B Value",
                                                                             outsideEpsilonMask[goodInBothMask],
-                                                                            epsilon)),
+                                                                            epsilon, units_x=units_a, units_y=units_b)),
                                               "scatter plot of file a values vs file b values for " + variableDisplayName,
                                               "Scatter.png", compared_fig_list)
         
@@ -282,7 +286,8 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
             
             functionsToReturn['scatterD']  = ((lambda : figures.create_hexbin_plot(aData[goodInBothMask], bData[goodInBothMask],
                                                                                    "Value in File A vs Value in File B",
-                                                                                   "File A Value", "File B Value", epsilon)),
+                                                                                   "File A Value", "File B Value", epsilon,
+                                                                                   units_x=units_a, units_y=units_b)),
                                               "density of file a values vs file b values for " + variableDisplayName,
                                               "Hex.png", compared_fig_list)
         
@@ -316,7 +321,7 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    # point by point
                                    absDiffData=None, rawDiffData=None,
                                    goodInBothMask=None,
-                                   troubleMask=None, outsideEpsilonMask=None,
+                                   mismatchMask=None, outsideEpsilonMask=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -327,7 +332,9 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    binName=None,  tupleName=None,
                                    
                                    # the optional epsilon for comparison of a percent of A
-                                   epsilonPercent=None
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
                                    
                                    ) :
         
@@ -366,7 +373,8 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                invalidMask=(~goodInAMask),
                                                                                dataRanges=dataRanges or sharedRange,
                                                                                dataRangeNames=dataRangeNames,
-                                                                               dataRangeColors=dataColors)),
+                                                                               dataRangeColors=dataColors,
+                                                                               units=units_a)),
                                               variableDisplayName + " in file a",
                                               "A.png",  original_fig_list)
             
@@ -383,7 +391,8 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                invalidMask=(~goodInBMask),
                                                                                dataRanges=dataRanges or sharedRange,
                                                                                dataRangeNames=dataRangeNames,
-                                                                               dataRangeColors=dataColors)),
+                                                                               dataRangeColors=dataColors,
+                                                                               units=units_b)),
                                               variableDisplayName + " in file b",
                                               "B.png",  original_fig_list)
         
@@ -403,7 +412,8 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                baseMapInstance, fullAxis,
                                                                                ("Absolute value of difference in\n"
                                                                                 + variableDisplayName),
-                                                                               invalidMask=(~goodInBothMask))),
+                                                                               invalidMask=(~goodInBothMask),
+                                                                               units=units_a)),
                                               "absolute value of difference in " + variableDisplayName,
                                               "AbsDiff.png", compared_fig_list)
         # make the subtractive difference plot
@@ -422,11 +432,12 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                baseMapInstance, fullAxis,
                                                                                ("Value of (Data File B - Data File A) for\n"
                                                                                 + variableDisplayName),
-                                                                               invalidMask=(~goodInBothMask))),
+                                                                               invalidMask=(~goodInBothMask),
+                                                                               units=units_a)),
                                               "the difference in " + variableDisplayName,
                                               "Diff.png",    compared_fig_list)
-        # make the trouble data plot
-        if ('do_plot_trouble' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_trouble']) :
+        # make the mismatch data plot
+        if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
             
             assert(aData.shape == bData.shape)
             assert(goodInAMask.shape == goodInBMask.shape)
@@ -441,17 +452,18 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
             bDataCopy = bData[:]
             tempMask = goodInAMask & (~goodInBMask) 
             bDataCopy[tempMask] = aData[tempMask]
-            functionsToReturn['trouble']   = ((lambda : mappedPlottingFunction(bDataCopy, 
+            functionsToReturn['mismatch']   = ((lambda : mappedPlottingFunction(bDataCopy, 
                                                                                lonLatDataDict['common']['lat'], 
                                                                                lonLatDataDict['common']['lon'],
                                                                                baseMapInstance, fullAxis,
-                                                                               ("Areas of trouble data in\n" + variableDisplayName),
+                                                                               ("Areas of mismatch data in\n" + variableDisplayName),
                                                                                invalidMask=(~(goodInAMask | goodInBMask)),
-                                                                               colorMap=mediumGrayColorMap, tagData=troubleMask,
+                                                                               colorMap=mediumGrayColorMap, tagData=mismatchMask,
                                                                                dataRanges=dataRanges,
-                                                                               dataRangeNames=dataRangeNames)), # TODO, does this need modification?
-                                              "trouble data in " + variableDisplayName,
-                                              "Trouble.png", compared_fig_list)
+                                                                               dataRangeNames=dataRangeNames,
+                                                                               units=units_a)), # TODO, does this need modification?
+                                              "mismatch data in " + variableDisplayName,
+                                              "Mismatch.png", compared_fig_list)
         
         return functionsToReturn
 
@@ -488,7 +500,7 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    # point by point
                                    absDiffData=None, rawDiffData=None,
                                    goodInBothMask=None,
-                                   troubleMask=None, outsideEpsilonMask=None,
+                                   mismatchMask=None, outsideEpsilonMask=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -499,7 +511,9 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    binName=None,  tupleName=None,
                                    
                                    # the optional epsilon for comparison of a percent of A
-                                   epsilonPercent=None
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
                                    
                                    ) :
         
@@ -537,7 +551,8 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                baseMapInstance, fullAxis,
                                                                                (variableDisplayName + "\nin File A"),
                                                                                invalidMask=(~goodInAMask),
-                                                                               uData=aUData, vData=aVData)),
+                                                                               uData=aUData, vData=aVData,
+                                                                               units=units_a)),
                                               variableDisplayName + " in file a",
                                               "A.png",  original_fig_list)
             
@@ -552,7 +567,8 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                baseMapInstance, fullAxis,
                                                                                (variableDisplayName + "\nin File B"),
                                                                                invalidMask=(~ goodInBMask),
-                                                                               uData=bUData, vData=bVData)),
+                                                                               uData=bUData, vData=bVData,
+                                                                               units=units_b)),
                                               variableDisplayName + " in file b",
                                               "B.png",  original_fig_list)
             
@@ -582,7 +598,8 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                    ("Absolute value of difference in\n"
                                                                                     + variableDisplayName),
                                                                                    invalidMask=(~ goodInBothMask),
-                                                                                   uData=diffUData, vData=diffVData)),
+                                                                                   uData=diffUData, vData=diffVData,
+                                                                                   units=units_a)),
                                                   "absolute value of difference in " + variableDisplayName,
                                                   "AbsDiff.png", compared_fig_list)
             # make the subtractive difference plot
@@ -602,11 +619,12 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                    ("Value of (Data File B - Data File A) for\n"
                                                                                     + variableDisplayName),
                                                                                    invalidMask=(~ goodInBothMask),
-                                                                                   uData=diffUData, vData=diffVData)),
+                                                                                   uData=diffUData, vData=diffVData,
+                                                                                   units=units_a)),
                                                   "the difference in " + variableDisplayName,
                                                   "Diff.png",    compared_fig_list)
-            # make the trouble data plot
-            if ('do_plot_trouble' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_trouble']) :
+            # make the mismatch data plot
+            if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
                 
                 assert(aData.shape == bData.shape)
                 assert(goodInAMask.shape == goodInBMask.shape)
@@ -621,19 +639,20 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                 bDataCopy = bData[:]
                 tempMask = goodInAMask & (~goodInBMask) 
                 bDataCopy[tempMask] = aData[tempMask]
-                functionsToReturn['trouble']   = ((lambda : mappedPlottingFunction(bDataCopy, 
+                functionsToReturn['mismatch']   = ((lambda : mappedPlottingFunction(bDataCopy, 
                                                                                    lonLatDataDict['common']['lat'], 
                                                                                    lonLatDataDict['common']['lon'],
                                                                                    baseMapInstance, fullAxis,
-                                                                                   ("Areas of trouble data in\n" + variableDisplayName),
+                                                                                   ("Areas of mismatch data in\n" + variableDisplayName),
                                                                                    invalidMask=(~(goodInAMask | goodInBMask)),
-                                                                                   colorMap=mediumGrayColorMap, tagData=troubleMask,
+                                                                                   colorMap=mediumGrayColorMap, tagData=mismatchMask,
                                                                                    dataRanges=dataRanges,
                                                                                    dataRangeNames=dataRangeNames,
                                                                                    # TODO, does this need modification?
-                                                                                   uData=bUData, vData=bVData)), 
-                                                  "trouble data in " + variableDisplayName,
-                                                  "Trouble.png", compared_fig_list)
+                                                                                   uData=bUData, vData=bVData,
+                                                                                   units=units_a)), 
+                                                  "mismatch data in " + variableDisplayName,
+                                                  "Mismatch.png", compared_fig_list)
         
         return functionsToReturn
 
@@ -666,7 +685,7 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    # point by point
                                    absDiffData=None, rawDiffData=None,
                                    goodInBothMask=None,
-                                   troubleMask=None, outsideEpsilonMask=None,
+                                   mismatchMask=None, outsideEpsilonMask=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -677,7 +696,9 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    binName=None,  tupleName=None,
                                    
                                    # the optional epsilon for comparison of a percent of A
-                                   epsilonPercent=None
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
                                    
                                    ) :
         """
@@ -694,13 +715,13 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
         assert(aData.shape == bData.shape)
         
         # make all our data sets for plotting ahead of time for simplicity
-        aList = [(aData, ~goodInAMask, 'r', 'A data', None)]
-        bList = [(bData, ~goodInBMask, 'b', 'B data', None)]
-        absDiffList = [(absDiffData, ~goodInBothMask, '', 'abs. diff. data', None)]
-        subDiffList = [(rawDiffData, ~goodInBothMask, '', 'sub. diff. data', None)]
+        aList = [(aData, ~goodInAMask, 'r', 'A data', None, units_a)]
+        bList = [(bData, ~goodInBMask, 'b', 'B data', None, units_b)]
+        absDiffList = [(absDiffData, ~goodInBothMask, '', 'abs. diff. data', None, units_a)] # todo, should this be a units?
+        subDiffList = [(rawDiffData, ~goodInBothMask, '', 'sub. diff. data', None, units_a)] # todo, should this be a units?
         
-        troubleList   = [(aData, ~goodInAMask, 'r', 'A data', troubleMask),
-                             (bData, ~goodInBMask, 'b', 'B data', troubleMask)]
+        mismatchList   = [(aData, ~goodInAMask, 'r', 'A data', mismatchMask, units_a),
+                          (bData, ~goodInBMask, 'b', 'B data', mismatchMask, units_b)]
         
         functionsToReturn = { }
         
@@ -730,16 +751,17 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
         # make the subtractive difference plot
         if ('do_plot_sub_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_sub_diff']) :
             functionsToReturn['diffSub']   = ((lambda: figures.create_line_plot_figure(subDiffList,
-                                                                               "Value of (Data File B - Data File A) for\n" + variableDisplayName)),
+                                                                               "Value of (Data File B - Data File A) for\n"
+                                                                               + variableDisplayName)),
                                               "the difference in " + variableDisplayName,
                                               "Diff.png",    compared_fig_list)
         
-        # make the trouble data plot
-        if ('do_plot_trouble' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_trouble']) :
-            functionsToReturn['trouble']   = ((lambda: figures.create_line_plot_figure(troubleList,
-                                                                               "Areas of trouble data in\n" + variableDisplayName)),
-                                              "trouble data in " + variableDisplayName,
-                                              "Trouble.png", compared_fig_list)
+        # make the mismatch data plot
+        if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
+            functionsToReturn['mismatch']   = ((lambda: figures.create_line_plot_figure(mismatchList,
+                                                                               "Areas of mismatch data in\n" + variableDisplayName)),
+                                              "mismatch data in " + variableDisplayName,
+                                              "Mismatch.png", compared_fig_list)
         
         return functionsToReturn
 
@@ -768,7 +790,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                    # point by point
                                    absDiffData=None, rawDiffData=None,
                                    goodInBothMask=None,
-                                   troubleMask=None, outsideEpsilonMask=None,
+                                   mismatchMask=None, outsideEpsilonMask=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -779,7 +801,9 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                    binName=None,  tupleName=None,
                                    
                                    # the optional epsilon for comparison of a percent of A
-                                   epsilonPercent=None
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
                                    
                                    ) :
         """
@@ -815,7 +839,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         absDiffData        = reorderMapObject.reorder_for_bin_tuple(absDiffData)
         rawDiffData        = reorderMapObject.reorder_for_bin_tuple(rawDiffData)
         goodInBothMask     = reorderMapObject.reorder_for_bin_tuple(goodInBothMask)
-        troubleMask        = reorderMapObject.reorder_for_bin_tuple(troubleMask)
+        mismatchMask       = reorderMapObject.reorder_for_bin_tuple(mismatchMask)
         outsideEpsilonMask = reorderMapObject.reorder_for_bin_tuple(outsideEpsilonMask)
         
         # our list of functions that will later create the plots
@@ -835,7 +859,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         functionsToReturn['multi-scatter'] = ((lambda : figures.create_complex_scatter_plot(scatterPlotList,
                                                                         "Value in File A vs Value in File B, Colored by Bin",
                                                                         "File A Value", "File B Value",
-                                                                        epsilon)),
+                                                                        epsilon, units_x=units_a, units_y=units_b)),
                                           "scatter plot of file a values vs file b values for " + variableDisplayName + " by bin",
                                           "MultiScatter.png", compared_fig_list)
         
@@ -861,7 +885,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                                                               "\nfor " + binName + " # " + str(binNumber + 1)),
                                                                              ('RMS Difference across ' + tupleName + ' dimension'),
                                                                              ('Number of Cases with a Given RMS Diff.'),
-                                                                             True)
+                                                                             True, units=units_a)
                 functionsToReturn[str(binNumber + 1) + 'histogram'] = (make_histogram,
                                                   "histogram of rms differences in " + variableDisplayName,
                                                   str(binNumber + 1) + "Hist.png", new_list)
@@ -903,8 +927,8 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                 caseNumText = ''
                 for caseIndex in caseIndexes :
                     caseNumText = caseNumText + str(caseIndex)
-                dataList = [(aData[binNumber][caseNumber], ~goodInAMask[binNumber][caseNumber], 'r', 'A case', None),
-                            (bData[binNumber][caseNumber], ~goodInBMask[binNumber][caseNumber], 'b', 'B case', None)]
+                dataList = [(aData[binNumber][caseNumber], ~goodInAMask[binNumber][caseNumber], 'r', 'A case', None, units_a),
+                            (bData[binNumber][caseNumber], ~goodInBMask[binNumber][caseNumber], 'b', 'B case', None, units_b)]
                 def make_lineplot(data=dataList, binNumber=binNumber, caseNumberText=caseNumText):
                     return figures.create_line_plot_figure(data,
                                                            variableDisplayName + " in both files" + "\n" + "for "
@@ -912,8 +936,8 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                                            + caseNumberText)
                 dataDiff = aData[binNumber][caseNumber] - bData[binNumber][caseNumber]
                 maskDiff = ~goodInAMask[binNumber][caseNumber] | ~goodInBMask[binNumber][caseNumber]
-                def make_diffplot(data=dataDiff, badMask=maskDiff, binNumber=binNumber, caseNumberText=caseNumText):
-                    return figures.create_line_plot_figure([(data, badMask, 'm', 'A - B', None)],
+                def make_diffplot(data=dataDiff, badMask=maskDiff, binNumber=binNumber, caseNumberText=caseNumText, units=units_a):
+                    return figures.create_line_plot_figure([(data, badMask, 'm', 'A - B', None, units)],
                                                            "Value of " + variableDisplayName + " in File A - the value in File B\n" +
                                                            "for " + binName + " # " + str(binNumber + 1) + " and case # " + caseNumberText)
                     
@@ -956,7 +980,7 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    # point by point
                                    absDiffData=None, rawDiffData=None,
                                    goodInBothMask=None,
-                                   troubleMask=None, outsideEpsilonMask=None,
+                                   mismatchMask=None, outsideEpsilonMask=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -967,7 +991,9 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    binName=None,  tupleName=None,
                                    
                                    # the optional epsilon for comparison of a percent of A
-                                   epsilonPercent=None
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
                                    
                                    ) :
         """
@@ -995,7 +1021,8 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             assert(aData.shape == goodInAMask.shape)
             
             functionsToReturn['originalA'] = ((lambda: figures.create_simple_figure(aData, variableDisplayName + "\nin File A",
-                                                                            invalidMask=~goodInAMask, colorbarLimits=sharedRange)),
+                                                                            invalidMask=~goodInAMask, colorbarLimits=sharedRange, 
+                                                                            units=units_a)),
                                               variableDisplayName + " in file a",
                                               "A.png",  original_fig_list)
             
@@ -1003,7 +1030,8 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             assert(bData.shape == goodInBMask.shape)
             
             functionsToReturn['originalB'] = ((lambda: figures.create_simple_figure(bData, variableDisplayName + "\nin File B",
-                                                                            invalidMask=~goodInBMask, colorbarLimits=sharedRange)),
+                                                                            invalidMask=~goodInBMask, colorbarLimits=sharedRange, 
+                                                                            units=units_b)),
                                               variableDisplayName + " in file b",
                                               "B.png",  original_fig_list)
         
@@ -1016,7 +1044,7 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             
             functionsToReturn['diffAbs']   = ((lambda: figures.create_simple_figure(absDiffData,
                                                                             "Absolute value of difference in\n" + variableDisplayName,
-                                                                            invalidMask=~goodInBothMask)),
+                                                                            invalidMask=~goodInBothMask, units=units_a)),
                                               "absolute value of difference in " + variableDisplayName,
                                               "AbsDiff.png", compared_fig_list)
         # make the subtractive difference plot
@@ -1028,19 +1056,19 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             
             functionsToReturn['diffSub']   = ((lambda: figures.create_simple_figure(rawDiffData,
                                                                             "Value of (Data File B - Data File A) for\n" + variableDisplayName,
-                                                                            invalidMask=~goodInBothMask)),
+                                                                            invalidMask=~goodInBothMask, units=units_a)),
                                               "the difference in " + variableDisplayName,
                                               "Diff.png",    compared_fig_list)
-        # make the trouble data plot
-        if ('do_plot_trouble' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_trouble']) :
+        # make the mismatch data plot
+        if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
             
             assert(goodInAMask is not None)
             assert(goodInBMask is not None)
             assert(goodInAMask.shape == goodInBMask.shape)
             assert(aData.shape       == bData.shape)
             assert(aData.shape       == goodInAMask.shape)
-            assert(troubleMask is not None)
-            assert(troubleMask.shape == aData.shape)
+            assert(mismatchMask is not None)
+            assert(mismatchMask.shape == aData.shape)
             
             
             # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
@@ -1048,11 +1076,11 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             bDataCopy = bData[:]
             tempMask = goodInAMask & (~goodInBMask) 
             bDataCopy[tempMask] = aData[tempMask]
-            functionsToReturn['trouble']   = ((lambda: figures.create_simple_figure(bDataCopy, "Areas of trouble data in\n" + variableDisplayName,
-                                                                            invalidMask=~(goodInAMask | goodInBMask), tagData=troubleMask,
-                                                                            colorMap=mediumGrayColorMap)),
-                                              "trouble data in " + variableDisplayName,
-                                              "Trouble.png", compared_fig_list)
+            functionsToReturn['mismatch']   = ((lambda: figures.create_simple_figure(bDataCopy, "Areas of mismatch data in\n" + variableDisplayName,
+                                                                            invalidMask=~(goodInAMask | goodInBMask), tagData=mismatchMask,
+                                                                            colorMap=mediumGrayColorMap, units=units_a)),
+                                              "mismatch data in " + variableDisplayName,
+                                              "Mismatch.png", compared_fig_list)
         
         return functionsToReturn
 

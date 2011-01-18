@@ -207,8 +207,8 @@ setOfVariables['Total Precipitable Water, Low'] = {
                                   'do_plot_scatter':   True,
                                   # should the histogram be plotted?
                                   'do_plot_histogram': True,
-                                  # should the trouble plot be plotted?
-                                  'do_plot_trouble':   True
+                                  # should the mismatch plot be plotted?
+                                  'do_plot_mismatch':  True
                                   }
 setOfVariables['Total Precipitable Water, Mid'] = {
                                   'variable_name': 'imager_prof_retr_abi_total_precipitable_water_mid',

@@ -477,7 +477,7 @@ def _check_lon_lat_equality(longitudeADataObject, latitudeADataObject,
     latitudeDiffInfo  = dataobj.DiffInfoObject(latitudeADataObject,  latitudeBDataObject,  epsilonValue=llepsilon)
     
     # how much difference is there between the two sets?
-    lon_lat_not_equal_mask = longitudeDiffInfo.diff_data_object.masks.trouble_mask | latitudeDiffInfo.diff_data_object.masks.trouble_mask
+    lon_lat_not_equal_mask = longitudeDiffInfo.diff_data_object.masks.mismatch_mask | latitudeDiffInfo.diff_data_object.masks.mismatch_mask
     lon_lat_not_equal_points_count = sum(lon_lat_not_equal_mask)
     lon_lat_not_equal_points_percent = (float(lon_lat_not_equal_points_count) / float(lon_lat_not_equal_mask.size)) * 100.0
     
@@ -491,23 +491,23 @@ def _check_lon_lat_equality(longitudeADataObject, latitudeADataObject,
             
             if ((len(longitudeADataObject.data[~longitudeADataObject.masks.ignore_mask]) > 0) and
                 (len( latitudeADataObject.data[~ latitudeADataObject.masks.ignore_mask]) > 0)) :
-                plot.plot_and_save_spacial_trouble(longitudeADataObject, latitudeADataObject,
+                plot.plot_and_save_spacial_mismatch(longitudeADataObject, latitudeADataObject,
                                                    lon_lat_not_equal_mask,
                                                    "A", "Lon./Lat. Points Mismatched between A and B\n" +
                                                    "(Shown in A)",
                                                    "LonLatMismatch",
                                                    outputPath, True,
-                                                   fullDPI=fullDPI, thumbDPI=thumbDPI)
+                                                   fullDPI=fullDPI, thumbDPI=thumbDPI, units="degrees")
             
             if ((len(longitudeBDataObject.data[~longitudeBDataObject.masks.ignore_mask]) > 0) and
                 (len( latitudeBDataObject.data[~ latitudeBDataObject.masks.ignore_mask]) > 0)) :
-                plot.plot_and_save_spacial_trouble(longitudeBDataObject, latitudeBDataObject,
+                plot.plot_and_save_spacial_mismatch(longitudeBDataObject, latitudeBDataObject,
                                                    lon_lat_not_equal_mask,
                                                    "B", "Lon./Lat. Points Mismatched between A and B\n" +
                                                    "(Shown in B)",
                                                    "LonLatMismatch",
                                                    outputPath, True,
-                                                   fullDPI=fullDPI, thumbDPI=thumbDPI)
+                                                   fullDPI=fullDPI, thumbDPI=thumbDPI, units="degrees")
     
     # setup our return data
     returnInfo = {}
@@ -560,22 +560,22 @@ def _compare_spatial_invalidity(longitude_a_object, longitude_b_object,
         if ((spatial_info['file A']['numInvPts'] > 0) and (do_include_images) and
             (len(longitude_a_object.data[~invalid_in_a_mask]) > 0) and
             (len( latitude_a_object.data[~invalid_in_a_mask]) > 0)) :
-            plot.plot_and_save_spacial_trouble(longitude_a_object, latitude_a_object,
+            plot.plot_and_save_spacial_mismatch(longitude_a_object, latitude_a_object,
                                                valid_only_in_mask_a,
                                                "A", "Points only valid in\nFile A\'s longitude & latitude",
                                                "SpatialMismatch",
                                                output_path, True,
-                                               fullDPI=fullDPI, thumbDPI=thumbDPI)
+                                               fullDPI=fullDPI, thumbDPI=thumbDPI, units="degrees")
         if ((spatial_info['file B']['numInvPts'] > 0) and (do_include_images) and
             (len(longitude_b_object.data[~invalid_in_b_mask]) > 0) and
             (len( latitude_b_object.data[~invalid_in_b_mask]) > 0)
             ) :
-            plot.plot_and_save_spacial_trouble(longitude_b_object, latitude_b_object,
+            plot.plot_and_save_spacial_mismatch(longitude_b_object, latitude_b_object,
                                                valid_only_in_mask_b,
                                                "B", "Points only valid in\nFile B\'s longitude & latitude",
                                                "SpatialMismatch",
                                                output_path, True,
-                                               fullDPI=fullDPI, thumbDPI=thumbDPI)
+                                               fullDPI=fullDPI, thumbDPI=thumbDPI, units="degrees")
     
     return invalid_in_common_mask, spatial_info, longitude_common, latitude_common
 
@@ -1471,7 +1471,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                              tupleName=     varRunInfo['tupleName']       if 'tupleName'       in varRunInfo else 'tuple',
                              epsilonPercent=varRunInfo['epsilon_percent'] if 'epsilon_percent' in varRunInfo else None,
                              fullDPI=       runInfo['detail_DPI'],
-                             thumbDPI=      runInfo['thumb_DPI'])
+                             thumbDPI=      runInfo['thumb_DPI'],
+                             units_a=       varRunInfo['units_a']         if 'units_a'         in varRunInfo else None,
+                             units_b=       varRunInfo['units_b']         if 'units_b'         in varRunInfo else None)
                 
                 print("\tfinished creating figures for: " + explanationName)
             

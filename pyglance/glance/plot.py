@@ -106,11 +106,11 @@ def _log_spawn_and_wait_if_needed (imageDescription, childPids,
     
     return
 
-def plot_and_save_spacial_trouble(longitudeObject, latitudeObject, spacialTroubleMask,
+def plot_and_save_spacial_mismatch(longitudeObject, latitudeObject, spacialMismatchMask,
                                   fileNameDiscriminator, title, fileBaseName, outputPath, makeSmall=False,
-                                  fullDPI=fullSizeDPI, thumbDPI=thumbSizeDPI) :
+                                  fullDPI=fullSizeDPI, thumbDPI=thumbSizeDPI, units=None) :
     """
-    given information on spatially placed trouble points in A and B, plot only those points in a very obvious way
+    given information on spatially placed mismatch points in A and B, plot only those points in a very obvious way
     on top of a background plot of a's data shown in grayscale, save this plot to the output path given
     if makeSmall is passed as true a smaller version of the image will also be saved
     """
@@ -118,27 +118,28 @@ def plot_and_save_spacial_trouble(longitudeObject, latitudeObject, spacialTroubl
     
     # get the bounding axis and make a basemap
     boundingAxes = plotfns.get_visible_axes(longitudeObject.data, latitudeObject.data, ~spaciallyInvalidMask)
-    LOG.debug("Visible axes for lon/lat trouble figure  are: " + str(boundingAxes))
+    LOG.debug("Visible axes for lon/lat mismatch figure  are: " + str(boundingAxes))
     baseMapInstance, boundingAxes = maps.create_basemap(longitudeObject.data, latitudeObject.data,
                                                         boundingAxes, plotfns.select_projection(boundingAxes))
     
     # make the figure
-    LOG.info("Creating spatial trouble image")
-    spatialTroubleFig = figures.create_mapped_figure(None, latitudeObject.data, longitudeObject.data, baseMapInstance, boundingAxes,
-                                                    title, invalidMask=spaciallyInvalidMask, tagData=spacialTroubleMask)
+    LOG.info("Creating spatial mismatch image")
+    spatialMismatchFig = figures.create_mapped_figure(None, latitudeObject.data, longitudeObject.data, baseMapInstance,
+                                                      boundingAxes, title, invalidMask=spaciallyInvalidMask,
+                                                      tagData=spacialMismatchMask, units=units)
     # save the figure
-    LOG.info("Saving spatial trouble image")
-    spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=fullDPI) 
+    LOG.info("Saving spatial mismatch image")
+    spatialMismatchFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".png", dpi=fullDPI) 
     
     # we may also save a smaller versions of the figure
     if (makeSmall) :
         
-        spatialTroubleFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=thumbDPI)
+        spatialMismatchFig.savefig(outputPath + "/" + fileBaseName + "." + fileNameDiscriminator + ".small.png", dpi=thumbDPI)
     
     # get rid of the figure
-    spatialTroubleFig.clf()
-    plt.close(spatialTroubleFig)
-    del(spatialTroubleFig)
+    spatialMismatchFig.clf()
+    plt.close(spatialMismatchFig)
+    del(spatialMismatchFig)
     
     return
 
@@ -164,7 +165,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                      binIndex=None, tupleIndex=None,
                                      binName='bin', tupleName='tuple',
                                      epsilonPercent=None,
-                                     fullDPI=None, thumbDPI=None) :
+                                     fullDPI=None, thumbDPI=None,
+                                     units_a=None, units_b=None) :
     """
     Plot images for a set of figures based on the data sets and settings
     passed in. The images will be saved to disk according to the settings.
@@ -239,16 +241,16 @@ def plot_and_save_comparison_figures (aData, bData,
         spaciallyInvalidMaskA = lonLatDataDict['a']['inv_mask']
         spaciallyInvalidMaskB = lonLatDataDict['b']['inv_mask']
     
-    # compare the two data sets to get our difference data and trouble info
+    # compare the two data sets to get our difference data and mismatch info
     aDataObject = dataobj.DataObject(aData, fillValue=missingValue,       ignoreMask=spaciallyInvalidMaskA)
     bDataObject = dataobj.DataObject(bData, fillValue=missingValueAltInB, ignoreMask=spaciallyInvalidMaskB)
     diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon, epsilonPercent=epsilonPercent)
     #TODO, for the moment, unpack these values into local variables
-    rawDiffData = diffInfo.diff_data_object.data
-    goodMask    = diffInfo.diff_data_object.masks.valid_mask
-    goodInAMask = diffInfo.a_data_object.masks.valid_mask
-    goodInBMask = diffInfo.b_data_object.masks.valid_mask
-    troubleMask = diffInfo.diff_data_object.masks.trouble_mask
+    rawDiffData    = diffInfo.diff_data_object.data
+    goodMask       = diffInfo.diff_data_object.masks.valid_mask
+    goodInAMask    = diffInfo.a_data_object.masks.valid_mask
+    goodInBMask    = diffInfo.b_data_object.masks.valid_mask
+    mismatchMask   = diffInfo.diff_data_object.masks.mismatch_mask
     outsideEpsilonMask = diffInfo.diff_data_object.masks.outside_epsilon_mask
     aNotFiniteMask = diffInfo.a_data_object.masks.non_finite_mask
     bNotFiniteMask = diffInfo.b_data_object.masks.non_finite_mask
@@ -292,7 +294,7 @@ def plot_and_save_comparison_figures (aData, bData,
                                        # point by point
                                        absDiffData=absDiffData, rawDiffData=rawDiffData,
                                        goodInBothMask=goodMask,
-                                       troubleMask=troubleMask, outsideEpsilonMask=outsideEpsilonMask,
+                                       mismatchMask=mismatchMask, outsideEpsilonMask=outsideEpsilonMask,
                                        
                                        # only used for plotting quiver data
                                        aUData=aUData, aVData=aVData,
@@ -301,7 +303,10 @@ def plot_and_save_comparison_figures (aData, bData,
                                        # only used for line plots 
                                        binIndex=binIndex, tupleIndex=tupleIndex,
                                        binName=binName, tupleName=tupleName,
-                                       epsilonPercent=epsilonPercent
+                                       epsilonPercent=epsilonPercent,
+                                       
+                                       # used for display in several types of plots
+                                       units_a=units_a, units_b=units_b
                                        )
         plottingFunctions.update(moreFunctions)
     
