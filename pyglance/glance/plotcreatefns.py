@@ -449,7 +449,7 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
             
             # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
             # that our plot won't be totally destroyed by missing or non-finite data from B
-            bDataCopy = bData[:]
+            bDataCopy = np.array(bData)
             tempMask = goodInAMask & (~goodInBMask) 
             bDataCopy[tempMask] = aData[tempMask]
             functionsToReturn['mismatch']   = ((lambda : mappedPlottingFunction(bDataCopy, 
@@ -636,7 +636,7 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                 
                 # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
                 # that our plot won't be totally destroyed by missing or non-finite data from B
-                bDataCopy = bData[:]
+                bDataCopy = np.array(bData)
                 tempMask = goodInAMask & (~goodInBMask) 
                 bDataCopy[tempMask] = aData[tempMask]
                 functionsToReturn['mismatch']   = ((lambda : mappedPlottingFunction(bDataCopy, 
@@ -1073,7 +1073,7 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             
             # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
             # that our plot won't be totally destroyed by missing or non-finite data from B
-            bDataCopy = bData[:]
+            bDataCopy = np.array(bData)
             tempMask = goodInAMask & (~goodInBMask) 
             bDataCopy[tempMask] = aData[tempMask]
             functionsToReturn['mismatch']   = ((lambda: figures.create_simple_figure(bDataCopy, "Areas of mismatch data in\n" + variableDisplayName,
