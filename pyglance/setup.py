@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-$Id: setup.py 66 2009-04-24 18:47:55Z rayg $
+$Id$
 see http://peak.telecommunity.com/DevCenter/setuptools
 
 note: if you want to develop this code and run from code on the command line,
@@ -22,11 +22,11 @@ easy_install -d $HOME/Library/Python -vi http://larch.ssec.wisc.edu/eggs/repos g
 from setuptools import setup, find_packages
 
 setup( name="glance", 
-       version="0.2.6.25", 
+       version="0.2.6.25-20110328-adl-rkg", 
        zip_safe = True,
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
        packages = find_packages('.'),
-       install_requires=[ 'numpy' ],
+       install_requires=[ 'numpy', 'matplotlib' ],
        package_data = {'': ['*.txt', '*.gif'], }
        )
 

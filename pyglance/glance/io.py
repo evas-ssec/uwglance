@@ -8,18 +8,35 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
 import os, logging
+import numpy as np
 
-from pyhdf.SD import SD,SDC, SDS, HDF4Error
+LOG = logging.getLogger(__name__)
+
+try:
+    import pyhdf
+    from pyhdf.SD import SD,SDC, SDS, HDF4Error
+except:
+    LOG.info('no pyhdf module available for HDF4')
+    pyhdf = None
+    SD = SDC = SDS = object
+    HDF4Error = EnvironmentError
+    
 try:
     import h5py
     from h5py import h5d
 except ImportError:
-    print ('***** unable to load hdf5 library *****')
-from pycdf import CDF, NC, strerror
+    LOG.info('no h5py module available for reading HDF5')
+    h5py = None
 
-import numpy as np
-
-LOG = logging.getLogger(__name__)
+try:    
+    import pycdf
+    from pycdf import CDF, NC, strerror
+except:
+    LOG.info('no pycdf module available')
+    pycdf = None
+    CDF = NC = object
+    def strerror(*args):
+        return 'no pycdf module installed'
 
 try:
     import dmv as dmvlib
@@ -27,6 +44,13 @@ try:
 except ImportError:
     LOG.info('no AERI dmv data file format module')
     dmvlib = None
+
+try:
+    import adl_blob
+    LOG.info('adl_blob module found for JPSS ADL data file access')
+except ImportError:
+    LOG.info('no adl_blob format handler available')
+    adl_blob = None
 
 
 fillValConst1 = '_FillValue'
@@ -50,6 +74,9 @@ class hdf(SD):
     """
     
     def __init__(self, filename, allowWrite=False):
+        if pyhdf is None:
+            LOG.error('pyhdf is not installed and is needed in order to read hdf4 files')
+            assert(pyhdf is not None)
         mode = SDC.READ
         if allowWrite:
             mode = mode | SDC.WRITE
@@ -180,6 +207,11 @@ class nc(CDF):
     """
     
     def __init__(self, filename, allowWrite=False):
+        
+        if pycdf is None:
+            LOG.error('pycdf is not installed and is needed in order to read NetCDF files')
+            assert(pycdf is not None)
+
         
         mode = NC.NOWRITE
         if allowWrite :
@@ -357,7 +389,9 @@ class h5(object):
         mode = 'r'
         if allowWrite :
             mode = 'r+'
-        
+        if h5py is None:
+            LOG.error('h5py module is not installed and is needed in order to read h5 files')
+            assert(h5py is not None)
         self._h5 = h5py.File(filename, mode)
     
     def __call__(self):
@@ -586,9 +620,103 @@ class aeri(object):
 cxs = rnc = cxv = csv = spc = sum = uvs = aeri
 
 
+def _search_xml(pathname):
+    xs = '.xml'
+    yield pathname + xs
+    yield os.path.splitext(pathname)[0] + xs
+    yield pathname.replace('-', '_') + xs
+    yield os.path.splitext(pathname)[0].replace('-', '_') + xs
+
+class jpss_adl(object):
+    """wrapper for JPSS ADL BLOBs 
+    This is a somewhat unique case in that the BLOB loader requires both an XML path and a BLOB path.
+    In this case, it is assumed that a softlinked pathname.xml exists for a given pathname.
+    FORMAT=jpss_adl glance stats truth/ATMS-FSDR.BE ATMS-FSDR
+    """
+    _blob = None
+
+    def __init__(self, filename, allowWrite=False):
+        assert(allowWrite==False)
+        for xmlname in _search_xml(filename):
+            if not os.path.exists(xmlname): 
+                continue
+            LOG.info('using %s for %s' % (xmlname, filename))
+            break
+        if not os.path.exists(xmlname):
+            LOG.error(xmlname + ' needs to provide layout for ' + filename)
+            return            
+        if adl_blob is None:
+            LOG.error('cannot open JPSS ADL files without adl_blob module in $PYTHONPATH')
+            return
+        if filename.lower().endswith('.be'):
+            endian = adl_blob.BIG_ENDIAN
+        elif filename.lower().endswith('.be'):
+            endian = adl_blob.LITTLE_ENDIAN
+        else:
+            endian = adl_blob.NATIVE_ENDIAN
+        LOG.debug('endianness of %s is %s' % (filename, endian))
+        self._blob = adl_blob.map(xmlname, filename, writable=False, endian=endian)        
+    
+    def __call__(self):
+        fieldnames = [name for name,field in self._blob._fields_]
+        return fieldnames
+        
+    def __getitem__(self, name):
+        field = getattr(self._blob, name)
+        if not hasattr(field,'_length_'): # FUTURE: is this rigorous? 
+            LOG.info('creating numpy array out of singleton value for %s' % name)
+            return np.array([field])
+        return np.array(field)
+       
+    def get_variable_object(self,name):
+        return None
+    
+    def missing_value(self, name):
+        return float('nan')
+    
+    def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
+        """
+        create a new variable with the given name
+        optionally set the missing value (fill value) and data to those given
+        
+        the created variable will be returned, or None if a variable could not
+        be created
+        """
+        
+        raise IOUnimplimentedError('Unable to create variable in JPSS ADL file, this functionality is not yet available.')
+        
+        return None
+    
+    def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
+        """
+        if the attribute exists for the given variable, set it to the new value
+        if the attribute does not exist for the given variable, create it and set it to the new value
+        """
+        
+        raise IOUnimplimentedError('Unable to add attribute to JPSS ADL file, this functionality is not yet available.')
+        
+        return
+    
+    def get_attribute(self, variableName, attributeName) :
+        """
+        returns the value of the attribute if it is available for this variable, or None
+        """
+        toReturn = None
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in JPSS ADL files. None will be used.')
+        
+        return toReturn
+
+
+
 
 def open(pathname, allowWrite=False):
-    cls = globals()[os.path.splitext(pathname)[1][1:].lower()]
+    suffix = os.path.splitext(pathname)[1][1:].lower()
+    if (not suffix) or (suffix not in globals()):
+        suffix = os.environ.get('FORMAT', None)
+        LOG.info('overriding unknown load format to "%s"' % suffix)
+    cls = globals()[suffix]
     return cls(pathname, allowWrite=allowWrite)
 
 
