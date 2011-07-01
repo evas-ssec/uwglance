@@ -8,6 +8,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
 import logging
+import math
 import numpy as np
 from numpy import * # todo, remove this line
 
@@ -15,7 +16,33 @@ from scipy.stats import pearsonr
 
 LOG = logging.getLogger(__name__)
 
+# for calculating the great circle distance, this is the radius well will
+# assume that the spherical model of the earth has, in km
+SPHERICAL_EARTH_RADIUS = 6373.0
+
 # -------------- generic data manipulation and analysis --------------
+
+# TODO have someone double check the math here
+def great_circle_distance (latitudeA, longitudeA, latitudeB, longitudeB) :
+    """
+    Calculate the great circle distance (in km) between the A and B points
+    given in the input parameters, the inputs are expected to be in degrees
+    
+    note: This method uses the spherical law of cosines, and is best suited
+    for smaller distances.
+    """
+    
+    # convert to radians
+    latARad = math.radians(latitudeA)
+    lonARad = math.radians(longitudeA)
+    latBRad = math.radians(latitudeB)
+    lonBRad = math.radians(longitudeB)
+    
+    distToReturn = math.acos(math.sin(latARad) * math.sin(latBRad) +
+                             math.cos(latARad) * math.cos(latBRad) *
+                             math.cos(lonBRad - lonARad)) * SPHERICAL_EARTH_RADIUS
+    
+    return distToReturn
 
 def min_with_mask(data, goodMask=None) :
     """

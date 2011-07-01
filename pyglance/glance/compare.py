@@ -106,6 +106,19 @@ def _check_file_names(fileAObject, fileBObject) :
     uniqueToANames = aNames - commonNames
     uniqueToBNames = bNames - commonNames
     
+    return _check_shared_names(set(fileAObject()), set(fileBObject()))
+
+def _check_shared_names (nameSetA, nameSetB) :
+    """
+    compare the names in the two sets
+    """
+    
+    # what names do they have in common?
+    commonNames = nameSetA.intersection(nameSetB)
+    # what names are unique to each set?
+    uniqueToANames = nameSetA - commonNames
+    uniqueToBNames = nameSetB - commonNames
+    
     return {'sharedVars': commonNames,  'uniqueToAVars': uniqueToANames, 'uniqueToBVars': uniqueToBNames}
 
 def _resolve_names(fileAObject, fileBObject, defaultValues,
@@ -426,6 +439,10 @@ def _get_and_analyze_lon_lat (fileObject,
     invalidLongitude = (longitudeData < -180)   | (longitudeData > 360) | ~isfinite(longitudeData)
     spaciallyInvalidMask = invalidLatitude | invalidLongitude
     
+    # get the missing value as well
+    longitudeMissingVal = fileObject.file_object.missing_value(longitudeVariableName)
+    latitudeMissingVal  = fileObject.file_object.missing_value( latitudeVariableName)
+    
     # analyze our spacially invalid data
     percentageOfSpaciallyInvalidPts, numberOfSpaciallyInvalidPts = _get_percentage_from_mask(spaciallyInvalidMask)
     
@@ -434,7 +451,8 @@ def _get_and_analyze_lon_lat (fileObject,
                        'perInvPts':    percentageOfSpaciallyInvalidPts
                        }
     
-    return dataobj.DataObject(longitudeData, ignoreMask=invalidLongitude), dataobj.DataObject(latitudeData, ignoreMask=invalidLatitude), spatialStatInfo
+    return dataobj.DataObject(longitudeData, fillValue=longitudeMissingVal, ignoreMask=invalidLongitude), \
+           dataobj.DataObject(latitudeData,  fillValue=latitudeMissingVal,  ignoreMask=invalidLatitude), spatialStatInfo
 
 def _get_percentage_from_mask(dataMask) :
     """
@@ -668,9 +686,27 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
         latitude_common      = None
     
     # FUTURE, return the lon/lat objects instead?
-    return {'a':      {"lon": longitude_a_object.data,      "lat": latitude_a_object.data,      "inv_mask": longitude_a_object.masks.ignore_mask},
-            'b':      {"lon": longitude_b_object.data,      "lat": latitude_b_object.data,      "inv_mask": longitude_b_object.masks.ignore_mask},
-            'common': {"lon": longitude_common,             "lat": latitude_common,             "inv_mask": spaciallyInvalidMask}   }, \
+    return {
+            'a':      {
+                       "lon":       longitude_a_object.data,
+                       "lat":       latitude_a_object.data,
+                       "inv_mask":  longitude_a_object.masks.ignore_mask,
+                       "lon_fill":  longitude_a_object.fill_value,
+                       "lat_fill":  latitude_a_object.fill_value
+                       },
+            'b':      {
+                       "lon":       longitude_b_object.data,
+                       "lat":       latitude_b_object.data,
+                       "inv_mask":  longitude_b_object.masks.ignore_mask,
+                       "lon_fill":  longitude_b_object.fill_value,
+                       "lat_fill":  latitude_b_object.fill_value
+                       },
+            'common': {
+                       "lon":       longitude_common,
+                       "lat":       latitude_common,
+                       "inv_mask":  spaciallyInvalidMask
+                       }
+            }, \
            spatialInfo
 
 def _open_and_process_files (args, numFilesExpected):
@@ -1316,7 +1352,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         technical_name, b_variable_technical_name, \
                 explanationName = _get_name_info_for_variable(displayName, varRunInfo)
         
-        print('analyzing: ' + explanationName + ')')
+        print('analyzing: ' + explanationName)
         
         # load the variable data
         aData = _load_variable_data(aFile.file_object, technical_name,

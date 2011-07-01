@@ -11,91 +11,11 @@ Copyright (c) 2010 University of Wisconsin SSEC. All rights reserved.
 import logging
 import numpy as np
 
+import glance.delta as delta
+
+
 LOG = logging.getLogger(__name__)
 
-# TODO, move to using this class (not yet finished)
-class CollocationMapping :
-    """
-    This class represents a mapping that collocates points in two
-    sets of data within certain tolerances. These points may be
-    filtered based on secondary criteria beyond spatial tolerances,
-    but once the inital mapping is defined, an instance of this class
-    can only be used to convert size-compatable data from the two
-    original sets into the final, collocated order.
-    
-    Note: the mapping will include all pairs of points that match
-    within the given epsilon and additional data criteria given,
-    this means an individual a or b point may be repeated if it matches
-    multiple points in the other data set satisfactorily
-    
-    WARNING: The algorithm used may fail to find all possible matches
-    if a longitude/latitude epsilon of greater than or equal to one
-    degree is given TODO
-    """
-    
-    """
-    raw_lon_lat_matches  - the number of points matched, based on the longitude and latitude alone
-    raw_unmatchable_in_a - the number of unmacthed pointes in a, based on longitude and latitude alone
-    raw_unmatchable_in_b - the number of unmacthed pointes in b, based on longitude and latitude alone
-    
-    a_point_mapping      - mapping of points in a to points in b; TODO give form
-    b_point_mapping      - mapping of points in b to points in a; TODO give form
-    
-    matched_longitude    - the list of matched longitude values
-    matched_latitude     - the list of matched latitude  values
-    
-    unmatchable_longitude_a - the list of longitude values in a that could not be matched
-    unmatchable_latitude_a  - the list of latitude  values in a that could not be matched
-    unmatchable_longitude_b - the list of longitude values in b that could not be matched
-    unmatchable_latitude_b  - the list of latitude  values in b that could not be matched
-    """
-    
-    def __init__(self,
-                 (a_longitude, a_latitude),
-                 (b_longitude, b_latitude),
-                 lon_lat_epsilon,
-                 valid_in_a_mask=None, valid_in_b_mask=None,
-                 additional_data_criteria=[ ],
-                 additional_filter_functions=[ ]) :
-        """
-        Build collocation mapping data based on two sets of
-        longitude and latitude, as well as an epsilon that
-        describes acceptable differences in degrees.
-        
-        Note: additional "criteria" variable data may be inculuded.
-        additional_filter_functions will be called in the form:
-        
-            additional_filter_functions[i](aRow, aCol, bRow, bCol, additional_data_criteria[i])
-        
-        a return of True or False is expected, to indicate whether or not
-        the match should be accepted
-        """
-        pass
-    
-    def _create_basic_mapping_from_lon_lat((alongitude, alatitude),
-                                           (blongitude, blatitude),
-                                           lonlatEpsilon,
-                                           invalidAMask=None, invalidBMask=None) :
-        """
-        match points together based on their longitude and latitude values
-        to match points must be within lonlatEpsilon degrees in both longitude and latitude
-        
-        if the longitude and latitude variables contain invalid data the invalidAMask and
-        invalidBMask should be passed with the appropriate masking to remove the invalid values
-        
-        the return will be in the form of two dictionaries of points, one from a and one from b,
-        indexed on the index number in the A or B data where they can be found. Each entry will
-        consist of a list of:
-            [longitudeValue, latitudeValue, indexNumber, [list of matching indexes in the other set]]
-        
-        Note: the return will include all pairs of points that match,
-        this means an individual a or b point may be repeated if it matches
-        multiple points within the lonlatEpsilon provided
-        
-        Warning: This algorithm will fail to find all matching points if the lonlatEpsilon is set to a
-        value greater than or equal to 1.0 degrees. This is related to the bin size used for searching
-        thoretically the bin size could be corrected to scale with the lonlatEpsilon in the future. TODO
-        """
 
 def create_colocation_mapping_within_epsilon((alongitude, alatitude),
                                              (blongitude, blatitude),
@@ -194,8 +114,8 @@ def create_colocation_mapping_within_epsilon((alongitude, alatitude),
         
         # figure out the lat/lon of the 9 bins that are "near" this one
         toSearch = [ ]
-        for latValue in range(binLatitude - 1, binLatitude + 1) :
-            for lonValue in range(binLongitude -1, binLongitude + 1) :
+        for latValue in (binLatitude - 1, binLatitude, binLatitude + 1) : # the old broken code: range(binLatitude - 1, binLatitude + 1) :
+            for lonValue in (binLongitude - 1, binLongitude, binLongitude + 1) : # the old broken code: range(binLongitude - 1, binLongitude + 1) :
                 toSearch.append((latValue, lonValue))
         
         # for each A pt in this bin
@@ -211,7 +131,8 @@ def create_colocation_mapping_within_epsilon((alongitude, alatitude),
                     # for each data point in the B bin, check if it matches our current A point
                     for bLat, bLon, bIndex, bMatches in bBins[(latValue, lonValue)] :
                         
-                        if (abs(bLat - aLat) < lonlatEpsilon) and (abs(aLon - bLon) < lonlatEpsilon) :
+                        # if the difference is is less than or equal to epsilon, this is an acceptable match
+                        if (abs(bLat - aLat) <= lonlatEpsilon) and (abs(aLon - bLon) <= lonlatEpsilon) :
                             totalMatches = totalMatches + 1
                             
                             # put the point on our matched lists

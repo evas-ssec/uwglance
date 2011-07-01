@@ -845,6 +845,8 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         # our list of functions that will later create the plots
         functionsToReturn = { }
         
+        if (aData.size <= 0) :
+            return functionsToReturn
         
         # create the scatter plot with colors for each section
         scatterPlotList = [ ]
