@@ -1582,8 +1582,9 @@ def stats_library_call(afn, bfn, var_list=[ ],
     TODO, should this move to a different file?
     """
     # unpack some options
-    epsilon_val = options_set['epsilon']
-    missing_val = options_set['missing']
+    epsilon_val  = options_set['epsilon']
+    missing_val  = options_set['missing']
+    do_pass_fail = options_set['usePassFail']
     
     LOG.debug ("file a: " + afn)
     LOG.debug ("file b: " + bfn)
@@ -1592,6 +1593,13 @@ def stats_library_call(afn, bfn, var_list=[ ],
     filesInfo = _open_and_process_files([afn, bfn], 2)
     aFile = filesInfo[afn]['fileObject']
     bFile = filesInfo[bfn]['fileObject']
+    
+    # information for testing pass/fail if needed
+    has_failed = False
+    defaultVariablePassFailSettings = {
+                                        'epsilon_failure_tolerance': 0.0,
+                                        'nonfinite_data_tolerance': 0.0
+                                       }
     
     # figure out the variable names and their individual settings
     if len(var_list) <= 0 :
@@ -1614,6 +1622,12 @@ def stats_library_call(afn, bfn, var_list=[ ],
         print >> output_channel, name
         print >> output_channel, ''
         variable_stats = statistics.StatisticalAnalysis(aData, bData, amiss, bmiss, epsilon=epsilon)
+        # if we're doing pass/fail testing, do that now
+        if do_pass_fail :
+            didPass, _, _, _ =_check_pass_or_fail(defaultVariablePassFailSettings,
+                                                  variable_stats.dictionary_form(),
+                                                  glance_analysis_defaults)
+            has_failed = has_failed or not(didPass)
         lal = list(variable_stats.dictionary_form().items())
         #lal = list(statistics.summarize(aData, bData, epsilon, (amiss,bmiss)).items()) 
         lal.sort()
@@ -1626,6 +1640,15 @@ def stats_library_call(afn, bfn, var_list=[ ],
             print >> output_channel, '' 
     if doc_atend:
         print >> output_channel, ('\n\n' + statistics.STATISTICS_DOC_STR)
+    
+    # if we are doing pass/fail, we need to return a status code
+    if do_pass_fail :
+        status_code = 0
+        if has_failed :
+            status_code = 3
+        LOG.debug("stats is returning status code: " + str(status_code))
+        return status_code
+    # note: if we aren't doing pass/fail, stats will not return anything
 
 def main():
     import optparse
@@ -1680,6 +1703,8 @@ python -m glance
                       action="store_true", default=False, help="start multiple processes to create images in parallel")
     parser.add_option('-d', '--nolonlat', dest='noLonLatVars',
                       action="store_true", default=False, help="do not try to find or analyze logitude and latitude")
+    parser.add_option('-x', '--doPassFail', dest='usePassFail',
+                      action="store_true", default=False, help="should the comparison test for pass/fail (currently only affects stats)")
     
     # parse the uers options from the command line
     options, args = parser.parse_args()
@@ -1739,12 +1764,16 @@ python -m glance
         tempOptions = { }
         tempOptions['epsilon']       = options.epsilon
         tempOptions['missing']       = options.missing
+        tempOptions['usePassFail']   = options.usePassFail
         # add more if needed for stats
         
-        _ = stats_library_call(_clean_path(afn), _clean_path(bfn),
-                               var_list=args[2:],
-                               options_set=tempOptions,
-                               do_document=do_doc)
+        status_result = stats_library_call(_clean_path(afn), _clean_path(bfn),
+                                           var_list=args[2:],
+                                           options_set=tempOptions,
+                                           do_document=do_doc)
+        
+        if status_result is not None :
+            return status_result
 
     def plotDiffs(*args) :
         """generate a set of images comparing two files
