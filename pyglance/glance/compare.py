@@ -1265,6 +1265,10 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     optional boolean values. this needs more work.)
     """
     
+    # have all the variables passed test criteria set for them?
+    # if no criteria were set then this will be true
+    didPassAll = True
+    
     # load the user settings from either the command line or a user defined config file
     pathsTemp, runInfo, defaultValues, requestedNames, usedConfigFile = _load_config_or_options(a_path, b_path,
                                                                                                 options_set,
@@ -1279,7 +1283,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     if (not runInfo['shouldIncludeImages']) and (not runInfo['shouldIncludeReport']) :
         LOG.warn("User selection of no image generation and no report generation will result in no " +
                  "content being generated. Aborting generation function.")
-        return
+        return 0 # nothing went wrong, we just had nothing to do!
     
     # hang onto info to identify who/what/when/where/etc. the report is being run by/for 
     runInfo.update(_get_run_identification_info( ))
@@ -1420,6 +1424,9 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                      non_finite_fail_fraction, \
                      r_squared_value = _check_pass_or_fail(varRunInfo, variable_stats, defaultValues)
             varRunInfo['did_pass'] = didPass
+            # update the overall pass status
+            if didPass is not None :
+                didPassAll = didPassAll & didPass
             
             # based on the settings and whether the variable passsed or failed,
             # should we include images for this variable?
@@ -1568,7 +1575,10 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         print ('generating glossary')
         report.generate_and_save_doc_page(statistics.StatisticalAnalysis.doc_strings(), pathsTemp['out'])
     
-    return
+    returnCode = 0 if didPassAll else 2 # return 2 only if some of the variables failed
+    
+    LOG.debug("Pass/Fail return code: " + str(returnCode))
+    return returnCode
 
 def stats_library_call(afn, bfn, var_list=[ ],
                        options_set={ },
@@ -1848,7 +1858,7 @@ python -m glance
         a_path = _clean_path(args[0])
         b_path = _clean_path(args[1])
         
-        reportGen_library_call(a_path, b_path, args[2:], tempOptions)
+        return reportGen_library_call(a_path, b_path, args[2:], tempOptions)
     
     def colocateData(*args) :
         """colocate data in two files
