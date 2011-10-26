@@ -1268,6 +1268,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     # have all the variables passed test criteria set for them?
     # if no criteria were set then this will be true
     didPassAll = True
+    do_pass_fail = options_set['usePassFail'] # todo, this is a temporary hack, should be loaded with other options
     
     # load the user settings from either the command line or a user defined config file
     pathsTemp, runInfo, defaultValues, requestedNames, usedConfigFile = _load_config_or_options(a_path, b_path,
@@ -1283,7 +1284,10 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     if (not runInfo['shouldIncludeImages']) and (not runInfo['shouldIncludeReport']) :
         LOG.warn("User selection of no image generation and no report generation will result in no " +
                  "content being generated. Aborting generation function.")
-        return 0 # nothing went wrong, we just had nothing to do!
+        if do_pass_fail :
+            return 0 # nothing went wrong, we just had nothing to do!
+        else :
+            return
     
     # hang onto info to identify who/what/when/where/etc. the report is being run by/for 
     runInfo.update(_get_run_identification_info( ))
@@ -1577,8 +1581,10 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     
     returnCode = 0 if didPassAll else 2 # return 2 only if some of the variables failed
     
-    LOG.debug("Pass/Fail return code: " + str(returnCode))
-    return returnCode
+    # if we are reporting the pass / fail, return an appropriate status code
+    if do_pass_fail :
+        LOG.debug("Pass/Fail return code: " + str(returnCode))
+        return returnCode
 
 def stats_library_call(afn, bfn, var_list=[ ],
                        options_set={ },
@@ -1854,6 +1860,7 @@ python -m glance
         tempOptions['lonlatepsilon'] = options.lonlatepsilon
         tempOptions['epsilon']       = options.epsilon
         tempOptions['missing']       = options.missing
+        tempOptions['usePassFail']   = options.usePassFail
         
         a_path = _clean_path(args[0])
         b_path = _clean_path(args[1])

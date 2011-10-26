@@ -97,13 +97,13 @@ class hdf(SD):
         data_type = None 
         scaling_method = None
         
-        print ("***** getting " + name + " from file")
+        #print ("***** getting " + name + " from file")
         
         # get the variable object and use it to
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
         raw_data_copy = variable_object[:]
-        print ("****** raw data loaded")
+        #print ("****** raw data loaded")
         try :
             # TODO, this currently won't work with geocat data, work around it for now
             scale_factor, scale_factor_error, add_offset, add_offset_error, data_type = SDS.getcal(variable_object)
@@ -120,7 +120,7 @@ class hdf(SD):
                 scaling_method = temp_attributes['scaling_method']
         SDS.endaccess(variable_object)
         
-        print ("***** scaling information loaded")
+        #print ("***** scaling information loaded")
         
         # don't do lots of work if we don't need to scale things
         if (scale_factor == 1.0) and (add_offset == 0.0) :

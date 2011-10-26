@@ -417,11 +417,15 @@ class NumericalComparisonStatistics (StatisticalData) :
     It may also contain additional statistics. This is indicated by the does_include_simple boolean.
     The possible additional statistics include:
     
-    rms_diff    -  the root mean squared of the absolute difference between the two data sets
-    std_diff    - the standard deviation of the absolute difference between the two data sets
-    mean_diff   -               the mean of the absolute difference between the two data sets
-    median_diff -             the median of the absolute difference between the two data sets
-    max_diff    -            the maximum of the absolute difference between the two data sets
+    rms_val      -  the root mean squared of the          difference between the two data sets
+    std_val      - the standard deviation of the          difference between the two data sets
+    mean_diff    -               the mean of the absolute difference between the two data sets
+    median_diff  -             the median of the absolute difference between the two data sets
+    max_diff     -            the maximum of the absolute difference between the two data sets
+    mean_delta   -               the mean of the          difference between the two data sets
+    median_delta -             the median of the          difference between the two data sets
+    max_delta    -            the maximum of the          difference between the two data sets
+    min_delta    -            the minimum of the          difference between the two data sets
     
     These statistics can also be generated separately in dictionary form by calling the
     basic_analysis method on this class.
@@ -434,14 +438,20 @@ class NumericalComparisonStatistics (StatisticalData) :
                                             "both have been defined",
                     'diff_outside_epsilon_fraction': "fraction of finite differences falling outside acceptable epsilon " +
                                             "definitions (out of common_finite_count)",
-                    'max_diff': "Maximum difference of finite values",
-                    'mean_diff': "mean difference of finite values",
-                    'median_diff': "median difference of finite values",
+                    'max_diff': "maximum absolute valued difference of the finite values",
+                    'mean_diff': "mean of the absolute value difference of the finite values",
+                    'median_diff': "median of the absolute value difference of the finite values",
+                    
+                    'mean_delta':      "mean of the subtractive difference of the finite values", 
+                    'median_delta':    "median of the subtractive difference of the finite values",
+                    'max_delta':       "maximum finite data value from the data set of B file - A file",
+                    'min_delta':       "minimum finite data value from the data set of B file - A file",
+                    
                     'perfect_match_count': "number of perfectly matched finite data points between A and B",
                     'perfect_match_fraction': "fraction of finite values perfectly matching between A and B (out of common_finite_count)",
-                    'rms_diff': "root mean square (RMS) difference of finite values",
+                    'rms_val': "root mean square (RMS) difference of finite values",
                     'r-squared correlation': "the square of the r correlation (see correlation)",
-                    'std_diff': "standard deviation of difference of finite values",
+                    'std_val': "standard deviation of difference of finite values",
                     'mismatch_points_count': 'number of points that differ in finite/missing status between the input data sets A and B,' +
                                             ' or are unacceptable when compared according to the current epsilon definitions',
                     'mismatch_points_fraction': 'fraction of points that differ in finite/missing status between the input data sets A and B,' +
@@ -497,17 +507,27 @@ class NumericalComparisonStatistics (StatisticalData) :
             basic_dict = NumericalComparisonStatistics.basic_analysis(diffInfoObject.diff_data_object.data,
                                                                       valid_in_both)
             if len(basic_dict) > 0 :
-                self.rms_diff      = basic_dict['rms_diff']
-                self.std_diff      = basic_dict['std_diff']
+                self.rms_val       = basic_dict['rms_val']
+                self.std_val       = basic_dict['std_val']
                 self.mean_diff     = basic_dict['mean_diff']
                 self.median_diff   = basic_dict['median_diff']
                 self.max_diff      = basic_dict['max_diff']
+                
+                self.mean_delta    = basic_dict['mean_delta']
+                self.median_delta  = basic_dict['median_delta']
+                self.max_delta     = basic_dict['max_delta']
+                self.min_delta     = basic_dict['min_delta']
             else :
-                self.rms_diff      = np.nan
-                self.std_diff      = np.nan
+                self.rms_val       = np.nan
+                self.std_val       = np.nan
                 self.mean_diff     = np.nan
                 self.median_diff   = np.nan
                 self.max_diff      = np.nan
+                
+                self.mean_delta    = np.nan
+                self.median_delta  = np.nan
+                self.max_delta     = np.nan
+                self.min_delta     = np.nan
             self.temp_analysis = basic_dict
     
     def dictionary_form(self) :
@@ -550,13 +570,20 @@ class NumericalComparisonStatistics (StatisticalData) :
             return { }
         
         # calculate our statistics
-        absDiffData = abs(diffData)
         root_mean_square_value = delta.calculate_root_mean_square(diffData, valid_mask)
-        return {    'rms_diff':                root_mean_square_value, 
-                    'std_diff':       np.std(absDiffData[valid_mask]), 
-                    'mean_diff':     np.mean(absDiffData[valid_mask]), 
-                    'median_diff': np.median(absDiffData[valid_mask]),
-                    'max_diff':       np.max(absDiffData[valid_mask])
+        tempDiffData = diffData[valid_mask]
+        absDiffData  = np.abs(tempDiffData)
+        return {    'rms_val':       root_mean_square_value, 
+                    'std_val':         np.std(tempDiffData),
+                    
+                    'mean_diff':       np.mean(absDiffData), 
+                    'median_diff':   np.median(absDiffData),
+                    'max_diff':         np.max(absDiffData),
+                    
+                    'mean_delta':     np.mean(tempDiffData), 
+                    'median_delta': np.median(tempDiffData),
+                    'max_delta':       np.max(tempDiffData),
+                    'min_delta':       np.min(tempDiffData)
                     }
     
     @staticmethod

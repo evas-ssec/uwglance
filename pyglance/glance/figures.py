@@ -375,9 +375,9 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, unit
         # info on the basic stats
         tempMask  = ones(data.shape, dtype=bool)
         tempStats = statistics.NumericalComparisonStatistics.basic_analysis(data, tempMask)
-        medianVal = tempStats['median_diff']
-        meanVal   = tempStats['mean_diff']
-        stdVal    = tempStats['std_diff']
+        medianVal = tempStats['median_delta']
+        meanVal   = tempStats['mean_delta']
+        stdVal    = tempStats['std_val']
         numPts    = data.size
         
         # info on the display of our statistics
