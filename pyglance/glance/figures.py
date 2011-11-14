@@ -7,10 +7,6 @@ Created by evas Dec 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-# these first two lines must stay before the pylab import
-import matplotlib
-matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
-
 from pylab import *
 
 import matplotlib.cm     as cm
@@ -32,6 +28,20 @@ LOG = logging.getLogger(__name__)
 # TODO this value is being used to work around a problem with the contourf
 # and how it handles range boundaries. Find a better solution if at all possible.
 offsetToRange = 0.0000000000000000001
+
+# make a custom medium grayscale color map for putting our bad data on top of
+mediumGrayColorMapData = {
+    'red'   : ((0.0, 1.00, 1.00),
+               (0.5, 0.60, 0.60),
+               (1.0, 0.20, 0.20)),
+    'green' : ((0.0, 1.00, 1.00),
+               (0.5, 0.60, 0.60),
+               (1.0, 0.20, 0.20)),
+    'blue'  : ((0.0, 1.00, 1.00),
+               (0.5, 0.60, 0.60),
+               (1.0, 0.20, 0.20))
+}
+MEDIUM_GRAY_COLOR_MAP = colors.LinearSegmentedColormap('mediumGrayColorMap', mediumGrayColorMapData, 256)
 
 # make an all green color map
 greenColorMapData = {
@@ -552,7 +562,7 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colo
     if not (colorMap is None) :
         kwargs['cmap'] = colorMap
     
-    if (data is not None) and (sum(invalidMask) < invalidMask.size) :
+    if (data is not None) and (np.sum(invalidMask) < invalidMask.size) :
         # draw our data
         im = imshow(cleanData, **kwargs)
         

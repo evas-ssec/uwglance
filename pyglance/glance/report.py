@@ -18,7 +18,7 @@ import shutil as shutil
 LOG = logging.getLogger(__name__)
 
 # TODO, this should be overridable in the config file when there is one
-floatFormat = '%.4g'
+floatFormat = '%#0.4g'
 formattingSettings = {
                       types.FloatType: floatFormat,
                       np.float32: floatFormat,

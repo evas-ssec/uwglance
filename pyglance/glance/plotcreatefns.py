@@ -7,12 +7,6 @@ Created by evas Dec 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
-# these first two lines must stay before the pylab import
-import matplotlib
-matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
-
-from pylab import *
-
 import matplotlib.colors as colors
 import matplotlib.cm     as colormapinfo
 
@@ -31,20 +25,6 @@ LOG = logging.getLogger(__name__)
 fullSizeDPI = 150 # 200
 # a constant for the thumbnail size dpi
 thumbSizeDPI = 50
-
-# make a custom medium grayscale color map for putting our bad data on top of
-mediumGrayColorMapData = {
-    'red'   : ((0.0, 1.00, 1.00),
-               (0.5, 0.60, 0.60),
-               (1.0, 0.20, 0.20)),
-    'green' : ((0.0, 1.00, 1.00),
-               (0.5, 0.60, 0.60),
-               (1.0, 0.20, 0.20)),
-    'blue'  : ((0.0, 1.00, 1.00),
-               (0.5, 0.60, 0.60),
-               (1.0, 0.20, 0.20))
-}
-mediumGrayColorMap = colors.LinearSegmentedColormap('mediumGrayColorMap', mediumGrayColorMapData, 256)
 
 # ********************* Section of utility functions ***********************
 
@@ -458,7 +438,7 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                baseMapInstance, fullAxis,
                                                                                ("Areas of mismatch data in\n" + variableDisplayName),
                                                                                invalidMask=(~(goodInAMask | goodInBMask)),
-                                                                               colorMap=mediumGrayColorMap, tagData=mismatchMask,
+                                                                               colorMap=figures.MEDIUM_GRAY_COLOR_MAP, tagData=mismatchMask,
                                                                                dataRanges=dataRanges,
                                                                                dataRangeNames=dataRangeNames,
                                                                                units=units_a)), # TODO, does this need modification?
@@ -645,7 +625,7 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                                                                    baseMapInstance, fullAxis,
                                                                                    ("Areas of mismatch data in\n" + variableDisplayName),
                                                                                    invalidMask=(~(goodInAMask | goodInBMask)),
-                                                                                   colorMap=mediumGrayColorMap, tagData=mismatchMask,
+                                                                                   colorMap=figures.MEDIUM_GRAY_COLOR_MAP, tagData=mismatchMask,
                                                                                    dataRanges=dataRanges,
                                                                                    dataRangeNames=dataRangeNames,
                                                                                    # TODO, does this need modification?
@@ -1080,7 +1060,7 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             bDataCopy[tempMask] = aData[tempMask]
             functionsToReturn['mismatch']   = ((lambda: figures.create_simple_figure(bDataCopy, "Areas of mismatch data in\n" + variableDisplayName,
                                                                             invalidMask=~(goodInAMask | goodInBMask), tagData=mismatchMask,
-                                                                            colorMap=mediumGrayColorMap, units=units_a)),
+                                                                            colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=units_a)),
                                               "mismatch data in " + variableDisplayName,
                                               "Mismatch.png", compared_fig_list)
         

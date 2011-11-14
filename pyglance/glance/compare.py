@@ -27,6 +27,8 @@ import glance.stats  as statistics
 import glance.plotcreatefns as plotcreate
 import glance.collocation   as collocation
 
+import glance.gui_controller as gui_control
+
 LOG = logging.getLogger(__name__)
 
 # these are the built in defaults for the settings
@@ -58,8 +60,6 @@ glance_analysis_defaults = {'epsilon': 0.0,
                             'total_data_failure_tolerance': None,
                             'minimum_acceptable_squared_correlation_coefficient': None
                             }
-
-UNITS_CONSTANT = "units"
 
 def _clean_path(string_path) :
     """
@@ -162,8 +162,8 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                 finalNames[name]['missing_value_alt_in_b'] = missing_b
                 
                 # get any information about the units listed in the files
-                finalNames[name]['units_a'] = fileAObject.get_attribute(name, UNITS_CONSTANT)
-                finalNames[name]['units_b'] = fileBObject.get_attribute(name, UNITS_CONSTANT)
+                finalNames[name]['units_a'] = fileAObject.get_attribute(name, io.UNITS_CONSTANT)
+                finalNames[name]['units_b'] = fileBObject.get_attribute(name, io.UNITS_CONSTANT)
                 
         # otherwise just do the ones the user asked for
         else : 
@@ -202,8 +202,8 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                                                                   missing, missing_b)
                         
                         # get any information about the units listed in the files
-                        finalNames[dispName]['units_a'] = fileAObject.get_attribute(name,   UNITS_CONSTANT)
-                        finalNames[dispName]['units_b'] = fileBObject.get_attribute(name_b, UNITS_CONSTANT)
+                        finalNames[dispName]['units_a'] = fileAObject.get_attribute(name,   io.UNITS_CONSTANT)
+                        finalNames[dispName]['units_b'] = fileBObject.get_attribute(name_b, io.UNITS_CONSTANT)
                         
                 else :
                     LOG.warn('No technical variable name was given for the entry described as "' + dispName + '". ' +
@@ -229,8 +229,8 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
             finalNames[name]['missing_value_alt_in_b'] = missing_b
             
             # get any information about the units listed in the files
-            finalNames[name]['units_a'] = fileAObject.get_attribute(name, UNITS_CONSTANT)
-            finalNames[name]['units_b'] = fileBObject.get_attribute(name, UNITS_CONSTANT)
+            finalNames[name]['units_a'] = fileAObject.get_attribute(name, io.UNITS_CONSTANT)
+            finalNames[name]['units_b'] = fileBObject.get_attribute(name, io.UNITS_CONSTANT)
     
     LOG.debug("Final selected set of variables to analyze:")
     LOG.debug(str(finalNames))
@@ -1921,7 +1921,24 @@ python -m glance
         b_path = _clean_path(args[1])
         
         colocateToFile_library_call(a_path, b_path, args[2:], tempOptions)
-
+    
+    def gui (*args) :
+        """start the glance graphical user interface
+        
+        This option launches the graphical user interface for glance. This interface includes only some of the basic
+        functionality of glance and may be expanded in the future.
+        
+        No arguments are required when using this option.
+        The various output related arguments (quiet, verbose, debug, etc.) may be used if desired.
+        
+        Examples:
+         python -m glance.compare gui
+        """
+        
+        LOG.debug("Launching Glance GUI")
+        temp_controller = gui_control.GlanceGUIController(_get_glance_version_string())
+        temp_controller.launch_gui()
+    
     # def build(*args):
     #     """build summary
     #     build extended info

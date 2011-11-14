@@ -7,9 +7,15 @@ Created by rayg Apr 2009.
 Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 """
 
+import os, sys
+
+PYQT4_HAX = '/sw/lib/qt4-mac/lib/python2.6/site-packages'
+if os.path.isdir(PYQT4_HAX):
+    sys.path.append(PYQT4_HAX)
+
 # these first two lines must stay before the pylab import
 import matplotlib
-matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
+matplotlib.use('Qt4Agg') # use the Anti-Grain Geometry rendering engine
 
 from pylab import *
 
@@ -53,6 +59,7 @@ def _handle_fig_creation_task(child_figure_function, log_message,
     if (isParent) :
         return pid
     else :
+        plt.ioff()
         figure = child_figure_function() 
         LOG.info(log_message)
         figure.savefig(os.path.join(outputPath, fullFigName), dpi=fullDPI)

@@ -52,6 +52,7 @@ except ImportError:
     LOG.info('no adl_blob format handler available')
     adl_blob = None
 
+UNITS_CONSTANT = "units"
 
 fillValConst1 = '_FillValue'
 fillValConst2 = 'missing_value'
@@ -375,6 +376,20 @@ class nc(CDF):
         
         if attributeName in temp_attributes :
             toReturn = temp_attributes[attributeName]
+        
+        return toReturn
+    
+    # Note: this function is not yet fully supported by the io module
+    # TODO, add this function to other io classes
+    def get_global_attribute(self, attributeName) :
+        """
+        returns the value of a global attribute if it is available or None
+        """
+        
+        toReturn = None
+        
+        if attributeName in self.attributes() :
+            toReturn = self.attributes()[attributeName]
         
         return toReturn
 
