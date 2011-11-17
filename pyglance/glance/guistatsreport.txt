@@ -1,0 +1,19 @@
+<%doc>
+This Mako template is intended to create a variable specific report page for Glance.
+
+Created by Eva Schiffer Nov 2011.
+Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
+</%doc>
+
+<%inherit file="variablereport.txt"/>
+
+<%block name="statDocLink"></%block>
+
+<%block name="htmlContent">
+    
+    <h3>${self.title()}</h3>
+    
+    ${self.stats()}
+    
+    
+</%block>

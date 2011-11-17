@@ -17,6 +17,10 @@ import matplotlib.cm     as cm
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
+from pkg_resources import resource_string, resource_filename
+from mako.template import Template
+from mako.lookup   import TemplateLookup
+
 import sys, os.path, logging
 import numpy as np
 
@@ -359,10 +363,20 @@ class GlanceGUIModel (object) :
         LOG.info ("Constructing statistics")
         
         tempAnalysis = stats.StatisticalAnalysis.withDataObjects(aData, bData, epsilon=self.epsilon)
+        tempInfo = {'variable_name':       tempVarA,
+                    'alternate_name_in_B': tempVarB}
+        kwargs = { 'runInfo':    tempInfo,
+                   'statGroups': tempAnalysis.dictionary_form(),
+                   }
+        
+        templateLookup = TemplateLookup(directories=[resource_filename(__name__, "stuff")])
+        guiTemplate    = Template(resource_string(__name__, "stuff/guistatsreport.txt"), lookup=templateLookup)
+        
+        renderedText = guiTemplate.render(**kwargs)
         
         # tell my listeners to show the stats data we've collected
         for listener in self.dataListeners :
-                listener.displayStatsData(tempVarA, tempVarB, tempAnalysis) # TODO, do we need a different set of data here?
+                listener.displayStatsData(tempVarA, tempVarB, renderedText) # TODO, do we need a different set of data here?
     
     def spawnPlotWithCurrentInfo (self) :
         """

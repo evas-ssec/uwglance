@@ -399,8 +399,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # I don't like this solution, but it would allow me to show multiple sets of stats at a time
         self.statsWindows[tempID] = StatisticsDisplayWindow(tempID,
                                                             aVariableName, variable_name_b=bVariableName,
-                                                            statsTextToDisplay=str(statsAnalysis.dictionary_form()), stored_in=self.statsWindows)
-                                                            #TODO, this is a terrible way to display this info, but shows that it is there
+                                                            statsTextToDisplay=statsAnalysis, stored_in=self.statsWindows)
     
     def fileDataUpdate (self, file_prefix, file_path, selected_variable, use_fill_override, new_fill_value, variable_dimensions,
                         variable_list=None, attribute_list=None) :
@@ -515,7 +514,9 @@ class StatisticsDisplayWindow (QtGui.QWidget) :
         layoutToUse = QtGui.QGridLayout()
         
         # set up the button at the bottom that creates plots
-        self.statsText = QtGui.QTextEdit(statsTextToDisplay)
+        self.statsText = QtGui.QTextEdit()
+        self.statsText.setHtml(statsTextToDisplay)
+        self.statsText.setReadOnly(True)
         layoutToUse.addWidget(self.statsText, 1, 1)
         
         # set up the overall window geometry

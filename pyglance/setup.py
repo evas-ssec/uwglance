@@ -25,8 +25,8 @@ setup( name="glance",
        version="0.2.7.01", 
        zip_safe = False,
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
-       packages = find_packages('.'),
+       packages = ['glance'], #find_packages('.'),
        install_requires=[ 'numpy', 'matplotlib' ],
-       package_data = {'stuff': ['*.txt', '*.gif'], }
+       package_data = {'': ['*.txt', '*.gif']}
        )
 
