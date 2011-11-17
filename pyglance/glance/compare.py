@@ -1161,10 +1161,10 @@ def reportGen_raw_data_simple_call (aData, bData, variableDisplayName,
         variableSettings['doc_path'] = quote(os.path.join(outputDirectory, './' + 'doc.html')) 
         
         # calculate the variable statistics
-        variable_stats = statistics.StatisticalAnalysis(aData, bData,
-                                                        missingValue, missingValue,
-                                                        None, None,
-                                                        epsilon, None).dictionary_form()
+        variable_stats = statistics.StatisticalAnalysis.withSimpleData(aData, bData,
+                                                                       missingValue, missingValue,
+                                                                       None, None,
+                                                                       epsilon, None).dictionary_form()
         
         # add a little additional info
         variableSettings['time'] = datetime.datetime.ctime(datetime.datetime.now())
@@ -1417,10 +1417,10 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             if not do_not_test_with_lon_lat :
                 mask_a_to_use = lon_lat_data['a']['inv_mask']
                 mask_b_to_use = lon_lat_data['b']['inv_mask']
-            variable_stats = statistics.StatisticalAnalysis(aData, bData,
-                                                            varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b'],
-                                                            mask_a_to_use, mask_b_to_use,
-                                                            varRunInfo['epsilon'], varRunInfo['epsilon_percent']).dictionary_form()
+            variable_stats = statistics.StatisticalAnalysis.withSimpleData(aData, bData,
+                                                                           varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b'],
+                                                                           mask_a_to_use, mask_b_to_use,
+                                                                           varRunInfo['epsilon'], varRunInfo['epsilon_percent']).dictionary_form()
             
             # add a little additional info to our variable run info before we squirrel it away
             varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
@@ -1637,7 +1637,7 @@ def stats_library_call(afn, bfn, var_list=[ ],
         print >> output_channel, '-'*32
         print >> output_channel, name
         print >> output_channel, ''
-        variable_stats = statistics.StatisticalAnalysis(aData, bData, amiss, bmiss, epsilon=epsilon)
+        variable_stats = statistics.StatisticalAnalysis.withSimpleData(aData, bData, amiss, bmiss, epsilon=epsilon)
         # if we're doing pass/fail testing, do that now
         if do_pass_fail :
             didPass, _, _, _ =_check_pass_or_fail(defaultVariablePassFailSettings,

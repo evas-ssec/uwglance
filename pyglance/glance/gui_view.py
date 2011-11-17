@@ -74,6 +74,10 @@ class GlanceGUIView (QtGui.QWidget) :
         # we will use this to remember were the user wanted to load files from last
         # TODO, can we remember this between program runs? something like preferences?
         self.lastFilePath = './'
+        
+        # hang on to stats windows so they don't vanish
+        self.statsWindows = { }
+        self.statsCounter = 1
     
     def _add_file_related_controls (self, file_prefix, grid_layout, currentRow) :
         """
@@ -155,6 +159,9 @@ class GlanceGUIView (QtGui.QWidget) :
         # now set up the input of the fill value that will be used
         grid_layout.addWidget(QtGui.QLabel("fill value:"), currentRow+1, 1)
         fillValue = QtGui.QLineEdit()
+        tempValidator = QtGui.QDoubleValidator(fillValue)
+        tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        fillValue.setValidator(tempValidator)
         fillValue.setDisabled(True)
         if   file_prefix is "A" :
             fillValue.editingFinished.connect(self.fillValueEditedA)
@@ -185,6 +192,10 @@ class GlanceGUIView (QtGui.QWidget) :
         # set up the epsilon input box
         layoutToUse.addWidget(QtGui.QLabel("epsilon:"), currentRow, 0)
         self.epsilonWidget = QtGui.QLineEdit()
+        tempValidator = QtGui.QDoubleValidator(self.epsilonWidget)
+        tempValidator.setBottom(0.0) # only accept positive epsilons
+        tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        self.epsilonWidget.setValidator(tempValidator)
         self.epsilonWidget.editingFinished.connect(self.reportEpsilonChanged)
         layoutToUse.addWidget(self.epsilonWidget, currentRow, 1, 1, 2)
         
@@ -200,7 +211,10 @@ class GlanceGUIView (QtGui.QWidget) :
         
         # TODO should I add a drop down to select how to visualize the data? (ie 2D, line, on a map, etc?)
         
-        # TODO add a button that shows stats
+        # set up a button that shows stats
+        self.statsButton = QtGui.QPushButton("Display Statistics")
+        self.statsButton.clicked.connect(self.reportDisplayStatsClicked)
+        layoutToUse.addWidget(self.statsButton, currentRow, 1, 1, 2)
         
         # set up the button at the bottom that creates plots
         self.displayButton = QtGui.QPushButton("Display Plot")
@@ -295,6 +309,9 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         
         newFillValue = self.widgetInfo[file_prefix]['fillValue'].text()
+        # it's still possible for this to not be a number, so fix that
+        newFillValue = self._extra_number_validation(newFillValue)
+        self.widgetInfo[file_prefix]['fillValue'].setText(str(newFillValue))
         
         # let our user update listeners know the fill value changed
         for listener in self.userUpdateListeners :
@@ -306,6 +323,9 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         
         newEpsilon = self.epsilonWidget.text()
+        # it's still possible for epsilon to not be a number, so fix that
+        newEpsilon = self._extra_number_validation(newEpsilon)
+        self.epsilonWidget.setText(str(newEpsilon))
         
         # let our user update listeners know the epsilon changed
         for listener in self.userUpdateListeners :
@@ -322,6 +342,18 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userSelectedImageType(newImageType)
     
+    def reportDisplayStatsClicked (self) :
+        """
+        the user clicked the display stats button
+        """
+        
+        # make sure the focus isn't in a line-edit box
+        self.statsButton.setFocus()
+        
+        # now report to our listeners that the user wants stats
+        for listener in self.userUpdateListeners :
+            listener.userRequestsStats()
+    
     def reportDisplayPlotClicked (self) :
         """
         the user clicked the display plot button
@@ -334,9 +366,41 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userRequestsPlot()
     
+    def _extra_number_validation (self, string_that_should_be_a_number) :
+        """
+        try to validate the string that should be a number
+        """
+        
+        toReturn = None
+        
+        try :
+            toReturn = int(string_that_should_be_a_number)
+        except ValueError :
+            try :
+                toReturn = float(string_that_should_be_a_number)
+            except ValueError :
+                pass # in this case we can't convert it, so just toss it
+        
+        return toReturn
+    
     #################     end methods related to user input   #################
     
     ################# start data model update related methods #################
+    
+    def displayStatsData (self, aVariableName, bVariableName, statsAnalysis) :
+        """
+        given the names of the two variables and the statistical analysis,
+        display this to the user
+        """
+        
+        tempID            = self.statsCounter
+        self.statsCounter = self.statsCounter + 1
+        
+        # I don't like this solution, but it would allow me to show multiple sets of stats at a time
+        self.statsWindows[tempID] = StatisticsDisplayWindow(tempID,
+                                                            aVariableName, variable_name_b=bVariableName,
+                                                            statsTextToDisplay=str(statsAnalysis.dictionary_form()), stored_in=self.statsWindows)
+                                                            #TODO, this is a terrible way to display this info, but shows that it is there
     
     def fileDataUpdate (self, file_prefix, file_path, selected_variable, use_fill_override, new_fill_value, variable_dimensions,
                         variable_list=None, attribute_list=None) :
@@ -386,7 +450,7 @@ class GlanceGUIView (QtGui.QWidget) :
         update the comparison epsilon displayed to the user
         """
         
-        self.epsilonWidget.setText(str(epsilon)) # TODO, this needs to be a float?
+        self.epsilonWidget.setText(str(epsilon))
         
     
     def updateImageTypes (self, imageType, list=None) :
@@ -422,6 +486,53 @@ class GlanceGUIView (QtGui.QWidget) :
         
         if objectToRegister not in self.userUpdateListeners :
             self.userUpdateListeners.append(objectToRegister)
+
+class StatisticsDisplayWindow (QtGui.QWidget) :
+    """
+    This class represents a window that displays a statistics comparison between two variables.
+    This window is intended to be displayed in a non-modal manner.
+    """
+    
+    def __init__ (self, id_number, variable_name_a, variable_name_b=None,
+                  statsTextToDisplay="", stored_in=None, parent=None) :
+        """
+        set up a window to display stats
+        """
+        
+        QtGui.QWidget.__init__(self, parent)
+        
+        self.id     = id_number
+        self.stored = stored_in
+        
+        # build and set the window title
+        tempTitle = "Statistics Comparing " + str(variable_name_a)
+        if (variable_name_b is not None) and (variable_name_b != variable_name_a) :
+            tempTitle = tempTitle + " / " + str(variable_name_b)
+        tempTitle = tempTitle + " data"
+        self.setWindowTitle(tempTitle)
+        
+        # create the layout and set up some of the overall record keeping
+        layoutToUse = QtGui.QGridLayout()
+        
+        # set up the button at the bottom that creates plots
+        self.statsText = QtGui.QTextEdit(statsTextToDisplay)
+        layoutToUse.addWidget(self.statsText, 1, 1)
+        
+        # set up the overall window geometry
+        self.setLayout(layoutToUse)
+        self.setGeometry(400, 400, 500, 500)
+        
+        self.show()
+    
+    def closeEvent (self, event) :
+        """
+        we need to clean some stuff up when the window wants to close
+        """
+        
+        if self.stored is not None :
+            del self.stored[self.id]
+        
+        event.accept()
 
 if __name__=='__main__':
     import doctest

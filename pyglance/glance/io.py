@@ -192,14 +192,19 @@ class hdf(SD):
         
         return
     
+    def get_variable_attributes (self, variableName) :
+        """
+        returns all the attributes associated with a variable name
+        """
+        
+        return self.get_variable_object(variableName).attributes()
+    
     def get_attribute(self, variableName, attributeName) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
         toReturn = None
-        
-        variable_object = self.get_variable_object(variableName)
-        temp_attributes = variable_object.attributes()
+        temp_attributes = self.get_variable_attributes(variableName)
         
         if attributeName in temp_attributes :
             toReturn = temp_attributes[attributeName]
@@ -365,14 +370,20 @@ class nc(CDF):
         
         return
     
+    def get_variable_attributes (self, variableName) :
+        """
+        returns all the attributes associated with a variable name
+        """
+        
+        return self.get_variable_object(variableName).attributes()
+    
     def get_attribute(self, variableName, attributeName) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
         toReturn = None
         
-        variable_object = self.get_variable_object(variableName)
-        temp_attributes = variable_object.attributes()
+        temp_attributes = self.get_variable_attributes(variableName)
         
         if attributeName in temp_attributes :
             toReturn = temp_attributes[attributeName]
@@ -525,15 +536,23 @@ class h5(object):
         
         return
     
+    def get_variable_attributes (self, variableName) :
+        """
+        returns all the attributes associated with a variable name
+        """
+        
+        return self.get_variable_object(variableName).attrs
+    
     def get_attribute(self, variableName, attributeName) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
         toReturn = None
         
-        variable_object = self.get_variable_object(variableName)
-        if (attributeName in variable_object.attrs) :
-            toReturn = variable_object.attrs[attributeName]
+        temp_attrs = self.get_variable_attributes(variableName)
+        
+        if (attributeName in temp_attrs) :
+            toReturn = temp_attrs[attributeName]
         
         return toReturn
 
@@ -624,6 +643,17 @@ class aeri(object):
         raise IOUnimplimentedError('Unable to add attribute to aeri file, this functionality is not yet available.')
         
         return
+    
+    def get_variable_attributes (self, variableName) :
+        """
+        returns all the attributes associated with a variable name
+        """
+        toReturn = { }
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in AERI files. None will be used.')
+        
+        return toReturn
     
     def get_attribute(self, variableName, attributeName) :
         """
@@ -716,6 +746,17 @@ class jpss_adl(object):
         raise IOUnimplimentedError('Unable to add attribute to JPSS ADL file, this functionality is not yet available.')
         
         return
+    
+    def get_variable_attributes (self, variableName) :
+        """
+        returns all the attributes associated with a variable name
+        """
+        toReturn = { }
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in JPSS ADL files. None will be used.')
+        
+        return toReturn
     
     def get_attribute(self, variableName, attributeName) :
         """

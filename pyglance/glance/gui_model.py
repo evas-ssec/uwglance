@@ -23,6 +23,7 @@ import numpy as np
 import glance.data    as dataobjects
 import glance.figures as figures
 import glance.io      as io
+import glance.stats   as stats
 
 LOG = logging.getLogger(__name__)
 
@@ -68,18 +69,15 @@ class _FileModelData (object) :
     
     self.file             - the FileInfo object representing this file, can be used to load more information later
     self.variable         - the name of the selected variable
-    self.doOverride       - false if the default fill value should be used, true otherwise
-    self.fillValue        - the fill value (may be different than the default), should be used when override is true
-    self.defaultFillValue - the default fill value, should be used when override is false
+    self.var_data_cache   - a cache of all the variable data that has been loaded for this file
+                            (stored in dataobjects.DataObject objects), keyed by variable name
+    self.var_attrs_cache  - a cache of variable attributes (keyed by variable name), each set of attributes is a dictionary,
+                            keyed with the attribute names and containing their values
     self.ALL_VARIABLES    - a list of all the variable names in the file
-    self.var_data         - the data contained in the currently selected variable (or None if no variable is selected)
-    self.var_attrs        - a dictionary of the variable attributes, keyed with the attribute names and containing their values
-    
-    TODO, eventually replace this with a better data object and/or some combination of data and settings objects?
     """
     
     def __init__(self, file_object=None, variable_selection=None, do_override=False, fill_value=None, default_fill_value=None,
-                 variables_list=None, variable_data=None, variable_attributes={ }) :
+                 variables_list=None, variable_data=None, variable_attributes=None) :
         """
         create a set of model data, using the data passed in
         
@@ -87,14 +85,16 @@ class _FileModelData (object) :
         """
         
         self.file             = file_object
-        self.variable         = variable_selection
-        self.doOverride       = do_override
-        self.fillValue        = fill_value
-        self.defaultFillValue = default_fill_value
+        self.variable         = str(variable_selection)
         self.ALL_VARIABLES    = variables_list
         
-        self.var_data         = variable_data
-        self.var_attrs        = variable_attributes
+        self.var_data_cache   = { }
+        self.var_attrs_cache  = { }
+        if variable_selection is not None :
+            self.var_data_cache[variable_selection]  = dataobjects.DataObject(variable_data, fillValue= fill_value,
+                                                                              overrideFillValue=do_override,
+                                                                              defaultFillValue=default_fill_value)
+            self.var_attrs_cache[variable_selection] = variable_attributes
 
 class GlanceGUIModel (object) :
     """
@@ -156,30 +156,51 @@ class GlanceGUIModel (object) :
         if newFile is None :
             return
         
+        # reset our caches
+        self._resetCaches(filePrefix)
+        
         # get the list of variables, and pick one
         variableList = sorted(newFile.file_object()) # gets a list of all the variables in the file
-        tempVariable = variableList[0]
-        fillValue    = newFile.file_object.missing_value(tempVariable)
+        tempVariable = str(variableList[0])
         
         # save all of the data related to this file for later use
         self.fileData[filePrefix].file               = newFile
         self.fileData[filePrefix].variable           = tempVariable
-        self.fileData[filePrefix].doOverride         = False
-        self.fileData[filePrefix].defaultFillValue   = fillValue
-        self.fileData[filePrefix].fillValue          = fillValue
         self.fileData[filePrefix].ALL_VARIABLES      = variableList
         
-        # get the size of the currently selected variable TODO, is it possible to do this without loading the variable?
-        tempShape = self._load_variable_data(filePrefix, str(self.fileData[filePrefix].variable))
+        # load info on the current variable
+        tempDataObj = self._load_variable_data(filePrefix, tempVariable)
         
-        # get the variable's attributes TODO, does this work on all types of files? (FIXME no, make a general method in io!)
-        self.fileData[filePrefix].var_attrs          = newFile.file_object.get_variable_object(str(tempVariable)).attributes()
+        # get the variable's attributes
+        tempAttrs = self._load_variable_attributes (filePrefix, tempVariable)
         
         # Now tell our data listeners that the file data changed
         for dataListener in self.dataListeners :
             LOG.debug("Sending update for file " + filePrefix + " with loaded data.")
-            dataListener.fileDataUpdate(filePrefix, newFile.path, tempVariable, False, fillValue, str(tempShape),
-                                        variable_list=variableList, attribute_list=self.fileData[filePrefix].var_attrs)
+            dataListener.fileDataUpdate(filePrefix, newFile.path, tempVariable, tempDataObj.override_fill_value,
+                                        self._select_fill_value(filePrefix), str(tempDataObj.data.shape),
+                                        variable_list=variableList, attribute_list=tempAttrs)
+    
+    def _load_variable_attributes (self, file_prefix, variable_name) :
+        """
+        Load the attributes for for a given file name, saving them to the
+        file data structure as appropriate
+        
+        return the loaded attributes for convenience
+        """
+        
+        variable_name = str(variable_name)
+        
+        tempAttrs = None
+        # if we can load the attributes from the cache, do that otherwise get them from the file
+        if variable_name in  self.fileData[file_prefix].var_attrs_cache.keys() :
+            tempAttrs = self.fileData[file_prefix].var_attrs_cache[variable_name]
+        else :
+            tempAttrs = self.fileData[file_prefix].file.file_object.get_variable_attributes(variable_name)
+            # cache these for later use
+            self.fileData[file_prefix].var_attrs_cache[variable_name] = tempAttrs
+        
+        return tempAttrs
     
     def _load_variable_data (self, file_prefix, variable_name) :
         """
@@ -189,8 +210,32 @@ class GlanceGUIModel (object) :
         TODO, can this be handled as a background task in the future?
         """
         
-        self.fileData[file_prefix].var_data = self.fileData[file_prefix].file.file_object[variable_name]
-        return self.fileData[file_prefix].var_data.shape
+        variable_name = str(variable_name)
+        
+        tempData = None
+        # if we have a cached version of this variable, use that, otherwise, load it from the file
+        if variable_name in self.fileData[file_prefix].var_data_cache.keys() :
+            LOG.debug ("Loading " + str(file_prefix) + " file cached variable: " + str(variable_name))
+            tempData = self.fileData[file_prefix].var_data_cache[variable_name]
+        else :
+            LOG.debug ("Loading " + str(file_prefix) + " file variable from file: " + str(variable_name))
+            tempRawData  = self.fileData[file_prefix].file.file_object[variable_name]
+            tempFillVal  = self.fileData[file_prefix].file.file_object.missing_value(variable_name)
+            tempOverride = False
+            # also save this new data in our cache TODO, this won't save the other data we need?
+            tempData = dataobjects.DataObject(tempRawData, fillValue=tempFillVal,
+                                              overrideFillValue=tempOverride,
+                                              defaultFillValue=tempFillVal)
+            self.fileData[file_prefix].var_data_cache[variable_name] = tempData
+        
+        return tempData
+    
+    def _resetCaches (self, file_prefix) :
+        """
+        Clear the two internal caches
+        """
+        self.fileData[file_prefix].var_data_cache  = { }
+        self.fileData[file_prefix].var_attrs_cache = { }
     
     def sendGeneralSettingsData (self) :
         """
@@ -215,44 +260,44 @@ class GlanceGUIModel (object) :
         if (newVariableText is not None) and (newVariableText != self.fileData[file_prefix].variable) :
             if newVariableText in self.fileData[file_prefix].ALL_VARIABLES :
                 LOG.debug("Setting file " + file_prefix + " variable selection to: " + newVariableText)
-                self.fileData[file_prefix].variable = newVariableText
+                self.fileData[file_prefix].variable = str(newVariableText)
                 didUpdate = True
                 
                 # load the data for this new variable
                 self._load_variable_data(file_prefix, str(newVariableText))
                 
-                # get the variable's attributes TODO, does this work on all types of files? (FIXME nope, make a general method in io!)
-                self.fileData[file_prefix].var_attrs = self.fileData[file_prefix].file.file_object.get_variable_object(str(newVariableText)).attributes()
-                
-                # the new fill value should be loaded and the override should be cleared
-                self.fileData[file_prefix].doOverride        = False
-                self.fileData[file_prefix].defaultFillValue  = self.fileData[file_prefix].file.file_object.missing_value(str(newVariableText))
-                self.fileData[file_prefix].fillValue         = self.fileData[file_prefix].defaultFillValue
+                # get the variable's attributes
+                self._load_variable_attributes (file_prefix, str(newVariableText))
+        
+        # for convenience hang on to this
+        tempVariableName = self.fileData[file_prefix].variable
         
         # update the override selection if needed
-        if newOverrideValue is not None :
+        if (newOverrideValue is not None) and (tempVariableName in self.fileData[file_prefix].var_data_cache.keys()) :
             LOG.debug("Setting file " + file_prefix + " override selection to: " + str(newOverrideValue))
-            self.fileData[file_prefix].doOverride = newOverrideValue
+            self.fileData[file_prefix].var_data_cache[self.fileData[file_prefix].variable].override_fill_value = newOverrideValue
             didUpdate = True
         
         # update the fill value if needed
-        if newFillValue is not np.nan :
+        if (newFillValue is not np.nan) and (tempVariableName in self.fileData[file_prefix].var_data_cache.keys()) :
             LOG.debug("Setting file " + file_prefix + " fill value to: " + str(newFillValue))
-            self.fileData[file_prefix].fillValue = newFillValue
+            self.fileData[file_prefix].var_data_cache[self.fileData[file_prefix].variable].fill_value = newFillValue
             didUpdate = True
         
         # let our data listeners know about any changes
         if didUpdate :
+            tempDataObject = self.fileData[file_prefix].var_data_cache[tempVariableName]
+            tempAttrsList  = self.fileData[file_prefix].var_attrs_cache[tempVariableName]
             for listener in self.dataListeners :
-                listener.fileDataUpdate(file_prefix, self.fileData[file_prefix].file.path,  self.fileData[file_prefix].variable,
-                                                     self.fileData[file_prefix].doOverride, self._select_fill_value(file_prefix),
-                                                     str(self.fileData[file_prefix].var_data.shape), attribute_list=self.fileData[file_prefix].var_attrs)
+                listener.fileDataUpdate(file_prefix, self.fileData[file_prefix].file.path, tempVariableName,
+                                                     tempDataObject.override_fill_value,   self._select_fill_value(file_prefix),
+                                                     str(tempDataObject.data.shape),       attribute_list=tempAttrsList)
     
     def _select_fill_value (self, file_prefix) :
         """
         which fill value should currently be used?
         """
-        return self.fileData[file_prefix].fillValue if self.fileData[file_prefix].doOverride else self.fileData[file_prefix].defaultFillValue
+        return self.fileData[file_prefix].var_data_cache[self.fileData[file_prefix].variable].select_fill_value()
     
     def updateSettingsDataSelection (self, newEpsilonValue=np.nan, newImageType=None) :
         """
@@ -282,6 +327,43 @@ class GlanceGUIModel (object) :
                 listener.updateEpsilon(self.epsilon)
                 listener.updateImageTypes(self.imageType)
     
+    def sendStatsInfo (self) :
+        """
+        our data listeners should be sent statistics information for a comparison
+        of the currently selected variables (if possible)
+        """
+        
+        tempVarA = self.fileData["A"].variable
+        tempVarB = self.fileData["B"].variable
+        aData    = self.fileData["A"].var_data_cache[tempVarA] if tempVarA in self.fileData["A"].var_data_cache else None
+        bData    = self.fileData["B"].var_data_cache[tempVarB] if tempVarB in self.fileData["B"].var_data_cache else None
+        
+        # check the minimum validity of our data
+        message = None
+        if (aData is None) or (bData is None) :
+            message = ("Data for requested files was not available. " +
+                       "Please load or reload files and try again.")
+        # check to see if the two variables have the same shape of data
+        elif aData.data.shape != bData.data.shape :
+            message = (tempVarA + ' / ' + tempVarB + ' ' + 
+                       'could not be compared because the data for these variables does not match in shape ' +
+                       'between the two files (file A data shape: ' + str(aData.data.shape) + '; file B data shape: '
+                       + str(bData.data.shape) + ').')
+        # if the data isn't valid, stop now
+        if message is not None :
+            for errorHandler in self.errorHandlers :
+                errorHandler.handleWarning(message)
+            # we can't make any stats from this data, so just return
+            return
+        
+        LOG.info ("Constructing statistics")
+        
+        tempAnalysis = stats.StatisticalAnalysis.withDataObjects(aData, bData, epsilon=self.epsilon)
+        
+        # tell my listeners to show the stats data we've collected
+        for listener in self.dataListeners :
+                listener.displayStatsData(tempVarA, tempVarB, tempAnalysis) # TODO, do we need a different set of data here?
+    
     def spawnPlotWithCurrentInfo (self) :
         """
         create a matplotlib plot using the current model information
@@ -289,10 +371,17 @@ class GlanceGUIModel (object) :
         TODO, move this into some sort of figure manager model object/module?
         """
         
+        LOG.debug ("Variable A cache entries: " + str(self.fileData["A"].var_data_cache.keys()))
+        LOG.debug ("Variable B cache entries: " + str(self.fileData["B"].var_data_cache.keys()))
+        
         LOG.info ("Preparing variable data for plotting...")
         
-        aData = self.fileData["A"].var_data
-        bData = self.fileData["B"].var_data
+        tempVarA = self.fileData["A"].variable
+        tempVarB = self.fileData["B"].variable
+        
+        # TODO, move to taking advantage of the whole data objects
+        aData = self.fileData["A"].var_data_cache[tempVarA].data if tempVarA in self.fileData["A"].var_data_cache else None
+        bData = self.fileData["B"].var_data_cache[tempVarB].data if tempVarB in self.fileData["B"].var_data_cache else None
         
         message = None
         
@@ -303,7 +392,7 @@ class GlanceGUIModel (object) :
                        "Please load or reload files and try again.")
         # check to see if the two variables have the same shape of data
         elif aData.shape != bData.shape :
-            message = (self.fileData["A"].variable + ' / ' + self.fileData["B"].variable + ' ' + 
+            message = (tempVarA + ' / ' + tempVarB + ' ' + 
                        'could not be compared because the data for these variables does not match in shape ' +
                        'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
                        + str(bData.shape) + ').')
@@ -328,8 +417,8 @@ class GlanceGUIModel (object) :
         rawDiffDataClean = bDataClean - aDataClean
         
         # pull the units information
-        aUnits = self.fileData["A"].file.file_object.get_attribute(str(self.fileData["A"].variable), io.UNITS_CONSTANT)
-        bUnits = self.fileData["B"].file.file_object.get_attribute(str(self.fileData["B"].variable), io.UNITS_CONSTANT)
+        aUnits = self.fileData["A"].file.file_object.get_attribute(self.fileData["A"].variable, io.UNITS_CONSTANT)
+        bUnits = self.fileData["B"].file.file_object.get_attribute(self.fileData["B"].variable, io.UNITS_CONSTANT)
         
         LOG.info("Spawning plot window: " + self.imageType)
         

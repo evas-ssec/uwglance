@@ -11,6 +11,7 @@ import sys, logging
 
 from pkg_resources import resource_string, resource_filename #, resource_stream
 from mako.template import Template
+from mako.lookup   import TemplateLookup
 import types as types
 import numpy as np
 import shutil as shutil
@@ -29,8 +30,10 @@ formattingSettings = {
 # in the template into the kwargs
 def _make_and_save_page (fullFilePath, templateFileNameToUse, **kwargs) :
     
+    tempLookup = TemplateLookup(directories=[resource_filename(__name__, "stuff")])
+    
     fileToWrite = open(fullFilePath, 'w')
-    tempTemplate = Template(resource_string(__name__, templateFileNameToUse))
+    tempTemplate = Template(resource_string(__name__, templateFileNameToUse), lookup=tempLookup)
 
     fileToWrite.write(tempTemplate.render(**kwargs))
     fileToWrite.close()
@@ -139,11 +142,11 @@ def generate_and_save_summary_report(files,
                'variables': variables 
                }
               
-    _make_and_save_page((outputPath + "/" + reportFileName), 'mainreport.txt', **kwargs)
+    _make_and_save_page((outputPath + "/" + reportFileName), 'stuff/mainreport.txt', **kwargs)
     
     # copy the pass/fail images, TODO should I move this to a list input in the parameters?
-    passFile = resource_filename(__name__, 'pass.gif') # TODO, how can this be done without unzipping the egg?
-    failFile = resource_filename(__name__, 'fail.gif') # TODO, how can this be done without unzipping the egg?
+    passFile = resource_filename(__name__, 'stuff/pass.gif') # TODO, how can this be done without unzipping the egg?
+    failFile = resource_filename(__name__, 'stuff/fail.gif') # TODO, how can this be done without unzipping the egg?
     shutil.copy(passFile, outputPath)
     shutil.copy(failFile, outputPath)
     
@@ -160,7 +163,7 @@ def generate_and_save_doc_page(definitions, outputPath) :
     """
     kwargs = {'definitions': definitions
               }
-    _make_and_save_page(outputPath + "/doc.html", 'doc.txt', **kwargs)
+    _make_and_save_page(outputPath + "/doc.html", 'stuff/doc.txt', **kwargs)
     
     return
 
@@ -258,7 +261,7 @@ def generate_and_save_variable_report(files,
                'imageNames': imageNames
                }
     
-    _make_and_save_page((outputPath + "/" + reportFileName), 'variablereport.txt', **kwargs)
+    _make_and_save_page((outputPath + "/" + reportFileName), 'stuff/variablereport.txt', **kwargs)
     
     return
 

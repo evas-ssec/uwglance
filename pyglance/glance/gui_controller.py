@@ -107,6 +107,13 @@ class GlanceGUIController (object) :
         
         self.model.updateSettingsDataSelection(newImageType=new_image_type)
     
+    def userRequestsStats (self) :
+        """
+        the user has asked for stats information
+        """
+        
+        self.model.sendStatsInfo() # TODO, should a different object handle this?
+    
     def userRequestsPlot (self) :
         """
         the user has asked for a plot

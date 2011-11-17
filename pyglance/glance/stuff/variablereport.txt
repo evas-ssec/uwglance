@@ -1,0 +1,169 @@
+<%doc>
+This Mako template is intended to create a variable specific report page for Glance.
+
+Created by Eva Schiffer Nov 2011.
+Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
+</%doc>
+
+<%!
+    import glance.report as report
+%>
+
+<%inherit file="basereport.txt"/>
+
+<%block name="title">
+    <%
+        variableName = runInfo['variable_name']
+        variableDisplayName = variableName
+        if (runInfo.has_key('display_name')):
+            variableDisplayName = runInfo['display_name']
+    %>
+    ${variableDisplayName} Variable Comparison
+</%block>
+
+## this version of the config file path is escaped to be down in the variable report directory
+<%block name="configFileLink">
+    Please see <a href="${runInfo['config_file_path']}">this copy of the configuration file</a>
+</%block>
+
+## additional filtering information specific to the variable being analyzed
+<%block name="additionalFilterInfo">
+    ## display info about the basic data filters if the data was filtered
+    % if ('data_filter_function_a' in runInfo) and (not (runInfo['data_filter_function_a'] is None)) :
+        Note: The data for this variable from file A was filtered.<br>
+        <% wasFiltered = True %>
+    % endif
+    % if ('data_filter_function_b' in runInfo) and (not (runInfo['data_filter_function_b'] is None)) :
+        Note: The data for this variable from file B was filtered.<br>
+        <% wasFiltered = True %>
+    % endif
+</%block>
+
+## these need to be linked out further to allow for variable directories; TODO, this won't work with deeper directories :(
+<%block name="lonlatInvalidImages">
+    <a href="../LonLatMismatch.A.png">
+        View mismatching points in A's lon/lat system
+    </a><br>
+    <a href="../LonLatMismatch.B.png">
+        View mismatching points in B's lon/lat system
+    </a>
+</%block>
+
+## this is the main body block that includes most of the comparison info
+<%block name="comparedData">
+    
+    ## show the original data images if we have any
+    <%block name="originalImages">
+    
+    % if (len(imageNames['original']) > 0) :
+        <h3>Original Data</h3>
+        <p>
+            % for image in imageNames['original']:
+                <a href="./${image}"><img src="small.${image}"></a>
+            % endfor
+        </p>
+    % endif
+    
+    </%block>
+    
+    ## this is the summary of how the data was compared
+    <%block name="comparisonSummary">
+    
+    <h3>Comparison Information</h3>
+    
+    ## comparison parameters
+    <p>
+        ## display the variable names
+        % if 'alternate_name_in_B' in runInfo :
+            variable name in A: ${runInfo['variable_name']} <br>
+            variable name in B: ${runInfo['alternate_name_in_B']} <br>
+        % else :
+            variable name: ${runInfo['variable_name']} <br>
+        % endif
+        
+        ## display the epsilon
+        epsilon value: ${runInfo['epsilon']} <br>
+        
+        ## if there is an epsilon percent, also show that
+        % if ('epsilon_percent' in runInfo) and (runInfo['epsilon_percent'] is not None) :
+            epsilon percent: ${runInfo['epsilon_percent']}% <br>
+        % endif
+        
+        ## display the missing value
+        % if ('missing_value_alt_in_b' in runInfo) and (not (runInfo['missing_value_alt_in_b'] is runInfo['missing_value'])) :
+            "missing" data value in A: ${str(runInfo['missing_value'])}<br>
+            "missing" data value in B: ${str(runInfo['missing_value_alt_in_b'])}<br>
+        % else :
+            "missing" data value: ${str(runInfo['missing_value'])}<br>
+        % endif
+        
+        ## if there are units available, display those
+        % if ('units_a' in runInfo) and (runInfo['units_a'] is not None) :
+            units in A: ${str(runInfo['units_a'])}<br>
+        % endif
+        % if ('units_b' in runInfo) and (runInfo['units_b'] is not None) :
+            units in B: ${str(runInfo['units_b'])}<br>
+        % endif
+    </p>
+    
+    </%block>
+    
+    ## show the comparison statistics
+    <%block name="stats">
+    
+    <h3>Statistical Summary</h3>
+    
+    ## list out all of the statistics groups we have
+    <dl>
+    % for setName in sorted(list(statGroups)) :
+        <% dataSet = statGroups[setName] %>
+            <dt>
+                ${setName}
+            </dt>
+            <dd>
+                % for statName, statValue in sorted(list(dataSet.items())) :
+                    ${statName}<%block name="statDocLink"><a href="${runInfo['doc_path']}">*</a></%block>: ${report.make_formatted_display_string(statValue)} <br>
+                % endfor
+                <br>
+            <dd>
+    % endfor
+    </dl>
+    
+    </%block>
+    
+    ## display any comparison images we have, if appropriate
+    <%block name="comparisonImages">
+    
+    <%
+    hideComparisonImages = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
+    %>
+    % if (len(imageNames['compared']) > 0) and (not hideComparisonImages) :
+        <p>
+            <% inSubSet = False %>
+            % for image in imageNames['compared'] :
+                ## if we have a plain image, display it
+                % if (type(image) is str) :
+                    % if inSubSet :
+                        <hr>
+                        <% inSubSet = False %>
+                    % endif
+                    <a href="./${image}"><img src="./small.${image}"></a>
+                
+                ## if we have a subset of images, separate it from the rest
+                % elif (type(image) is list) :
+                    <% inSubSet = True %>
+                    <hr>
+                    <blockquote>
+                        % for subImage in image :
+                            <a href="./${subImage}"><img src="./small.${subImage}"></a>
+                        % endfor
+                    </blockquote>
+                % endif
+                
+            % endfor
+        </p>
+    % endif
+    
+    </%block>
+    
+</%block>

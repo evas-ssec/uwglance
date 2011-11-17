@@ -354,8 +354,8 @@ class GeneralStatistics (StatisticalData) :
         total_num_values = a_missing_mask.size
         
         # fill in our statistics
-        self.a_missing_value = diffInfoObject.a_data_object.fill_value
-        self.b_missing_value = diffInfoObject.b_data_object.fill_value
+        self.a_missing_value = diffInfoObject.a_data_object.select_fill_value()
+        self.b_missing_value = diffInfoObject.b_data_object.select_fill_value()
         self.epsilon         = diffInfoObject.epsilon_value
         self.epsilon_percent = diffInfoObject.epsilon_percent
         self.max_a           = delta.max_with_mask(diffInfoObject.a_data_object.data, good_in_a_mask)
@@ -615,23 +615,50 @@ class StatisticalAnalysis (StatisticalData) :
     documentation of the statistics.
     """
     
-    def __init__ (self,
-                  a_data,                b_data,
-                  a_missing_value=None,  b_missing_value=None,
-                  a_ignore_mask=None,    b_ignore_mask=None,
-                  epsilon=0., epsilon_percent=None) :
+    def __init__ (self) :
         """
-        do a full statistical analysis of the data
+        this is a blank constructor to support our new class method creation pattern
+        """
+        self.title = "Statistical Summary"
+    
+    @classmethod
+    def withSimpleData (in_class,
+                        a_data,                b_data,
+                        a_missing_value=None,  b_missing_value=None,
+                        a_ignore_mask=None,    b_ignore_mask=None,
+                        epsilon=0., epsilon_percent=None) :
+        """
+        do a full statistical analysis of the data, after building the data objects
         """
         
-        self.title = "Statistical Summary"
+        new_object  = in_class()
         
         aDataObject = dataobj.DataObject(a_data, fillValue=a_missing_value, ignoreMask=a_ignore_mask)
         bDataObject = dataobj.DataObject(b_data, fillValue=b_missing_value, ignoreMask=b_ignore_mask)
-        diffInfo    = dataobj.DiffInfoObject(aDataObject, bDataObject,
-                                          epsilonValue=epsilon, epsilonPercent=epsilon_percent) 
         
-        self._create_stats(diffInfo)
+        diffInfo    = dataobj.DiffInfoObject(aDataObject, bDataObject,
+                                             epsilonValue=epsilon, epsilonPercent=epsilon_percent) 
+        
+        new_object._create_stats(diffInfo)
+        
+        return new_object
+    
+    @classmethod
+    def withDataObjects (in_class,
+                         a_data_object, b_data_object,
+                         epsilon=0.,    epsilon_percent=None) :
+        """
+        do a full statistical analysis of the data, using the given data objects
+        """
+        
+        new_object = in_class()
+        
+        diffInfo   = dataobj.DiffInfoObject(a_data_object, b_data_object,
+                                            epsilonValue=epsilon, epsilonPercent=epsilon_percent) 
+        
+        new_object._create_stats(diffInfo)
+        
+        return new_object
     
     def _create_stats(self, diffInfoObject) :
         """

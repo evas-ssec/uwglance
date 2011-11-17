@@ -89,9 +89,14 @@ class DataObject (object) :
     data       - the raw array of data (generally this should be a numpy array)
     fill_value - the fill value used in the data array
     masks      - the set of masks that apply to this data
+    
+    override_fill_value - should the fill_value be used rather than the default_fill_value
+                          (this defaults to True so the fill_value is used, insuring backwards compatability)
+    default_fill_value  - the default fill value that will be used if override_fill_value is False
     """
     
-    def __init__(self, dataArray, fillValue=None, ignoreMask=None) :
+    def __init__(self, dataArray, fillValue=None, ignoreMask=None,
+                 overrideFillValue=True, defaultFillValue=None) :
         """
         Create the data object.
         
@@ -103,6 +108,9 @@ class DataObject (object) :
         self.data       = dataArray
         self.fill_value = fillValue
         self.masks      = BasicMaskSetObject(ignoreMask)
+        
+        self.override_fill_value = overrideFillValue
+        self.default_fill_value  = defaultFillValue
     
     def self_analysis(self) :
         """
@@ -122,9 +130,10 @@ class DataObject (object) :
         # find and mark the missing values
         missing_mask    = np.zeros(shape, dtype=np.bool)
         # if the data has a fill value, mark where the missing data is
-        if self.fill_value is not None :
-            missing_mask[self.data == self.fill_value] = True
-            missing_mask[self.masks.ignore_mask]       = False
+        tempFillValue = self.select_fill_value()
+        if tempFillValue is not None :
+            missing_mask[self.data == tempFillValue] = True
+            missing_mask[self.masks.ignore_mask]     = False
         
         # define the valid mask as places where the data is not missing,
         # nonfinite, or ignored
@@ -133,6 +142,14 @@ class DataObject (object) :
         # set our masks
         self.masks = BasicMaskSetObject(self.masks.ignore_mask, valid_mask,
                                         non_finite_mask, missing_mask)
+    
+    def select_fill_value (self) :
+        """
+        choose the fill value to use
+        """
+        toReturn = self.fill_value if self.override_fill_value else self.default_fill_value
+        
+        return toReturn
 
 class DiffInfoObject (object) :
     """
@@ -248,8 +265,8 @@ class DiffInfoObject (object) :
         # get our shared data type and fill value
         sharedType, fill_data_value = DiffInfoObject._get_shared_type_and_fill_value(aDataObject.data,
                                                                                      bDataObject.data,
-                                                                                     aDataObject.fill_value,
-                                                                                     bDataObject.fill_value)
+                                                                                     aDataObject.select_fill_value(),
+                                                                                     bDataObject.select_fill_value())
         
         # construct our diff'ed data set
         raw_diff = np.zeros(shape, dtype=sharedType)
