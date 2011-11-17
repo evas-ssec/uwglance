@@ -331,10 +331,34 @@ class GlanceGUIModel (object) :
                 listener.updateEpsilon(self.epsilon)
                 listener.updateImageTypes(self.imageType)
     
+    def _verifyDataCompatability (self, aDataObject, bDataObject, aName, bName) :
+        """
+        Confirm that the two data objects can minimally be compared.
+        
+        return None if they can be compared or a text message explaining why they cannot.
+        """
+        
+        # check the minimum comparison requirments
+        message = None
+        # if either object does not exist, they can not be compared
+        if (aDataObject is None) or (bDataObject is None) :
+            message = ("Data for requested files was not available. " +
+                       "Please load or reload files and try again.")
+        # check to see if the two variables have the same shape of data
+        elif aDataObject.data.shape != bDataObject.data.shape :
+            message = (aName + ' / ' + bName + ' ' + 
+                       'could not be compared because the data for these variables does not match in shape ' +
+                       'between the two files (file A data shape: ' + str(aDataObject.data.shape) + '; file B data shape: '
+                       + str(bDataObject.data.shape) + ').')
+        
+        return message
+    
     def sendStatsInfo (self) :
         """
         our data listeners should be sent statistics information for a comparison
         of the currently selected variables (if possible)
+        
+        TODO, move this to some sort of report manager model object?
         """
         
         tempVarA = self.fileData["A"].variable
@@ -343,16 +367,8 @@ class GlanceGUIModel (object) :
         bData    = self.fileData["B"].var_data_cache[tempVarB] if tempVarB in self.fileData["B"].var_data_cache else None
         
         # check the minimum validity of our data
-        message = None
-        if (aData is None) or (bData is None) :
-            message = ("Data for requested files was not available. " +
-                       "Please load or reload files and try again.")
-        # check to see if the two variables have the same shape of data
-        elif aData.data.shape != bData.data.shape :
-            message = (tempVarA + ' / ' + tempVarB + ' ' + 
-                       'could not be compared because the data for these variables does not match in shape ' +
-                       'between the two files (file A data shape: ' + str(aData.data.shape) + '; file B data shape: '
-                       + str(bData.data.shape) + ').')
+        message = self._verifyDataCompatability (aData, bData, tempVarA, tempVarB)
+        
         # if the data isn't valid, stop now
         if message is not None :
             for errorHandler in self.errorHandlers :
@@ -369,8 +385,8 @@ class GlanceGUIModel (object) :
                    'statGroups': tempAnalysis.dictionary_form(),
                    }
         
-        templateLookup = TemplateLookup(directories=[resource_filename(__name__, "stuff")])
-        guiTemplate    = Template(resource_string(__name__, "stuff/guistatsreport.txt"), lookup=templateLookup)
+        templateLookup = TemplateLookup(directories=[resource_filename(__name__, ".")])
+        guiTemplate    = Template(resource_string(__name__, "guistatsreport.txt"), lookup=templateLookup)
         
         renderedText = guiTemplate.render(**kwargs)
         
@@ -394,22 +410,12 @@ class GlanceGUIModel (object) :
         tempVarB = self.fileData["B"].variable
         
         # TODO, move to taking advantage of the whole data objects
-        aData = self.fileData["A"].var_data_cache[tempVarA].data if tempVarA in self.fileData["A"].var_data_cache else None
-        bData = self.fileData["B"].var_data_cache[tempVarB].data if tempVarB in self.fileData["B"].var_data_cache else None
+        aData = self.fileData["A"].var_data_cache[tempVarA] if tempVarA in self.fileData["A"].var_data_cache else None
+        bData = self.fileData["B"].var_data_cache[tempVarB] if tempVarB in self.fileData["B"].var_data_cache else None
         
-        message = None
+        # TODO, this ignores the fact that the "original" plots don't need two sets of data
+        message = self._verifyDataCompatability (aData, bData, tempVarA, tempVarB)
         
-        # TODO, right now this does not take into account the fact that the two "original" plots only need one of the two variables
-        # minimally validate the data
-        if (aData is None) or (bData is None) :
-            message = ("Data for requested files was not available. " +
-                       "Please load or reload files and try again.")
-        # check to see if the two variables have the same shape of data
-        elif aData.shape != bData.shape :
-            message = (tempVarA + ' / ' + tempVarB + ' ' + 
-                       'could not be compared because the data for these variables does not match in shape ' +
-                       'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
-                       + str(bData.shape) + ').')
         # if the data isn't valid, stop now
         if message is not None :
             for errorHandler in self.errorHandlers :
@@ -417,18 +423,8 @@ class GlanceGUIModel (object) :
             # we can't make any images from this data, so just return
             return
         
-        tempAFillMask = np.zeros(aData.shape, dtype=np.bool)
-        tempAFillMask[aData == float(self._select_fill_value("A"))] = True
-        tempBFillMask = np.zeros(bData.shape, dtype=np.bool)
-        tempBFillMask[bData == float(self._select_fill_value("B"))] = True
-        tempCleanMask = tempAFillMask | tempBFillMask
-        
-        aDataClean = aData[~tempCleanMask]
-        bDataClean = bData[~tempCleanMask]
-        cleanMismatchMask = np.zeros(aDataClean.shape, dtype=np.bool)
-        cleanMismatchMask[abs(aDataClean - bDataClean) > float(self.epsilon)] = True
-        
-        rawDiffDataClean = bDataClean - aDataClean
+        # compare our data
+        diffData = dataobjects.DiffInfoObject(aData, bData, epsilonValue=self.epsilon)
         
         # pull the units information
         aUnits = self.fileData["A"].file.file_object.get_attribute(self.fileData["A"].variable, io.UNITS_CONSTANT)
@@ -442,54 +438,58 @@ class GlanceGUIModel (object) :
         
         if   self.imageType == ORIGINAL_A :
             
-            tempFigure = figures.create_simple_figure(aData, self.fileData["A"].variable + "\nin File A",
-                                                      invalidMask=tempAFillMask, colorMap=cm.jet, units=aUnits)
+            tempFigure = figures.create_simple_figure(aData.data, self.fileData["A"].variable + "\nin File A",
+                                                      invalidMask=aData.masks.missing_mask, colorMap=cm.jet, units=aUnits)
             
         elif self.imageType == ORIGINAL_B :
             
-            tempFigure = figures.create_simple_figure(bData, self.fileData["B"].variable + "\nin File B",
-                                                      invalidMask=tempBFillMask, colorMap=cm.jet, units=bUnits)
+            tempFigure = figures.create_simple_figure(bData.data, self.fileData["B"].variable + "\nin File B",
+                                                      invalidMask=bData.masks.missing_mask, colorMap=cm.jet, units=bUnits)
             
         elif self.imageType == ABS_DIFF :
             
-            tempFigure = figures.create_simple_figure(np.abs(bData - aData), "Absolute value of difference\nin " + self.fileData["A"].variable,
-                                                      invalidMask=tempCleanMask, colorMap=cm.jet, units=aUnits)
+            tempFigure = figures.create_simple_figure(np.abs(diffData.diff_data_object.data), "Absolute value of difference\nin " + self.fileData["A"].variable,
+                                                      invalidMask=~diffData.diff_data_object.masks.valid_mask, colorMap=cm.jet, units=aUnits)
             
         elif self.imageType == RAW_DIFF :
             
-            tempFigure = figures.create_simple_figure(bData - aData, "Value of (Data File B - Data File A)\nfor " + self.fileData["A"].variable,
-                                                      invalidMask=tempCleanMask, colorMap=cm.jet, units=aUnits)
+            tempFigure = figures.create_simple_figure(diffData.diff_data_object.data, "Value of (Data File B - Data File A)\nfor " + self.fileData["A"].variable,
+                                                      invalidMask=~diffData.diff_data_object.masks.valid_mask, colorMap=cm.jet, units=aUnits)
             
         elif self.imageType == HISTOGRAM :
             
+            rawDiffDataClean = diffData.diff_data_object.data[diffData.diff_data_object.masks.valid_mask]
             tempFigure = figures.create_histogram(rawDiffDataClean, DEFAULT_NUM_BINS, "Difference in\n" + self.fileData["A"].variable,
                                                   "Value of (B - A) at each data point", "Number of points with a given difference", units=aUnits)
             
         elif self.imageType == MISMATCH :
             
-            mismatchMask = np.zeros(aData.shape, dtype=bool)
-            mismatchMask[abs(aData - bData) > float(self.epsilon)] = True
-            mismatchMask[tempCleanMask] = False
-            mismatchMask[tempBFillMask ^ tempAFillMask] = True
-            
-            tempFigure = figures.create_simple_figure(aData, "Areas of mismatch data\nin " + self.fileData["A"].variable,
-                                                      invalidMask=tempCleanMask, tagData=mismatchMask, colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=aUnits)
+            mismatchMask = diffData.diff_data_object.masks.mismatch_mask
+            tempFigure = figures.create_simple_figure(aData.data, "Areas of mismatch data\nin " + self.fileData["A"].variable,
+                                                      invalidMask=aData.masks.missing_mask, tagData=mismatchMask, colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=aUnits)
             
         elif self.imageType == SCATTER :
             
+            tempCleanMask     = aData.masks.missing_mask | bData.masks.missing_mask
+            aDataClean        = aData.data[~tempCleanMask]
+            bDataClean        = bData.data[~tempCleanMask]
+            cleanMismatchMask = diffData.diff_data_object.masks.mismatch_mask[~tempCleanMask]
             figures.create_scatter_plot(aDataClean, bDataClean, "Value in File A vs Value in File B", 
                                         "File A Value in " + self.fileData["A"].variable,
                                         "File B Value in " + self.fileData["B"].variable,
-                                        badMask=cleanMismatchMask, epsilon=float(self.epsilon),
+                                        badMask=cleanMismatchMask, epsilon=self.epsilon,
                                         units_x=aUnits, units_y=bUnits)
             
         elif self.imageType == HEX_PLOT :
             
+            tempCleanMask     = aData.masks.missing_mask | bData.masks.missing_mask
+            aDataClean        = aData.data[~tempCleanMask]
+            bDataClean        = bData.data[~tempCleanMask]
             tempFigure = figures.create_hexbin_plot(aDataClean, bDataClean,
                                                     "Value in File A vs Value in File B",
                                                     "File A Value in " + self.fileData["A"].variable,
                                                     "File B Value in " + self.fileData["B"].variable,
-                                                    epsilon=float(self.epsilon),
+                                                    epsilon=self.epsilon,
                                                     units_x=aUnits, units_y=bUnits)
         
         plt.draw()
