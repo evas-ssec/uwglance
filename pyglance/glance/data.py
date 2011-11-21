@@ -293,6 +293,28 @@ class DiffInfoObject (object) :
                                                    mismatch_pt_mask, outside_epsilon_mask)
         
         return diff_data_object
+    
+    @staticmethod
+    def verifyDataCompatability (aDataObject, bDataObject, aName, bName) :
+        """
+        Confirm that the two data objects can minimally be compared.
+        
+        return None if they can be compared or a text message explaining why they cannot.
+        """
+        # check the minimum comparison requirments
+        message = None
+        
+        # if either object does not exist, they can not be compared
+        if (aDataObject is None) or (bDataObject is None) :
+            message = ("Requested data was not available or did not exist.")
+        # check to see if the two variables have the same shape of data
+        elif aDataObject.data.shape != bDataObject.data.shape :
+            message = (aName + ' / ' + bName + ' ' + 
+                       'could not be compared because the data for these variables does not match in shape ' +
+                       'between the two files (file A data shape: ' + str(aDataObject.data.shape) + '; file B data shape: '
+                       + str(bDataObject.data.shape) + ').')
+        
+        return message
 
 class FileInfo (object) :
     """

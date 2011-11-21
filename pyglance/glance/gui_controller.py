@@ -15,8 +15,10 @@ if os.path.isdir(PYQT4_HAX):
 
 from PyQt4 import QtGui
 
-import glance.gui_view  as gui_view
-import glance.gui_model as gui_model
+import glance.gui_view          as gui_view
+import glance.gui_model         as gui_model
+import glance.gui_statsprovider as gui_stats
+import glance.gui_figuremanager as gui_figs
 
 LOG = logging.getLogger(__name__)
 
@@ -33,6 +35,8 @@ class GlanceGUIController (object) :
     
     self.view  - the view object (see glance.gui_view)
     self.model - the model object (see glance.gui_model)
+    self.stats - the stats provider object (see glance.gui_statsprovider)
+    self.figs  - the figure manager object (see glance.gui_figuremanager)
     self.qtApp - an application object, used to start QT
     """
     
@@ -45,10 +49,15 @@ class GlanceGUIController (object) :
         self.qtApp = QtGui.QApplication(sys.argv)
         self.view  = gui_view.GlanceGUIView(version_string)
         self.model = gui_model.GlanceGUIModel()
+        self.stats = gui_stats.GlanceGUIStats(self.model)
+        self.figs  = gui_figs.GlanceGUIFigures(self.model)
         
         # set things up to talk to each other
         self.model.registerErrorHandler(self)
         self.model.registerDataListener(self.view)
+        self.stats.registerErrorHandler(self)
+        self.stats.registerStatsListener(self.view)
+        self.figs.registerErrorHandler(self)
         self.view.registerUserUpdateListener(self)
         
         # force the initial info load from the model
@@ -112,14 +121,14 @@ class GlanceGUIController (object) :
         the user has asked for stats information
         """
         
-        self.model.sendStatsInfo() # TODO, should a different object handle this?
+        self.stats.sendStatsInfo()
     
     def userRequestsPlot (self) :
         """
         the user has asked for a plot
         """
         
-        self.model.spawnPlotWithCurrentInfo()
+        self.figs.spawnPlot()
     
     ################# end of methods to handle user input reporting #################
     

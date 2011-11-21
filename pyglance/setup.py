@@ -22,11 +22,11 @@ easy_install -d $HOME/Library/Python -vi http://larch.ssec.wisc.edu/eggs/repos g
 from setuptools import setup, find_packages
 
 setup( name="glance", 
-       version="0.2.7.01", 
+       version="0.2.7.02", 
        zip_safe = False,
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
        packages = ['glance'], #find_packages('.'),
-       install_requires=[ 'numpy', 'matplotlib' ],
+       install_requires=[ 'numpy', 'matplotlib', 'mako>=0.4.1' ],
        package_data = {'': ['*.txt', '*.gif']}
        )
 

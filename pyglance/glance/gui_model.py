@@ -7,27 +7,11 @@ Created by evas Oct 2011.
 Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 """
 
-# these first two lines must stay before the pylab import
-import matplotlib
-matplotlib.use('Qt4Agg') # use the Qt Anti-Grain Geometry rendering engine
-
-from pylab import *
-
-import matplotlib.cm     as cm
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-
-from pkg_resources import resource_string, resource_filename
-from mako.template import Template
-from mako.lookup   import TemplateLookup
-
-import sys, os.path, logging
+import logging
 import numpy as np
 
-import glance.data    as dataobjects
-import glance.figures as figures
-import glance.io      as io
-import glance.stats   as stats
+import glance.data as dataobjects
+import glance.io   as io
 
 LOG = logging.getLogger(__name__)
 
@@ -61,9 +45,6 @@ IMAGE_TYPES = [ORIGINAL_A,
                SCATTER,
                HEX_PLOT
               ]
-
-# the number of bins to use for histograms
-DEFAULT_NUM_BINS = 50
 
 class _FileModelData (object) :
     """
@@ -331,168 +312,62 @@ class GlanceGUIModel (object) :
                 listener.updateEpsilon(self.epsilon)
                 listener.updateImageTypes(self.imageType)
     
-    def _verifyDataCompatability (self, aDataObject, bDataObject, aName, bName) :
+    def getVariableName (self, filePrefix) :
         """
-        Confirm that the two data objects can minimally be compared.
-        
-        return None if they can be compared or a text message explaining why they cannot.
+        get the name of the variable loaded for the given file prefix
+        or None if no variable is loaded
         """
+        toReturn = None
         
-        # check the minimum comparison requirments
-        message = None
-        # if either object does not exist, they can not be compared
-        if (aDataObject is None) or (bDataObject is None) :
-            message = ("Data for requested files was not available. " +
-                       "Please load or reload files and try again.")
-        # check to see if the two variables have the same shape of data
-        elif aDataObject.data.shape != bDataObject.data.shape :
-            message = (aName + ' / ' + bName + ' ' + 
-                       'could not be compared because the data for these variables does not match in shape ' +
-                       'between the two files (file A data shape: ' + str(aDataObject.data.shape) + '; file B data shape: '
-                       + str(bDataObject.data.shape) + ').')
+        if filePrefix in self.fileData.keys() :
+            toReturn = self.fileData[filePrefix].variable
         
-        return message
+        return toReturn
     
-    def sendStatsInfo (self) :
+    def getVariableData (self, filePrefix, variableName) :
         """
-        our data listeners should be sent statistics information for a comparison
-        of the currently selected variables (if possible)
+        get the data object for the variable of variableName associated with the file prefix
+        or None if that variable is not loaded
         
-        TODO, move this to some sort of report manager model object?
+        Note: this is not a copy, but the original object, so any manipulations
+        done to it will be reflected in the model
         """
+        toReturn = None
         
-        tempVarA = self.fileData["A"].variable
-        tempVarB = self.fileData["B"].variable
-        aData    = self.fileData["A"].var_data_cache[tempVarA] if tempVarA in self.fileData["A"].var_data_cache else None
-        bData    = self.fileData["B"].var_data_cache[tempVarB] if tempVarB in self.fileData["B"].var_data_cache else None
+        if (filePrefix in self.fileData) and (variableName in self.fileData[filePrefix].var_data_cache) :
+            toReturn = self.fileData[filePrefix].var_data_cache[variableName]
         
-        # check the minimum validity of our data
-        message = self._verifyDataCompatability (aData, bData, tempVarA, tempVarB)
-        
-        # if the data isn't valid, stop now
-        if message is not None :
-            for errorHandler in self.errorHandlers :
-                errorHandler.handleWarning(message)
-            # we can't make any stats from this data, so just return
-            return
-        
-        LOG.info ("Constructing statistics")
-        
-        tempAnalysis = stats.StatisticalAnalysis.withDataObjects(aData, bData, epsilon=self.epsilon)
-        tempInfo = {'variable_name':       tempVarA,
-                    'alternate_name_in_B': tempVarB}
-        kwargs = { 'runInfo':    tempInfo,
-                   'statGroups': tempAnalysis.dictionary_form(),
-                   }
-        
-        templateLookup = TemplateLookup(directories=[resource_filename(__name__, ".")])
-        guiTemplate    = Template(resource_string(__name__, "guistatsreport.txt"), lookup=templateLookup)
-        
-        renderedText = guiTemplate.render(**kwargs)
-        
-        # tell my listeners to show the stats data we've collected
-        for listener in self.dataListeners :
-                listener.displayStatsData(tempVarA, tempVarB, renderedText) # TODO, do we need a different set of data here?
+        return toReturn
     
-    def spawnPlotWithCurrentInfo (self) :
+    def getUnitsText (self, filePrefix, variableName) :
         """
-        create a matplotlib plot using the current model information
-        
-        TODO, move this into some sort of figure manager model object/module?
+        get the text describing the units of the variable if the variable exists and that
+        attribute exists, otherwise return None
         """
+        return self.fileData[filePrefix].file.file_object.get_attribute(variableName, io.UNITS_CONSTANT)
+    
+    def getEpsilon (self) :
+        """
+        get the current value of epsilon
+        """
+        return self.epsilon
+    
+    def getImageType (self) :
+        """
+        get the text string describing the image type currently selected
         
-        LOG.debug ("Variable A cache entries: " + str(self.fileData["A"].var_data_cache.keys()))
-        LOG.debug ("Variable B cache entries: " + str(self.fileData["B"].var_data_cache.keys()))
+        the return will correspond to one of the constants from this module:
         
-        LOG.info ("Preparing variable data for plotting...")
-        
-        tempVarA = self.fileData["A"].variable
-        tempVarB = self.fileData["B"].variable
-        
-        # TODO, move to taking advantage of the whole data objects
-        aData = self.fileData["A"].var_data_cache[tempVarA] if tempVarA in self.fileData["A"].var_data_cache else None
-        bData = self.fileData["B"].var_data_cache[tempVarB] if tempVarB in self.fileData["B"].var_data_cache else None
-        
-        # TODO, this ignores the fact that the "original" plots don't need two sets of data
-        message = self._verifyDataCompatability (aData, bData, tempVarA, tempVarB)
-        
-        # if the data isn't valid, stop now
-        if message is not None :
-            for errorHandler in self.errorHandlers :
-                errorHandler.handleWarning(message)
-            # we can't make any images from this data, so just return
-            return
-        
-        # compare our data
-        diffData = dataobjects.DiffInfoObject(aData, bData, epsilonValue=self.epsilon)
-        
-        # pull the units information
-        aUnits = self.fileData["A"].file.file_object.get_attribute(self.fileData["A"].variable, io.UNITS_CONSTANT)
-        bUnits = self.fileData["B"].file.file_object.get_attribute(self.fileData["B"].variable, io.UNITS_CONSTANT)
-        
-        LOG.info("Spawning plot window: " + self.imageType)
-        
-        plt.ion() # make sure interactive plotting is on
-        
-        # create the plot
-        
-        if   self.imageType == ORIGINAL_A :
-            
-            tempFigure = figures.create_simple_figure(aData.data, self.fileData["A"].variable + "\nin File A",
-                                                      invalidMask=aData.masks.missing_mask, colorMap=cm.jet, units=aUnits)
-            
-        elif self.imageType == ORIGINAL_B :
-            
-            tempFigure = figures.create_simple_figure(bData.data, self.fileData["B"].variable + "\nin File B",
-                                                      invalidMask=bData.masks.missing_mask, colorMap=cm.jet, units=bUnits)
-            
-        elif self.imageType == ABS_DIFF :
-            
-            tempFigure = figures.create_simple_figure(np.abs(diffData.diff_data_object.data), "Absolute value of difference\nin " + self.fileData["A"].variable,
-                                                      invalidMask=~diffData.diff_data_object.masks.valid_mask, colorMap=cm.jet, units=aUnits)
-            
-        elif self.imageType == RAW_DIFF :
-            
-            tempFigure = figures.create_simple_figure(diffData.diff_data_object.data, "Value of (Data File B - Data File A)\nfor " + self.fileData["A"].variable,
-                                                      invalidMask=~diffData.diff_data_object.masks.valid_mask, colorMap=cm.jet, units=aUnits)
-            
-        elif self.imageType == HISTOGRAM :
-            
-            rawDiffDataClean = diffData.diff_data_object.data[diffData.diff_data_object.masks.valid_mask]
-            tempFigure = figures.create_histogram(rawDiffDataClean, DEFAULT_NUM_BINS, "Difference in\n" + self.fileData["A"].variable,
-                                                  "Value of (B - A) at each data point", "Number of points with a given difference", units=aUnits)
-            
-        elif self.imageType == MISMATCH :
-            
-            mismatchMask = diffData.diff_data_object.masks.mismatch_mask
-            tempFigure = figures.create_simple_figure(aData.data, "Areas of mismatch data\nin " + self.fileData["A"].variable,
-                                                      invalidMask=aData.masks.missing_mask, tagData=mismatchMask, colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=aUnits)
-            
-        elif self.imageType == SCATTER :
-            
-            tempCleanMask     = aData.masks.missing_mask | bData.masks.missing_mask
-            aDataClean        = aData.data[~tempCleanMask]
-            bDataClean        = bData.data[~tempCleanMask]
-            cleanMismatchMask = diffData.diff_data_object.masks.mismatch_mask[~tempCleanMask]
-            figures.create_scatter_plot(aDataClean, bDataClean, "Value in File A vs Value in File B", 
-                                        "File A Value in " + self.fileData["A"].variable,
-                                        "File B Value in " + self.fileData["B"].variable,
-                                        badMask=cleanMismatchMask, epsilon=self.epsilon,
-                                        units_x=aUnits, units_y=bUnits)
-            
-        elif self.imageType == HEX_PLOT :
-            
-            tempCleanMask     = aData.masks.missing_mask | bData.masks.missing_mask
-            aDataClean        = aData.data[~tempCleanMask]
-            bDataClean        = bData.data[~tempCleanMask]
-            tempFigure = figures.create_hexbin_plot(aDataClean, bDataClean,
-                                                    "Value in File A vs Value in File B",
-                                                    "File A Value in " + self.fileData["A"].variable,
-                                                    "File B Value in " + self.fileData["B"].variable,
-                                                    epsilon=self.epsilon,
-                                                    units_x=aUnits, units_y=bUnits)
-        
-        plt.draw()
+            ORIGINAL_A,
+            ORIGINAL_B,
+            ABS_DIFF,
+            RAW_DIFF,
+            HISTOGRAM,
+            MISMATCH,
+            SCATTER,
+            HEX_PLOT
+        """
+        return self.imageType
     
     def registerDataListener (self, objectToRegister) :
         """

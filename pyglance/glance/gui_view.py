@@ -15,6 +15,8 @@ if os.path.isdir(PYQT4_HAX):
 
 from PyQt4 import QtGui, QtCore
 
+from functools import partial
+
 LOG = logging.getLogger(__name__)
 
 """
@@ -100,10 +102,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # set some tooltip text
         loadButton.setToolTip("Load a file: glance can handle NetCDF, HDF4, HDF5, and AERI files")
         # connect the button to an action
-        if   file_prefix is "A" :
-            loadButton.clicked.connect(self.clickedALoad)
-        elif file_prefix is "B" :
-            loadButton.clicked.connect(self.clickedBLoad)
+        loadButton.clicked.connect(partial(self.selectFileToLoad, file_prefix=file_prefix))
         self.widgetInfo[file_prefix]['load'] = loadButton
         grid_layout.addWidget(loadButton, currentRow, 4)
         
@@ -113,10 +112,7 @@ class GlanceGUIView (QtGui.QWidget) :
         grid_layout.addWidget(QtGui.QLabel("variable name:"), currentRow, 1)
         variableSelection = QtGui.QComboBox()
         variableSelection.setDisabled(True)
-        if   file_prefix is "A" :
-            variableSelection.activated.connect(self.selectedAVariable)
-        elif file_prefix is "B" :
-            variableSelection.activated.connect(self.selectedBVariable)
+        variableSelection.activated.connect(partial(self.reportVariableSelected, file_prefix=file_prefix))
         self.widgetInfo[file_prefix]['variable'] = variableSelection
         grid_layout.addWidget(variableSelection, currentRow, 2, 1, 3)
         
@@ -149,10 +145,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # set up a check box to override the fill value loaded from the file
         overrideFillButton = QtGui.QCheckBox("override fill value")
         overrideFillButton.setDisabled(True)
-        if   file_prefix is "A" :
-            overrideFillButton.stateChanged.connect(self.toggledAOverride)
-        elif file_prefix is "B" :
-            overrideFillButton.stateChanged.connect(self.toggledBOverride)
+        overrideFillButton.stateChanged.connect(partial(self.reportOverrideChange, file_prefix=file_prefix))
         self.widgetInfo[file_prefix]['override'] = overrideFillButton
         grid_layout.addWidget(overrideFillButton, currentRow, 1)
         
@@ -163,10 +156,7 @@ class GlanceGUIView (QtGui.QWidget) :
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         fillValue.setValidator(tempValidator)
         fillValue.setDisabled(True)
-        if   file_prefix is "A" :
-            fillValue.editingFinished.connect(self.fillValueEditedA)
-        elif file_prefix is "B" :
-            fillValue.editingFinished.connect(self.fillValueEditedB)
+        fillValue.editingFinished.connect(partial(self.fillValueChanged, file_prefix=file_prefix))
         self.widgetInfo[file_prefix]['fillValue'] = fillValue
         grid_layout.addWidget(fillValue, currentRow+1, 2, 1, 3)
         
@@ -227,15 +217,7 @@ class GlanceGUIView (QtGui.QWidget) :
     
     ################# start methods related to user input #################
     
-    def clickedALoad (self) :
-        
-        self.selectFileToLoad ("A")
-    
-    def clickedBLoad (self) :
-        
-        self.selectFileToLoad ("B")
-    
-    def selectFileToLoad (self, file_prefix) :
+    def selectFileToLoad (self, file_prefix=None) :
         """
         when the load button is pressed, let the user pick a file to load
         """
@@ -252,15 +234,7 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.newFileSelected(file_prefix, tempFilePath)
     
-    def selectedAVariable (self) :
-        
-        self.reportVariableSelected("A")
-    
-    def selectedBVariable (self) :
-        
-        self.reportVariableSelected("B")
-    
-    def reportVariableSelected (self, file_prefix) :
+    def reportVariableSelected (self, file_prefix=None) :
         """
         when a variable is selected for one of the files, report it to any user update listeners
         """
@@ -271,15 +245,7 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userSelectedVariable(file_prefix, selectionText)
     
-    def toggledAOverride (self) :
-        
-        self.reportOverrideChange("A")
-    
-    def toggledBOverride (self) :
-        
-        self.reportOverrideChange("B")
-    
-    def reportOverrideChange (self, file_prefix) :
+    def reportOverrideChange (self, file_prefix=None) :
         """
         when the user checks or unchecks one of the override checkboxes, report it to user update listeners
         """
@@ -295,15 +261,7 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userChangedOverload(file_prefix, shouldDoOverride)
     
-    def fillValueEditedA (self) :
-        
-        self.fillValueChanged("A")
-    
-    def fillValueEditedB (self) :
-        
-        self.fillValueChanged("B")
-    
-    def fillValueChanged (self, file_prefix) :
+    def fillValueChanged (self, file_prefix=None) :
         """
         when the user edits a fill value, report it to user update listeners
         """
