@@ -18,6 +18,12 @@ from pycdf import CDFError
 from subprocess import check_call as sh
 from urllib import quote
 
+import matplotlib
+if "gui" in sys.argv[1:] :
+    matplotlib.use('Qt4Agg')
+else :
+    matplotlib.use('Agg')
+
 import glance.io     as io
 import glance.delta  as delta
 import glance.data   as dataobj
@@ -1922,6 +1928,9 @@ python -m glance
         
         colocateToFile_library_call(a_path, b_path, args[2:], tempOptions)
     
+    # Note: the figure plotting in the GUI is dependant on having selected an interactive renderer in the first "use"
+    # statement at the beginning of this module. (It had to be moved into this module to pre-empt other use statempents
+    # from imports of other glance modules.)
     def gui (*args) :
         """start the glance graphical user interface
         

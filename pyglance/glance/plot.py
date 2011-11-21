@@ -15,7 +15,7 @@ if os.path.isdir(PYQT4_HAX):
 
 # these first two lines must stay before the pylab import
 import matplotlib
-matplotlib.use('Qt4Agg') # use the Anti-Grain Geometry rendering engine
+#matplotlib.use('Qt4Agg') # use the Anti-Grain Geometry rendering engine
 
 from pylab import *
 

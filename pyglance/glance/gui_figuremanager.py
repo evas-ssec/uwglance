@@ -9,7 +9,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 
 # these first two lines must stay before the pylab import
 import matplotlib
-matplotlib.use('Qt4Agg') # use the Qt Anti-Grain Geometry rendering engine
+#matplotlib.use('Qt4Agg') # use the Qt Anti-Grain Geometry rendering engine
 
 from pylab import *
 
