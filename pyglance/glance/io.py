@@ -103,6 +103,7 @@ class hdf(SD):
         # get the variable object and use it to
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
+        #print ("****** variable object gotten")
         raw_data_copy = variable_object[:]
         #print ("****** raw data loaded")
         try :
@@ -208,6 +209,18 @@ class hdf(SD):
         
         if attributeName in temp_attributes :
             toReturn = temp_attributes[attributeName]
+        
+        return toReturn
+    
+    def get_global_attribute(self, attributeName) :
+        """
+        returns the value of a global attribute if it is available or None
+        """
+        
+        toReturn = None
+        
+        if attributeName in self.attributes() :
+            toReturn = self.attributes()[attributeName]
         
         return toReturn
 
@@ -390,8 +403,6 @@ class nc(CDF):
         
         return toReturn
     
-    # Note: this function is not yet fully supported by the io module
-    # TODO, add this function to other io classes
     def get_global_attribute(self, attributeName) :
         """
         returns the value of a global attribute if it is available or None
@@ -555,6 +566,18 @@ class h5(object):
             toReturn = temp_attrs[attributeName]
         
         return toReturn
+    
+    def get_global_attribute(self, attributeName) :
+        """
+        returns the value of a global attribute if it is available or None
+        """
+        
+        toReturn = None
+        
+        if attributeName in self._h5.attrs :
+            toReturn = self._h5.attrs[attributeName]
+        
+        return toReturn
 
 
 
@@ -665,6 +688,18 @@ class aeri(object):
         LOG.warn('Glance does not yet support attribute retrieval in AERI files. None will be used.')
         
         return toReturn
+    
+    def get_global_attribute(self, attributeName) :
+        """
+        returns the value of a global attribute if it is available or None
+        """
+        
+        toReturn = None
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in AERI files. None will be used.')
+        
+        return toReturn
 
 # handle the variety of file suffixes by building aliases to aeri class
 cxs = rnc = cxv = csv = spc = sum = uvs = aeri
@@ -762,6 +797,18 @@ class jpss_adl(object):
         """
         returns the value of the attribute if it is available for this variable, or None
         """
+        toReturn = None
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in JPSS ADL files. None will be used.')
+        
+        return toReturn
+    
+    def get_global_attribute(self, attributeName) :
+        """
+        returns the value of a global attribute if it is available or None
+        """
+        
         toReturn = None
         
         # TODO
