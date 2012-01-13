@@ -46,6 +46,45 @@ IMAGE_TYPES = [ORIGINAL_A,
                HEX_PLOT
               ]
 
+# a list of image types that require both the A and B data
+COMPARISON_IMAGES = [ABS_DIFF,
+                     RAW_DIFF,
+                     HISTOGRAM,
+                     MISMATCH,
+                     SCATTER,
+                     HEX_PLOT
+                    ]
+
+# constants for possible types of data handling
+SIMPLE_2D = "Simple Two Dimensional"
+MAPPED_2D = "Mapped Two Dimensional"
+ONLY_1D   = "One Dimensional"
+
+# a list of data handling types, for conveinence
+DATA_FORMS = [SIMPLE_2D,
+              MAPPED_2D,
+              ONLY_1D]
+
+# the default names that the model will try to select for the latitude and longitude
+DEFAULT_LONGITUDE = 'pixel_longitude'
+DEFAULT_LATITUDE  = 'pixel_latitude'
+
+class UnableToReadFile(Exception):
+    """
+    An exception to be used when glance could not read a file
+    """
+    
+    def __init__(self, filePath):
+        """
+        create this exception, giving a message based on the file path
+        """
+        
+        self.message = str("Unable to open file. Glance was not able to determine the file type for "
+                           + filePath + " or cannot process that type of file.")
+    
+    def __str__(self):
+        return self.message
+
 class _FileModelData (object) :
     """
     This object is meant to be used internally by the GUI model. The model is going to mess with the
@@ -62,6 +101,7 @@ class _FileModelData (object) :
     """
     
     def __init__(self, file_object=None, variable_selection=None, do_override=False, fill_value=None, default_fill_value=None,
+                 latitude_name=None, longitude_name=None,
                  variables_list=None, variable_data=None, variable_attributes=None) :
         """
         create a set of model data, using the data passed in
@@ -71,6 +111,8 @@ class _FileModelData (object) :
         
         self.file             = file_object
         self.variable         = str(variable_selection)
+        self.latitude         = latitude_name
+        self.longitude        = longitude_name
         self.ALL_VARIABLES    = variables_list
         
         self.var_data_cache   = { }
@@ -86,11 +128,14 @@ class GlanceGUIModel (object) :
     This is the main model that handles the information behind the glance GUI.
     It includes:
     
-    self.fileData      - a dictionary with _FileModelData objects indexed by the two file prefixes
-    self.epsilon       - the epsilon value for comparison
-    self.imageType     - the image type that should be created when files are compared
-    self.dataListeners - objects that want to be notified when data changes
-    self.errorHandlers - objects that want to be notified when there's a serious error
+    self.fileData       - a dictionary with _FileModelData objects indexed by the two file prefixes
+    self.epsilon        - the epsilon value for comparison
+    self.epsilonPercent - the epsilon percent value for comparison
+    self.llEpsilon      - the epsilon used for judging the longitude and latitude data
+    self.imageType      - the image type that should be created when files are compared
+    self.dataForm       - the form the data should be considered to be
+    self.dataListeners  - objects that want to be notified when data changes
+    self.errorHandlers  - objects that want to be notified when there's a serious error
     """
     
     def __init__ (self) :
@@ -104,23 +149,26 @@ class GlanceGUIModel (object) :
         self.fileData["B"] = _FileModelData( )
         
         # general settings
-        self.epsilon       = 0.0
-        self.imageType     = None
-        
-        # select the first image type as a default
-        self.imageType     = IMAGE_TYPES[0]
+        self.epsilon        = 0.0
+        self.epsilonPercent = None
+        self.llEpsilon      = 0.0
+        self.imageType      = IMAGE_TYPES[0]
+        self.dataForm       = SIMPLE_2D
         
         # this represents all the people who want to hear about data updates
         # these people can register and will get data related messages
-        self.dataListeners = [ ]
+        self.dataListeners  = [ ]
         # this represents all the people who want to hear when we have errors
         # that the user should know about
         # these people can register and will get error related messages
-        self.errorHandlers = [ ]
+        self.errorHandlers  = [ ]
     
     def loadNewFile (self, filePrefix, newFilePath) :
         """
         load up a new file based on the prefix and path given
+        
+        may raise an UnableToReadFile exception if the given file path is non-null
+        but the resulting file cannot be parsed by glance
         """
         
         # check to see if we were given a valid file path
@@ -130,16 +178,9 @@ class GlanceGUIModel (object) :
         
         # attempt to open the file
         try :
-            newFile      = dataobjects.FileInfo(str(newFilePath))
+            newFile = dataobjects.FileInfo(str(newFilePath))
         except KeyError :
-            newFile = None
-            messageTemp = "Unable to open file. Glance was not able to determine the file type for\n " + newFilePath + "\nor cannot process that type of file."
-            for errorHandler in self.errorHandlers :
-                errorHandler.handleWarning(messageTemp)
-        
-        # if we couldn't get a valid file, stop now
-        if newFile is None :
-            return
+            raise UnableToReadFile(newFilePath)
         
         # reset our caches
         self._resetCaches(filePrefix)
@@ -149,9 +190,17 @@ class GlanceGUIModel (object) :
         tempVariable = str(variableList[0])
         
         # save all of the data related to this file for later use
-        self.fileData[filePrefix].file               = newFile
-        self.fileData[filePrefix].variable           = tempVariable
-        self.fileData[filePrefix].ALL_VARIABLES      = variableList
+        self.fileData[filePrefix].file          = newFile
+        self.fileData[filePrefix].variable      = tempVariable
+        self.fileData[filePrefix].ALL_VARIABLES = variableList
+        
+        # set the longitude and latitude names, using the defaults if they exist
+        self.fileData[filePrefix].latitude      = tempVariable
+        self.fileData[filePrefix].longitude     = tempVariable
+        if DEFAULT_LATITUDE  in variableList :
+            self.fileData[filePrefix].latitude  = DEFAULT_LATITUDE
+        if DEFAULT_LONGITUDE in variableList :
+            self.fileData[filePrefix].longitude = DEFAULT_LONGITUDE
         
         # load info on the current variable
         tempDataObj = self._load_variable_data(filePrefix, tempVariable)
@@ -165,6 +214,10 @@ class GlanceGUIModel (object) :
             dataListener.fileDataUpdate(filePrefix, newFile.path, tempVariable, tempDataObj.override_fill_value,
                                         self._select_fill_value(filePrefix), str(tempDataObj.data.shape),
                                         variable_list=variableList, attribute_list=tempAttrs)
+            dataListener.updateSelectedLatLon(filePrefix,
+                                              self.fileData[filePrefix].latitude,
+                                              self.fileData[filePrefix].longitude,
+                                              lonlatList=variableList)
     
     def _load_variable_attributes (self, file_prefix, variable_name) :
         """
@@ -230,7 +283,10 @@ class GlanceGUIModel (object) :
         # let each of our listeners know about the general data
         for dataListener in self.dataListeners :
             dataListener.updateEpsilon(self.epsilon)
+            dataListener.updateEpsilonPercent(self.epsilonPercent)
+            dataListener.updateLLEpsilon(self.llEpsilon)
             dataListener.updateImageTypes(self.imageType, list=IMAGE_TYPES)
+            dataListener.updateDataForms(self.dataForm, list=DATA_FORMS)
     
     def updateFileDataSelection (self, file_prefix, newVariableText=None, newOverrideValue=None, newFillValue=np.nan) :
         """
@@ -284,7 +340,8 @@ class GlanceGUIModel (object) :
         """
         return self.fileData[file_prefix].var_data_cache[self.fileData[file_prefix].variable].select_fill_value()
     
-    def updateSettingsDataSelection (self, newEpsilonValue=np.nan, newImageType=None) :
+    def updateSettingsDataSelection (self, newEpsilonValue=np.nan, newImageType=None, newDataForm=None,
+                                     newEpsilonPercent=np.nan, newllEpsilon=np.nan) :
         """
         someone has changed one or more of the general settings related data values
         
@@ -299,6 +356,18 @@ class GlanceGUIModel (object) :
             self.epsilon = newEpsilonValue
             didUpdate = True
         
+        # update the epsilon %
+        if newEpsilonPercent is not np.nan :
+            LOG.debug("Setting epsilon percent to: " + str(newEpsilonPercent))
+            self.epsilonPercent = newEpsilonPercent
+            didUpdate = True
+        
+        # update the lon/lat epsilon if needed
+        if newllEpsilon is not np.nan :
+            LOG.debug("Setting lon/lat epsilon to: " + str(newllEpsilon))
+            self.llEpsilon = newllEpsilon
+            didUpdate = True
+        
         # update the image type if needed
         if (newImageType is not None) and (newImageType != self.imageType) :
             if newImageType in IMAGE_TYPES :
@@ -306,21 +375,87 @@ class GlanceGUIModel (object) :
                 self.imageType = newImageType
                 didUpdate = True
         
+        # update the data form if needed
+        if (newDataForm is not None) and (newDataForm != self.dataForm) :
+            if newDataForm in DATA_FORMS :
+                LOG.debug("Setting data form to: " + newDataForm)
+                self.dataForm = newDataForm
+                didUpdate = True
+        
         # let our data listeners know about any changes
         if didUpdate :
             for listener in self.dataListeners :
                 listener.updateEpsilon(self.epsilon)
+                listener.updateEpsilonPercent(self.epsilonPercent)
+                listener.updateLLEpsilon(self.llEpsilon)
                 listener.updateImageTypes(self.imageType)
+                listener.updateDataForms(self.dataForm)
+    
+    def updateLonLatSelections (self, file_prefix, new_latitude_name=None, new_longitude_name=None) :
+        """
+        someone has changed one or more of the file specific longitude/latitude related values
+        
+        Note: if an input value is left at it's default (None) then it's assumed that it was not externally changed
+        """
+        
+        didUpdate = False
+        
+        # update the latitude name
+        if (new_latitude_name is not None) and (new_latitude_name != self.fileData[file_prefix].latitude) :
+            LOG.debug ("Setting latitude name to: " + new_latitude_name)
+            self.fileData[file_prefix].latitude = new_latitude_name
+            # make sure that this variable is in the cache for use later
+            _ = self._load_variable_data (file_prefix, new_latitude_name)
+            didUpdate = True
+        
+        # update the longitude name
+        if new_longitude_name is not None :
+            LOG.debug ("Setting longitude name to: " + new_longitude_name)
+            self.fileData[file_prefix].longitude = new_longitude_name
+            # make sure that this variable is in the cache for use later
+            _ = self._load_variable_data (file_prefix, new_longitude_name)
+            didUpdate = True
+        
+        # let our listeners know if we did any updating
+        if didUpdate :
+            for listener in self.dataListeners :
+                listener.updateSelectedLatLon(file_prefix, self.fileData[file_prefix].latitude, self.fileData[file_prefix].longitude)
     
     def getVariableName (self, filePrefix) :
         """
         get the name of the variable loaded for the given file prefix
-        or None if no variable is loaded
+        or None if no file is loaded
         """
         toReturn = None
         
         if filePrefix in self.fileData.keys() :
             toReturn = self.fileData[filePrefix].variable
+        
+        return toReturn
+    
+    def getLongitudeName (self, filePrefix) :
+        """
+        get the name of the longitude variable selected for the given file prefix
+        or None if no file is loaded
+        """
+        
+        toReturn = None
+        
+        if filePrefix in self.fileData.keys() :
+            toReturn = self.fileData[filePrefix].longitude
+        
+        return toReturn
+    
+    def getLatitudeName (self, filePrefix) :
+        """
+        get the name of the latitude variable selected for the given file prefix
+        or None if no file is loaded
+        """
+        
+        toReturn = None
+        
+        if filePrefix in self.fileData.keys() :
+            toReturn = self.fileData[filePrefix].latitude
         
         return toReturn
     
@@ -344,13 +479,31 @@ class GlanceGUIModel (object) :
         get the text describing the units of the variable if the variable exists and that
         attribute exists, otherwise return None
         """
-        return self.fileData[filePrefix].file.file_object.get_attribute(variableName, io.UNITS_CONSTANT)
+        
+        toReturn = None
+        
+        if (filePrefix in self.fileData) and (self.fileData[filePrefix].file is not None) :
+            toReturn = self.fileData[filePrefix].file.file_object.get_attribute(variableName, io.UNITS_CONSTANT)
+        
+        return toReturn
     
     def getEpsilon (self) :
         """
         get the current value of epsilon
         """
         return self.epsilon
+    
+    def getEpsilonPercent (self) :
+        """
+        get the current value of epsilon percent
+        """
+        return self.epsilonPercent
+    
+    def getLLEpsilon (self) :
+        """
+        get the current value of the lon/lat epsilon
+        """
+        return self.llEpsilon
     
     def getImageType (self) :
         """
@@ -368,6 +521,19 @@ class GlanceGUIModel (object) :
             HEX_PLOT
         """
         return self.imageType
+    
+    def getDataForm (self) :
+        """
+        get the text string describing the data form currently selected
+        
+        the return will correspond to one of the constants from this module:
+        
+            SIMPLE_2D
+            MAPPED_2D
+            ONLY_1D
+        """
+        
+        return self.dataForm
     
     def registerDataListener (self, objectToRegister) :
         """

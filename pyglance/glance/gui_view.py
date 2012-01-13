@@ -66,8 +66,22 @@ class GlanceGUIView (QtGui.QWidget) :
         # set our title with the version string
         self.setWindowTitle(versionString)
         
+        # a place to hang onto our file specific widgets
+        self.widgetInfo = { }
+        
         # setup the rest of our window
-        self._setup_qt_controls()
+        # TODO, this section is temporary, set up the tabs in a sub function?
+        self.tabWidget = QtGui.QTabWidget()
+        tempWidget = QtGui.QWidget()
+        tempWidget.setLayout(self._build_data_tab())
+        self.tabWidget.addTab(tempWidget, "basic")
+        tempWidget = QtGui.QWidget()
+        tempWidget.setLayout(self._build_settings_tab())
+        self.tabWidget.addTab(tempWidget, "settings")
+        tempLayout = QtGui.QGridLayout()
+        tempLayout.addWidget(self.tabWidget)
+        self.setLayout(tempLayout)
+        self.setGeometry(600, 600, 625, 700)
         
         # this will represent those who want to be notified
         # when the user changes things
@@ -80,6 +94,66 @@ class GlanceGUIView (QtGui.QWidget) :
         # hang on to stats windows so they don't vanish
         self.statsWindows = { }
         self.statsCounter = 1
+    
+    def _build_data_tab (self) :
+        """
+        built the qt controls for the basic data tab and lay them out in a grid layout
+        """
+        
+        # create the layout and set up some of the overall record keeping
+        layoutToUse = QtGui.QGridLayout()
+        currentRow = 0
+        
+        # set up the file info for the A file
+        currentRow = self._add_file_related_controls("A", layoutToUse, currentRow)
+        # set up the file info for the B file
+        currentRow = self._add_file_related_controls("B", layoutToUse, currentRow)
+        
+        # set up the epsilon input box
+        layoutToUse.addWidget(QtGui.QLabel("epsilon:"), currentRow, 0)
+        self.epsilonWidget = QtGui.QLineEdit()
+        self.epsilonWidget.setToolTip("Maximum acceptible difference between the variable data in the two files.")
+        tempValidator = QtGui.QDoubleValidator(self.epsilonWidget)
+        tempValidator.setBottom(0.0) # only accept positive epsilons
+        tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        self.epsilonWidget.setValidator(tempValidator)
+        self.epsilonWidget.editingFinished.connect(self.reportEpsilonChanged)
+        layoutToUse.addWidget(self.epsilonWidget, currentRow, 1, 1, 2)
+        
+        currentRow = currentRow + 1
+        
+        # set up the epsilon percent input box
+        layoutToUse.addWidget(QtGui.QLabel("epsilon percent:"), currentRow, 0)
+        self.epsilonPerWidget = QtGui.QLineEdit()
+        self.epsilonPerWidget.setToolTip("Maximum acceptible difference between the variable data in terms of % of each data point in the A file.")
+        tempValidator = QtGui.QDoubleValidator(self.epsilonPerWidget)
+        tempValidator.setBottom(0.0) # only accept positive epsilon percents
+        tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        self.epsilonPerWidget.setValidator(tempValidator)
+        self.epsilonPerWidget.editingFinished.connect(self.reportEpsilonPercentChanged)
+        layoutToUse.addWidget(self.epsilonPerWidget, currentRow, 1, 1, 2)
+        
+        currentRow = currentRow + 1
+        
+        # set up the drop down to allow image type selection
+        layoutToUse.addWidget(QtGui.QLabel("Image Type:"), currentRow, 0)
+        self.imageSelectionDropDown = QtGui.QComboBox()
+        self.imageSelectionDropDown.activated.connect(self.reportImageTypeSelected)
+        layoutToUse.addWidget(self.imageSelectionDropDown, currentRow, 1, 1, 2)
+        
+        currentRow = currentRow + 1
+        
+        # set up a button that shows stats
+        self.statsButton = QtGui.QPushButton("Display Statistics")
+        self.statsButton.clicked.connect(self.reportDisplayStatsClicked)
+        layoutToUse.addWidget(self.statsButton, currentRow, 1, 1, 2)
+        
+        # set up the button at the bottom that creates plots
+        self.displayButton = QtGui.QPushButton("Display Plot")
+        self.displayButton.clicked.connect(self.reportDisplayPlotClicked)
+        layoutToUse.addWidget(self.displayButton, currentRow, 3, 1, 2)
+        
+        return layoutToUse
     
     def _add_file_related_controls (self, file_prefix, grid_layout, currentRow) :
         """
@@ -95,6 +169,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # set up the file loading control
         grid_layout.addWidget(QtGui.QLabel("File " + file_prefix + ":"), currentRow, 0)
         filePath   = QtGui.QLineEdit()
+        filePath.setToolTip("The currently loaded file.")
         filePath.setReadOnly(True) # this is mostly for displaying the file path, the load button selects it
         self.widgetInfo[file_prefix]['path'] = filePath
         grid_layout.addWidget(filePath, currentRow, 1, 1, 3)
@@ -144,6 +219,7 @@ class GlanceGUIView (QtGui.QWidget) :
         
         # set up a check box to override the fill value loaded from the file
         overrideFillButton = QtGui.QCheckBox("override fill value")
+        overrideFillButton.setToolTip("Check to override the default fill value.")
         overrideFillButton.setDisabled(True)
         overrideFillButton.stateChanged.connect(partial(self.reportOverrideChange, file_prefix=file_prefix))
         self.widgetInfo[file_prefix]['override'] = overrideFillButton
@@ -152,6 +228,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # now set up the input of the fill value that will be used
         grid_layout.addWidget(QtGui.QLabel("fill value:"), currentRow+1, 1)
         fillValue = QtGui.QLineEdit()
+        fillValue.setToolTip("The fill value that will be used.")
         tempValidator = QtGui.QDoubleValidator(fillValue)
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         fillValue.setValidator(tempValidator)
@@ -164,56 +241,127 @@ class GlanceGUIView (QtGui.QWidget) :
         
         return currentRow
     
-    def _setup_qt_controls (self) :
+    def _build_settings_tab (self) :
         """
-        built the basic input boxes / labels / buttons / etc and lay them out on the window
+        built the basic qt controls for the settings tab and lay them out in a grid layout
         """
         
         # create the layout and set up some of the overall record keeping
         layoutToUse = QtGui.QGridLayout()
         currentRow = 0
-        self.widgetInfo = { }
         
-        # set up the file info for the A file
-        currentRow = self._add_file_related_controls("A", layoutToUse, currentRow)
-        # set up the file info for the B file
-        currentRow = self._add_file_related_controls("B", layoutToUse, currentRow)
+        # add the filter entry areas
+        currentRow = self._add_filter_controls("A", layoutToUse, currentRow)
+        currentRow = self._add_filter_controls("B", layoutToUse, currentRow)
         
-        # set up the epsilon input box
-        layoutToUse.addWidget(QtGui.QLabel("epsilon:"), currentRow, 0)
-        self.epsilonWidget = QtGui.QLineEdit()
-        tempValidator = QtGui.QDoubleValidator(self.epsilonWidget)
+        # add the drop down for selecting the data display form
+        layoutToUse.addWidget(QtGui.QLabel("Data Form:"), currentRow, 0)
+        self.dataDisplayFormDropDown = QtGui.QComboBox()
+        self.dataDisplayFormDropDown.activated.connect(self.reportDataFormSelected)
+        layoutToUse.addWidget(self.dataDisplayFormDropDown, currentRow, 1, 1, 2)
+        
+        currentRow = currentRow + 1
+        
+        # add a check box to constrain originals to the same range
+        showOriginalsInSameRange = QtGui.QCheckBox("show original plots in same range")
+        showOriginalsInSameRange.setToolTip("Check to constrain the colorbar range of the Original A and " +
+                                            "Original B data plots to be the same.\nThe range will include all data in both A and B.")
+        showOriginalsInSameRange.setDisabled(False)
+        #showOriginalsInSameRange.stateChanged.connect(TODO)
+        self.useSameRangeWidget = showOriginalsInSameRange
+        layoutToUse.addWidget(showOriginalsInSameRange, currentRow, 1, 1, 2)
+        
+        currentRow = currentRow + 1
+        
+        # add lon/lat controls
+        
+        # add the lon/lat controls that are separated by file
+        currentRow = self._add_lon_lat_controls("A", layoutToUse, currentRow)
+        currentRow = self._add_lon_lat_controls("B", layoutToUse, currentRow)
+        
+        # add box to enter lon/lat epsilon
+        layoutToUse.addWidget(QtGui.QLabel("lon/lat epsilon:"), currentRow, 0)
+        llepsilonWidget = QtGui.QLineEdit()
+        self.llepsilonWidget = llepsilonWidget
+        llepsilonWidget.setToolTip("Maximum acceptible difference between the longitudes or latitudes in the two files.")
+        tempValidator = QtGui.QDoubleValidator(llepsilonWidget)
         tempValidator.setBottom(0.0) # only accept positive epsilons
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
-        self.epsilonWidget.setValidator(tempValidator)
-        self.epsilonWidget.editingFinished.connect(self.reportEpsilonChanged)
-        layoutToUse.addWidget(self.epsilonWidget, currentRow, 1, 1, 2)
+        llepsilonWidget.setValidator(tempValidator)
+        llepsilonWidget.editingFinished.connect(self.reportLLEpsilonChanged)
+        layoutToUse.addWidget(llepsilonWidget, currentRow, 1, 1, 2)
         
-        currentRow = currentRow + 1
+        # TODO, possible enhancements for the future
+        #       add filters for lon/lat?
+        #       allow lon/lat to be loaded from a different file?
+        #       add buttons to let you plot lon/lat specific errors?
         
-        # set up the drop down to allow image type selection
-        layoutToUse.addWidget(QtGui.QLabel("Image Type:"), currentRow, 0)
-        self.imageSelectionDropDown = QtGui.QComboBox()
-        self.imageSelectionDropDown.activated.connect(self.reportImageTypeSelected)
-        layoutToUse.addWidget(self.imageSelectionDropDown, currentRow, 1, 1, 2)
+        return layoutToUse
+    
+    def _add_filter_controls (self, file_prefix, grid_layout, current_row) :
+        """
+        Add controls for the user to enter the filter function and any adjunct
+        support code needed to set up that function using the given grid_layout
         
-        currentRow = currentRow + 1
+        return the next free current_row number when finished adding widgets
+        """
         
-        # TODO should I add a drop down to select how to visualize the data? (ie 2D, line, on a map, etc?)
+        # add the entry to name the specific function
+        grid_layout.addWidget(QtGui.QLabel(str(file_prefix) + " filter function:"), current_row, 0)
+        functionEntry = QtGui.QLineEdit()
+        functionEntry.setToolTip("Enter python function to use for filtering " + str(file_prefix) + " data here."
+                                 + "\nThis function should work in the form function_name(data_to_filter)"
+                                 + "\n and you should enter only the function_name here.")
+        #functionEntry.editingFinished.connect(TODO)
+        grid_layout.addWidget(functionEntry, current_row, 1, 1, 3)
+        self.widgetInfo[file_prefix]["filter_function"] = functionEntry
         
-        # set up a button that shows stats
-        self.statsButton = QtGui.QPushButton("Display Statistics")
-        self.statsButton.clicked.connect(self.reportDisplayStatsClicked)
-        layoutToUse.addWidget(self.statsButton, currentRow, 1, 1, 2)
+        current_row = current_row + 1
         
-        # set up the button at the bottom that creates plots
-        self.displayButton = QtGui.QPushButton("Display Plot")
-        self.displayButton.clicked.connect(self.reportDisplayPlotClicked)
-        layoutToUse.addWidget(self.displayButton, currentRow, 3, 1, 2)
+        grid_layout.addWidget(QtGui.QLabel(str(file_prefix) + " filter setup: "), current_row, 0)
+        setupCodeEntry = QtGui.QTextEdit()
+        setupCodeEntry.setToolTip("Enter additional python code needed to set up the filter function for " + str(file_prefix) + ".")
+        setupCodeEntry.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred) # TODO, this is not working!
+        #setupCodeEntry.editingFinished.connect(TODO)
+        self.widgetInfo[file_prefix]["filter_setup"] = setupCodeEntry
+        grid_layout.addWidget(setupCodeEntry, current_row, 1, 1, 3)
         
-        # set up the overall window geometry
-        self.setLayout(layoutToUse)
-        self.setGeometry(600, 600, 625, 700)
+        current_row = current_row + 1
+        
+        return current_row
+    
+    def _add_lon_lat_controls (self, file_prefix, grid_layout, current_row) :
+        """
+        Add the longitude and latitude controls for the given file_prefix to
+        the given grid_layout starting on current_row
+        
+        return the next free current_row number when finished adding widgets
+        """
+        
+        # add the label so we know which file this is for
+        grid_layout.addWidget(QtGui.QLabel(file_prefix + " Navigation:"), current_row, 0)
+        
+        current_row = current_row + 1
+        
+        # add drop down to select latitude
+        grid_layout.addWidget(QtGui.QLabel("Latitude:"), current_row, 1)
+        latNameDropDown = QtGui.QComboBox()
+        latNameDropDown.activated.connect(partial(self.reportLatitudeSelected, file_prefix=file_prefix))
+        self.widgetInfo[file_prefix]["latName"] = latNameDropDown
+        grid_layout.addWidget(latNameDropDown, current_row, 2, 1, 2)
+        
+        current_row = current_row + 1
+        
+        # add drop down to select longitude
+        grid_layout.addWidget(QtGui.QLabel("Longitude:"), current_row, 1)
+        lonNameDropDown = QtGui.QComboBox()
+        lonNameDropDown.activated.connect(partial(self.reportLongitudeSelected, file_prefix=file_prefix))
+        self.widgetInfo[file_prefix]["lonName"] = lonNameDropDown
+        grid_layout.addWidget(lonNameDropDown, current_row, 2, 1, 2)
+        
+        current_row = current_row + 1
+        
+        return current_row
     
     ################# start methods related to user input #################
     
@@ -289,6 +437,57 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userChangedEpsilon(newEpsilon)
     
+    def reportLLEpsilonChanged (self) :
+        """
+        when the lon/lat epsilon changes, report it to user update listeners
+        """
+        
+        newLLEpsilon = self.llepsilonWidget.text()
+        # it's still possible for epsilon to not be a number, so fix that
+        newLLEpsilon = self._extra_number_validation(newLLEpsilon)
+        self.llepsilonWidget.setText(str(newLLEpsilon))
+        
+        # let our user update listeners know the llepsilon changed
+        for listener in self.userUpdateListeners :
+            listener.userChangedLLEpsilon(newLLEpsilon)
+    
+    
+    def reportEpsilonPercentChanged (self) :
+        """
+        when the epsilon percent changes, report it to user update listeners
+        """
+        
+        newEpsilonPer = self.epsilonPerWidget.text()
+        # it's still possible for epsilon percent to not be a number, so fix that
+        newEpsilonPer = self._extra_number_validation(newEpsilonPer)
+        self.epsilonPerWidget.setText(str(newEpsilonPer))
+        
+        # let our user update listeners know the epsilon percent changed
+        for listener in self.userUpdateListeners :
+            listener.userChangedEpsilonPercent(newEpsilonPer)
+    
+    def reportLongitudeSelected (self, file_prefix=None) :
+        """
+        when a longitude variable is selected for one of the files, report it to any user update listeners
+        """
+        
+        selectionText = self.widgetInfo[file_prefix]['lonName'].currentText()
+        
+        # let our listeners know the user selected a longitude
+        for listener in self.userUpdateListeners :
+            listener.userSelectedLongitude(file_prefix, selectionText)
+    
+    def reportLatitudeSelected (self, file_prefix=None) :
+        """
+        when a latitude variable is selected for one of the files, report it to any user update listeners
+        """
+        
+        selectionText = self.widgetInfo[file_prefix]['latName'].currentText()
+        
+        # let our listeners know the user selected a latitude
+        for listener in self.userUpdateListeners :
+            listener.userSelectedLatitude(file_prefix, selectionText)
+    
     def reportImageTypeSelected (self) :
         """
         the user selected a new image type, so let our user update listeners know that
@@ -299,6 +498,17 @@ class GlanceGUIView (QtGui.QWidget) :
         # report the new image type to our user update listeners
         for listener in self.userUpdateListeners :
             listener.userSelectedImageType(newImageType)
+    
+    def reportDataFormSelected (self) :
+        """
+        the user selected a new data form, so let our user update listeners know that
+        """
+        
+        newDataForm = self.dataDisplayFormDropDown.currentText()
+        
+        # report the new data form to our user update listeners
+        for listener in self.userUpdateListeners :
+            listener.userSelectedDataForm(newDataForm)
     
     def reportDisplayStatsClicked (self) :
         """
@@ -368,10 +578,12 @@ class GlanceGUIView (QtGui.QWidget) :
         # set the path
         self.widgetInfo[file_prefix]['path'].setText(file_path)
         
-        # if we got a new variable list, set up the list of variables
+        # if we got a new variable list, set up the appropriate drop down list
         if variable_list is not None :
+            # set up the list of selectable variables for analysis
             self.widgetInfo[file_prefix]['variable'].clear()
             self.widgetInfo[file_prefix]['variable'].addItems(variable_list)
+        
         # set the selected variable
         tempPosition = self.widgetInfo[file_prefix]['variable'].findText(selected_variable)
         self.widgetInfo[file_prefix]['variable'].setCurrentIndex(tempPosition)
@@ -380,7 +592,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]['override'].setChecked(use_fill_override)
         
         # set the fill value that's going to be used
-        self.widgetInfo[file_prefix]['fillValue'].setText(str(new_fill_value)) # TODO, this should not be a string
+        self.widgetInfo[file_prefix]['fillValue'].setText(str(new_fill_value))
         
         # show the variable dimensions
         self.widgetInfo[file_prefix]['dims'].setText(str(variable_dimensions))
@@ -402,13 +614,49 @@ class GlanceGUIView (QtGui.QWidget) :
             self.widgetInfo[file_prefix]['override'].setDisabled(False)
             self.widgetInfo[file_prefix]['fillValue'].setDisabled(not use_fill_override)
     
+    def updateSelectedLatLon(self, filePrefix, newLatitude, newLongitude, lonlatList=None) :
+        """
+        Update the latitude and longitude names that are selected in the drop down,
+        if a list is given, then replace the list of options that are being displayed for that file.
+        """
+        
+        # if we got a new list, set up the appropriate drop down lists
+        if lonlatList is not None :
+            
+            # set up the longitude and latitude selectors
+            self.widgetInfo[filePrefix]['latName'].clear()
+            self.widgetInfo[filePrefix]['latName'].addItems(lonlatList)
+            self.widgetInfo[filePrefix]['lonName'].clear()
+            self.widgetInfo[filePrefix]['lonName'].addItems(lonlatList)
+        
+        # set the selected latitude
+        tempPosition = self.widgetInfo[filePrefix]['latName'].findText(newLatitude)
+        self.widgetInfo[filePrefix]['latName'].setCurrentIndex(tempPosition)
+        
+        # set the selected longitude
+        tempPosition = self.widgetInfo[filePrefix]['lonName'].findText(newLongitude)
+        self.widgetInfo[filePrefix]['lonName'].setCurrentIndex(tempPosition)
+    
     def updateEpsilon (self, epsilon) :
         """
         update the comparison epsilon displayed to the user
         """
         
         self.epsilonWidget.setText(str(epsilon))
+    
+    def updateEpsilonPercent (self, epsilonPercent) :
+        """
+        update the epsilon percent displayed to the user
+        """
         
+        self.epsilonPerWidget.setText(str(epsilonPercent))
+    
+    def updateLLEpsilon (self, newLonLatEpsilon) :
+        """
+        update the epsilon for longitude and latitude displayed to the user
+        """
+        
+        self.llepsilonWidget.setText(str(newLonLatEpsilon))
     
     def updateImageTypes (self, imageType, list=None) :
         """
@@ -424,6 +672,21 @@ class GlanceGUIView (QtGui.QWidget) :
         # change the currently selected image type
         tempPosition = self.imageSelectionDropDown.findText(imageType)
         self.imageSelectionDropDown.setCurrentIndex(tempPosition)
+    
+    def updateDataForms(self, dataForm, list=None) :
+        """
+        update the data form that's selected,
+        if the list is given, clear and reset the list of possible data forms
+        """
+        
+        # replace the list if needed
+        if list is not None :
+            self.dataDisplayFormDropDown.clear()
+            self.dataDisplayFormDropDown.addItems(list)
+        
+        # change the currently selected data form
+        tempPosition = self.dataDisplayFormDropDown.findText(dataForm)
+        self.dataDisplayFormDropDown.setCurrentIndex(tempPosition)
     
     ################# end data model update related methods #################
     

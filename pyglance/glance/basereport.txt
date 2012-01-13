@@ -57,7 +57,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
         ## display info on the config file that was used, if one was
         % if ('config_file_path' in runInfo) and (runInfo['config_file_path'] is not None) :
             <p>
-                A configuration file was used to control the production report.<br>
+                A configuration file was used to control the production of this report.<br>
                 <%block name="configFileLink">
                 Please see <a href="./${runInfo['config_file_name']}">this copy of the configuration file</a>
                 </%block>

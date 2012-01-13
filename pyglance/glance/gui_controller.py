@@ -20,6 +20,8 @@ import glance.gui_model         as gui_model
 import glance.gui_statsprovider as gui_stats
 import glance.gui_figuremanager as gui_figs
 
+from glance.data import IncompatableDataObjects
+
 LOG = logging.getLogger(__name__)
 
 """
@@ -79,7 +81,10 @@ class GlanceGUIController (object) :
         a new file has been selected by the user
         """
         
-        self.model.loadNewFile(file_prefix, new_file_path)
+        try :
+            self.model.loadNewFile(file_prefix, new_file_path)
+        except gui_model.UnableToReadFile, utrf :
+            self.handleWarning(str(utrf))
     
     def userSelectedVariable (self, file_prefix, newSelection) :
         """
@@ -109,6 +114,34 @@ class GlanceGUIController (object) :
         
         self.model.updateSettingsDataSelection(newEpsilonValue=new_epsilon)
     
+    def userChangedEpsilonPercent (self, new_epsilon_percent) :
+        """
+        the user has entered a new epsilon percent value
+        """
+        
+        self.model.updateSettingsDataSelection(newEpsilonPercent=new_epsilon_percent)
+    
+    def userChangedLLEpsilon (self, new_lonlat_epsilon) :
+        """
+        the user has entered a new lon/lat epsilon
+        """
+        
+        self.model.updateSettingsDataSelection(newllEpsilon=new_lonlat_epsilon)
+    
+    def userSelectedLongitude (self, file_prefix, newSelection) :
+        """
+        the user selected a new longitude variable
+        """
+        
+        self.model.updateLonLatSelections(file_prefix, new_longitude_name=newSelection)
+    
+    def userSelectedLatitude (self, file_prefix, newSelection) :
+        """
+        the user selected a new latitude variable
+        """
+        
+        self.model.updateLonLatSelections(file_prefix, new_latitude_name=newSelection)
+    
     def userSelectedImageType (self, new_image_type) :
         """
         the user has selected a new image type
@@ -116,19 +149,32 @@ class GlanceGUIController (object) :
         
         self.model.updateSettingsDataSelection(newImageType=new_image_type)
     
+    def userSelectedDataForm (self, new_data_form) :
+        """
+        the user has selected a new data form
+        """
+        
+        self.model.updateSettingsDataSelection(newDataForm=new_data_form)
+    
     def userRequestsStats (self) :
         """
         the user has asked for stats information
         """
         
-        self.stats.sendStatsInfo()
+        try :
+            self.stats.sendStatsInfo()
+        except IncompatableDataObjects, ido :
+            self.handleWarning(str(ido))
     
     def userRequestsPlot (self) :
         """
         the user has asked for a plot
         """
         
-        self.figs.spawnPlot()
+        try :
+            self.figs.spawnPlot()
+        except (IncompatableDataObjects, ValueError), idove :
+            self.handleWarning(str(idove))
     
     ################# end of methods to handle user input reporting #################
     

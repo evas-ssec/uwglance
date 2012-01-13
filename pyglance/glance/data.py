@@ -16,6 +16,44 @@ import glance.io    as io
 
 LOG = logging.getLogger(__name__)
 
+class IncompatableDataObjects (ValueError) :
+    """
+    this exception represents a case where two data objects are completely incompatable
+    """
+    
+    def __init__ (self, aName, bName, dataObjectA=np.nan, dataObjectB=np.nan) :
+        """
+        create the exception, giving a more specific error message if the objects are passed in
+        """
+        
+        # basic message
+        self.message = "Data objects could not be compared."
+        
+        # if we have the data objects, give a more specific message
+        if (dataObjectA is not np.nan) and (dataObjectB is not np.nan) :
+            
+            # if either object does not exist, they can not be compared
+            if (dataObjectA is None) and (dataObjectB is None) :
+                self.message = "Both requested data sets were unavailable or did not exist."
+                
+            # if only one of the two does not exist, give a sligly different message
+            elif (dataObjectA is None) or (dataObjectB is None) :
+                self.message = ("One of the requested data sets was unavailable or did not exist. " +
+                                "A non-existant data set cannot be compared to a data set containing data.")
+                
+            # check to see if the two variables have the same shape of data
+            elif dataObjectA.data.shape != dataObjectB.data.shape :
+                self.message = (aName + ' / ' + bName + ' ' +
+                                'could not be compared because the data for these variables does not match in shape ' +
+                                '(A data shape: ' + str(dataObjectA.data.shape) + '; B data shape: '
+                                + str(dataObjectB.data.shape) + ').')
+    
+    def __str__(self):
+        """
+        return our message
+        """
+        return self.message
+
 class BasicMaskSetObject (object) :
     """
     This class represents a basic set of masks that a data set may have.
@@ -111,6 +149,8 @@ class DataObject (object) :
         
         self.override_fill_value = overrideFillValue
         self.default_fill_value  = defaultFillValue
+        
+        self.have_analyzed = False
     
     def self_analysis(self) :
         """
@@ -142,6 +182,8 @@ class DataObject (object) :
         # set our masks
         self.masks = BasicMaskSetObject(self.masks.ignore_mask, valid_mask,
                                         non_finite_mask, missing_mask)
+        
+        self.have_analyzed = True
     
     def select_fill_value (self) :
         """
@@ -150,6 +192,28 @@ class DataObject (object) :
         toReturn = self.fill_value if self.override_fill_value else self.default_fill_value
         
         return toReturn
+    
+    def get_min (self) :
+        """
+        get the minimum value in this data set
+        """
+        
+        # TODO it would be better to put this test in the analysis function
+        # TODO but first I'd need to be sure that wouldn't break anything
+        if not self.have_analyzed :
+            self.self_analysis()
+        return delta.min_with_mask(self.data, self.masks.valid_mask)
+    
+    def get_max (self) :
+        """
+        get the maximum value in this data set
+        """
+        
+        # TODO it would be better to put this test in the analysis function
+        # TODO but first I'd need to be sure that wouldn't break anything
+        if not self.have_analyzed :
+            self.self_analysis()
+        return delta.max_with_mask(self.data, self.masks.valid_mask)
 
 class DiffInfoObject (object) :
     """
@@ -299,22 +363,16 @@ class DiffInfoObject (object) :
         """
         Confirm that the two data objects can minimally be compared.
         
-        return None if they can be compared or a text message explaining why they cannot.
+        raises an IncompatableDataObjects error if the two data objects are not comparable in the most basic of ways
         """
-        # check the minimum comparison requirments
-        message = None
         
-        # if either object does not exist, they can not be compared
+        # check the minimum comparison requirements
         if (aDataObject is None) or (bDataObject is None) :
-            message = ("Requested data was not available or did not exist.")
-        # check to see if the two variables have the same shape of data
-        elif aDataObject.data.shape != bDataObject.data.shape :
-            message = (aName + ' / ' + bName + ' ' + 
-                       'could not be compared because the data for these variables does not match in shape ' +
-                       'between the two files (file A data shape: ' + str(aDataObject.data.shape) + '; file B data shape: '
-                       + str(bDataObject.data.shape) + ').')
+            raise IncompatableDataObjects(aName, bName, dataObjectA=aDataObject, dataObjectB=bDataObject)
+        if aDataObject.data.shape != bDataObject.data.shape :
+            raise IncompatableDataObjects(aName, bName, dataObjectA=aDataObject, dataObjectB=bDataObject)
         
-        return message
+        return
 
 class FileInfo (object) :
     """

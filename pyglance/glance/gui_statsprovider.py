@@ -60,6 +60,8 @@ class GlanceGUIStats (object) :
         """
         our data listeners should be sent statistics information for a comparison
         of the currently selected variables (if possible)
+        
+        may raise an IncompatableDataObjects exception if it is impossible to compare the given data
         """
         
         # get Variable names
@@ -70,20 +72,15 @@ class GlanceGUIStats (object) :
         aDataObject = self.dataModel.getVariableData("A", aVarName)
         bDataObject = self.dataModel.getVariableData("B", bVarName)
         
-        # check the minimum validity of our data
-        message = dataobjects.DiffInfoObject.verifyDataCompatability (aDataObject, bDataObject, aVarName, bVarName)
-        
-        # if the data isn't valid, stop now
-        if message is not None :
-            for errorHandler in self.errorHandlers :
-                errorHandler.handleWarning(message)
-            # we can't make any stats from this data, so just return
-            return
+        # check the minimum validity of our data; this call can raise an IncompatableDataObjects exception
+        dataobjects.DiffInfoObject.verifyDataCompatability(aDataObject, bDataObject, aVarName, bVarName)
         
         LOG.info ("Constructing statistics")
         
         # do the statistical analysis and collect the data that will be needed to render it nicely
-        tempAnalysis = stats.StatisticalAnalysis.withDataObjects(aDataObject, bDataObject, epsilon=self.dataModel.getEpsilon())
+        tempAnalysis = stats.StatisticalAnalysis.withDataObjects(aDataObject, bDataObject,
+                                                                 epsilon=self.dataModel.getEpsilon(),
+                                                                 epsilon_percent=self.dataModel.getEpsilonPercent())
         tempInfo = { 'variable_name':       aVarName,
                      'alternate_name_in_B': bVarName }
         kwargs   = { 'runInfo':    tempInfo,
