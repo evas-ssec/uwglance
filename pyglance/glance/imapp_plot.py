@@ -204,7 +204,7 @@ def _plot_pressure_data (baseMapInstance, pressureLat, pressureLon, pressureData
         baseMapInstance.scatter(pressX, pressY, s=3.0, c=pressureData, marker='o', cmap=colorMap, vmin=0, vmax=1000, lw=0)
         
         # create the pressure colorbar
-        colorBarToReturn = colorbar(format='%.3g', orientation='horizontal', shrink=0.25)
+        colorBarToReturn = colorbar(format='%.5g', orientation='horizontal', shrink=0.25)
         for tempText in colorBarToReturn.ax.get_xticklabels():
             tempText.set_fontsize(5)
         colorBarToReturn.set_label("Trajectory Pressure (mb)")
@@ -231,9 +231,11 @@ def _plot_initial_modis_aod (baseMapInstance, longitude, latitude, initAODdata, 
     
     return colorBarToReturn
 
-def _build_basic_figure_with_map (baseMapInstance, latRange=None, lonRange=None, useDarkBackground=True,) :
+def _build_basic_figure_with_map (baseMapInstance, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=True,) :
     """
     create a figure with the longitude and latitude info given
+    
+    if None is given for the parallelWidth or meridianWidth the parallels or meridians will not be drawn
     """
     
     # create the empty figure
@@ -249,12 +251,13 @@ def _build_basic_figure_with_map (baseMapInstance, latRange=None, lonRange=None,
         baseMapInstance.drawstates(     color=lineColor, linewidth=0.5)
         baseMapInstance.drawmapboundary(color=lineColor, linewidth=0.5)
     # draw the parallels and meridians
-    if latRange is not None :
-        parallels = arange(-80.,  90., latRange / 4.0)
+    if parallelWidth is not None :
+        parallels = np.arange(-90.,  90., parallelWidth)
         baseMapInstance.drawparallels(parallels,labels=[1,0,0,1], color=lineColor, linewidth=0.5)
-    if lonRange is not None :
-        meridians = arange(  0., 360., lonRange / 4.0)
+    if meridianWidth is not None :
+        meridians = np.arange(  0., 360., meridianWidth)
         baseMapInstance.drawmeridians(meridians,labels=[1,0,0,1], color=lineColor, linewidth=0.5)
+        # baseMapInstance.drawmeridians([80, 85, 90],labels=[1,0,0,1], color=lineColor, linewidth=0.5)
     
     return axes, figure
 
@@ -292,12 +295,14 @@ def _make_range_with_data_objects(list_of_data_objects, num_intervals, offset_to
 
 # todo, I hate this solution for making contourf show the number of levels that I want,
 # but I've searched repeatedly and can't find another way to get it to let me specify
-def _make_range_with_masked_arrays(list_of_masked_arrays, num_intervals, offset_to_range=0.0) :
+def _make_range_with_masked_arrays(list_of_masked_arrays, num_intervals, offset_to_range=0.0, optional_top_boundry=None, optional_bottom_boundry=None) :
     """
     get an array with numbers representing the bounds of a set of ranges
     that covers all the valid data present in the masked arrays given
     (these may be used for plotting the data)
     if an offset is passed, the outtermost range will be expanded by that much
+    
+    If optional top or bottom boundaries are given, the range will be expanded to include them.
     
     note: the list of masked arrays may be 0 or more masked arrays, if it 0, this
     method returns None since no useful range can be created
@@ -314,6 +319,12 @@ def _make_range_with_masked_arrays(list_of_masked_arrays, num_intervals, offset_
         minVal = min(each_masked_array.min(), minVal)
         maxVal = max(each_masked_array.max(), maxVal)
     
+    # if we were given optional boundaries, incorporate them
+    if optional_top_boundry    is not None:
+        maxVal = max(maxVal, optional_top_boundry)
+    if optional_bottom_boundry is not None:
+        minVal = min(minVal, optional_bottom_boundry)
+    
     # TODO, there's the possibility for failure here if all data is fully masked out?
     
     # take any offsets into account
@@ -325,7 +336,7 @@ def _make_range_with_masked_arrays(list_of_masked_arrays, num_intervals, offset_
 def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitudeData,
                           pressureData=None, pressLongitudeData=None, pressLatitudeData=None,
                           baseMapInstance=None, figureTitle="MODIS AOD & AOD Trajectories",
-                          useDarkBackground=True, latRange=None, lonRange=None,
+                          useDarkBackground=True, parallelWidth=None, meridianWidth=None,
                           windsDataU=None, windsDataV=None, windsDataLon=None, windsDataLat=None,
                           backgroundDataSets={ }) :
     """
@@ -344,7 +355,7 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     
     # create a figure and draw geopolitical features on it
     axes, figure = _build_basic_figure_with_map (baseMapInstance,
-                                                 latRange=latRange, lonRange=lonRange,
+                                                 parallelWidth=parallelWidth, meridianWidth=meridianWidth,
                                                  useDarkBackground=useDarkBackground)
     
     # choose the color map
@@ -422,14 +433,18 @@ python -m glance.imapp_plot aodTraj A.nc
     parser.add_option('-d', '--windsSubdivideFactor', dest="subdivideFactor", type='int',
                     default=1, help="factor to subdivide and filter out some winds data for visiblity; " +
                                     "higher factors result in fewer winds; data is filtered evenly along the indices of the winds data grid")
+    parser.add_option('-m', '--meridianWidth', dest="meridianWidth", type='int',
+                      default=5, help="the width in degrees between displayed meridians")
+    parser.add_option('-r', '--parallelWidth', dest="parallelWidth", type='int',
+                      default=5, help="the width in degrees between displayed parallels")
     
     # time related settings
     parser.add_option('-s', '--startTime', dest="startTime", type='int',
                     default=0, help="set first time to process")
     parser.add_option('-e', '--endTime', dest="endTime", type='int',
                     help="set last time to process")
-    parser.add_option('-f', '--futureWindow', dest="futureWindow", type='int',
-                    default=6, help="set number of hours of future pressures to show; 6 hours is the default")
+    parser.add_option('-i', '--timeWindow', dest="timeWindow", type='int',
+                    default=6, help="set number of hours of trajectory data to show; 6 hours is the default")
     parser.add_option('-j', '--jumpEmptyStartHours', dest="doJump",
                       action="store_true", help="start generating images on the first hour with trajectory data that is after 0 (ie. not 0); if used this flag " +
                                                 "overrrides the start time option when determining which images will be created at the start of a series")
@@ -478,10 +493,10 @@ python -m glance.imapp_plot aodTraj A.nc
         steps for each frame
         """
         
-        LOG.debug("startTime:    " + str(options.startTime))
         LOG.debug("will startTime be modified by jumping frames? " + str(options.doJump))
-        LOG.debug("endTime:      " + str(options.endTime))
-        LOG.debug("futureWindow: " + str(options.futureWindow))
+        LOG.debug("startTime:  " + str(options.startTime))
+        LOG.debug("endTime:    " + str(options.endTime))
+        LOG.debug("timeWindow: " + str(options.timeWindow))
         
         # setup the output directory now
         if not (os.path.isdir(options.outpath)) :
@@ -510,10 +525,10 @@ python -m glance.imapp_plot aodTraj A.nc
         # get information on where we should display the data
         northeastLon, northeastLat = trajectoryFileObject.file_object.get_global_attribute( defaultValues['neName'] )
         southwestLon, southwestLat = trajectoryFileObject.file_object.get_global_attribute( defaultValues['swName'] )
-        latRange = abs(northeastLat - southwestLat)
-        lonRange = abs(southwestLon - northeastLon)
         LOG.debug ("Viewing window, northeast corner (lat / lon): " + str(northeastLat) + " / " + str(northeastLon))
         LOG.debug ("Viewing window, southwest corner (lat / lon): " + str(southwestLat) + " / " + str(southwestLon))
+        parallelWidth = options.parallelWidth
+        meridianWidth = options.meridianWidth
         
         # double check the map projection
         _check_requested_projection(trajectoryFileObject.file_object.get_global_attribute("MAP_PROJECTION"), fileDescription="the main trajectory file")
@@ -620,7 +635,7 @@ python -m glance.imapp_plot aodTraj A.nc
                                   llcrnrlon=southwestLon, urcrnrlon=northeastLon, lat_ts=20, resolution='l') # TODO do I need to use lat_ts=20, ?
         
         # sort out the times we're using
-        futureWindow = options.futureWindow
+        timeWindow = options.timeWindow
         startTime    = options.startTime if options.startTime >= 0      else 0
         # if we need to jump to start at the first trajectory data after 0, do that now
         if options.doJump :
@@ -643,25 +658,25 @@ python -m glance.imapp_plot aodTraj A.nc
             
             # get the time that represents the most current trajectory data
             mostCurrentTrajTimeIndex = _find_most_current_index_at_time (trajectoryTimeData, currentTime)
-            # get the time that represents the last point included in the future window
-            lastTimeIncludedIndex    = _find_most_current_index_at_time (trajectoryTimeData, (currentTime + futureWindow))
+            # get the time that represents the first point included in the time window
+            firstTimeIncludedIndex    = _find_most_current_index_at_time (trajectoryTimeData, (currentTime - timeWindow))
             
             # only get data to plot the trajectory points if there is some available
             thisFramePressures = None
             thisFramePressLon  = None
             thisFramePressLat  = None
-            if mostCurrentTrajTimeIndex <= lastTimeIncludedIndex :
+            if mostCurrentTrajTimeIndex >= firstTimeIncludedIndex :
                 
                 # TODO , double check that this isn't off by one
-                LOG.debug("Most current time index:          " + str(mostCurrentTrajTimeIndex))
-                LOG.debug("Last data in future window index: " + str(lastTimeIncludedIndex))
-                LOG.debug("Most current time:                " + str(trajectoryTimeData[mostCurrentTrajTimeIndex]))
-                LOG.debug("Last data in future window time:  " + str(trajectoryTimeData[lastTimeIncludedIndex]))
+                LOG.debug("Most current time index: " + str(mostCurrentTrajTimeIndex))
+                LOG.debug("First time window index: " + str(firstTimeIncludedIndex))
+                LOG.debug("Most current time time:  " + str(trajectoryTimeData[mostCurrentTrajTimeIndex]))
+                LOG.debug("First time window time:  " + str(trajectoryTimeData[firstTimeIncludedIndex]))
                 
                 # now pull out the pressure data and related lon/lat info for plotting
-                thisFramePressures = trajectoryPressureData[mostCurrentTrajTimeIndex : lastTimeIncludedIndex+1].ravel()
-                thisFramePressLon  =          longitudeData[mostCurrentTrajTimeIndex : lastTimeIncludedIndex+1].ravel()
-                thisFramePressLat  =           latitudeData[mostCurrentTrajTimeIndex : lastTimeIncludedIndex+1].ravel()
+                thisFramePressures = trajectoryPressureData[firstTimeIncludedIndex : mostCurrentTrajTimeIndex+1].ravel()
+                thisFramePressLon  =          longitudeData[firstTimeIncludedIndex : mostCurrentTrajTimeIndex+1].ravel()
+                thisFramePressLat  =           latitudeData[firstTimeIncludedIndex : mostCurrentTrajTimeIndex+1].ravel()
             
             # we need to plot the winds under the other data so they don't cover it up
             currentWindsU, currentWindsV, currentWindsLon, currentWindsLat = None, None, None, None
@@ -695,7 +710,8 @@ python -m glance.imapp_plot aodTraj A.nc
             
             # if we're doing cloud effective emissivity, add those to the background list
             if doOptionalCloudEffectiveEmiss :
-                tempLevels = _make_range_with_masked_arrays(listOfCloudEffectiveEmissivityPasses.values(), LEVELS_FOR_BACKGROUND_PLOTS)
+                tempLevels = _make_range_with_masked_arrays(listOfCloudEffectiveEmissivityPasses.values(), LEVELS_FOR_BACKGROUND_PLOTS,
+                                                            optional_bottom_boundry=0.0, optional_top_boundry=1.0)
                 for emissName in sorted(listOfCloudEffectiveEmissivityPasses.keys()) :
                     emissSetNumber = emissName.split('_')[-1] # get the number off the end of the name
                     # if the numbering is at all different between the variables, this will fail
@@ -707,7 +723,8 @@ python -m glance.imapp_plot aodTraj A.nc
             
             # if we're doing the optical depth land and ocean, add those to the background list too
             if doOptionalDepthLandAndOcean :
-                tempLevels = _make_range_with_masked_arrays(listOfOpticalDepthLandAndOcean.values(), LEVELS_FOR_BACKGROUND_PLOTS)
+                tempLevels = _make_range_with_masked_arrays(listOfOpticalDepthLandAndOcean.values(), LEVELS_FOR_BACKGROUND_PLOTS,
+                                                            optional_bottom_boundry=0.0, optional_top_boundry=1.0)
                 for aodName in sorted(listOfOpticalDepthLandAndOcean.keys()) :
                     aodNumber = aodName.split('_')[-1] # get the number off the end of the name
                     # if the numbering is at all different between the variables, this will fail
@@ -721,7 +738,7 @@ python -m glance.imapp_plot aodTraj A.nc
             LOG.info("Creating trajectory plot for time " + str(float(currentTime)) + ".")
             tempFigure = _create_imapp_figure (initAODFlat,                     initLonData,                          initLatData,
                                                pressureData=thisFramePressures, pressLongitudeData=thisFramePressLon, pressLatitudeData=thisFramePressLat,
-                                               baseMapInstance=basemapObject, latRange=latRange, lonRange=lonRange,
+                                               baseMapInstance=basemapObject, parallelWidth=parallelWidth, meridianWidth=meridianWidth,
                                                windsDataU=currentWindsU, windsDataV=currentWindsV,
                                                windsDataLon=optionalDataWindsLongitude, windsDataLat=optionalDataWindsLatitude,
                                                figureTitle="MODIS AOD & AOD Trajectories on " + str(currentTime) + "Z",
