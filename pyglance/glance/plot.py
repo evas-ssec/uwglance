@@ -336,10 +336,10 @@ def plot_and_save_comparison_figures (aData, bData,
     # now we need to wait for all of our child processes to terminate before returning
     if (isParent) : # just in case
         if len(childPids) > 0 :
-            print ("waiting for completion of " + variableDisplayName + " images...")
+            LOG.info ("waiting for completion of " + variableDisplayName + " images...")
         for pid in childPids:
             os.waitpid(pid, 0)
-        print("... creation and saving of images for " + variableDisplayName + " completed")
+        LOG.info("... creation and saving of images for " + variableDisplayName + " completed")
     
     return original_images, compared_images
 

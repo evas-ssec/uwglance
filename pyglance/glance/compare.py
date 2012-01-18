@@ -217,7 +217,7 @@ def _resolve_names(fileAObject, fileBObject, defaultValues,
                              'Skipping this variable.')
     else:
         # format command line input similarly to the stuff from the config file
-        print (requestedNames)
+        #print (requestedNames)
         finalFromCommandLine = _parse_varnames(fileCommonNames, requestedNames,
                                                defaultValues['epsilon'], defaultValues['missing_value'])
         for name, epsilon, missing in finalFromCommandLine :
@@ -634,7 +634,7 @@ def _handle_lon_lat_info (lon_lat_settings, a_file_object, b_file_object, output
         return { }, spatialInfo
     
     # if we should not be comparing against the logitude and latitude, stop now
-    print ('lon_lat_settings: ' + str(lon_lat_settings))
+    LOG.debug ('lon_lat_settings: ' + str(lon_lat_settings))
     
     # figure out the names to be used for the longitude and latitude variables
     a_longitude_name = lon_lat_settings['longitude']
@@ -1049,7 +1049,7 @@ def colocateToFile_library_call(a_path, b_path, var_list=[ ],
         technical_name, b_variable_technical_name, \
                 explanationName = _get_name_info_for_variable(displayName, varRunInfo)
         
-        print('analyzing: ' + explanationName + ')')
+        LOG.info('analyzing: ' + explanationName + ')')
         
         # load the variable data
         aData = _load_variable_data(aFile.file_object, technical_name,
@@ -1213,7 +1213,7 @@ def reportGen_raw_data_simple_call (aData, bData, variableDisplayName,
                          shouldClearMemoryWithThreads=useThreads,
                          shouldUseSharedRangeForOriginal=True)
             
-            print("\tfinished creating figures for: " + variableDisplayName)
+            LOG.info("\tfinished creating figures for: " + variableDisplayName)
         
         # create a temporary files object
         files = {'file A': {'path': "raw data input",
@@ -1227,7 +1227,7 @@ def reportGen_raw_data_simple_call (aData, bData, variableDisplayName,
                     }
         
         # create our report 
-        print ('Generating report for: ' + variableDisplayName) 
+        LOG.info ('Generating report for: ' + variableDisplayName) 
         report.generate_and_save_variable_report(files,
                                                  variableSettings, runInfo,
                                                  variable_stats,
@@ -1236,7 +1236,7 @@ def reportGen_raw_data_simple_call (aData, bData, variableDisplayName,
                                                  outputDirectory, "index.html")
         
         # make the glossary page
-        print ('Generating glossary page')
+        LOG.info ('Generating glossary page')
         report.generate_and_save_doc_page(statistics.StatisticalAnalysis.doc_strings(), outputDirectory)
         
     else :
@@ -1367,7 +1367,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         technical_name, b_variable_technical_name, \
                 explanationName = _get_name_info_for_variable(displayName, varRunInfo)
         
-        print('analyzing: ' + explanationName)
+        LOG.info('analyzing: ' + explanationName)
         
         # load the variable data
         aData = _load_variable_data(aFile.file_object, technical_name,
@@ -1529,7 +1529,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                              units_a=       varRunInfo['units_a']         if 'units_a'         in varRunInfo else None,
                              units_b=       varRunInfo['units_b']         if 'units_b'         in varRunInfo else None)
                 
-                print("\tfinished creating figures for: " + explanationName)
+                LOG.info("\tfinished creating figures for: " + explanationName)
             
             # create the report page for this variable
             if (runInfo['shouldIncludeReport']) :
@@ -1543,7 +1543,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                     'variable_run_info':      varRunInfo
                                                     }
                 
-                print ('\tgenerating report for: ' + explanationName) 
+                LOG.info ('\tgenerating report for: ' + explanationName) 
                 report.generate_and_save_variable_report(files,
                                                          varRunInfo, runInfo,
                                                          variable_stats,
@@ -1574,7 +1574,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
         
         # make the main summary report
-        print ('generating summary report')
+        LOG.info ('generating summary report')
         report.generate_and_save_summary_report(files,
                                                 pathsTemp['out'], 'index.html',
                                                 runInfo,
@@ -1583,7 +1583,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                 nameStats)
         
         # make the glossary
-        print ('generating glossary')
+        LOG.info ('generating glossary')
         report.generate_and_save_doc_page(statistics.StatisticalAnalysis.doc_strings(), pathsTemp['out'])
     
     returnCode = 0 if didPassAll else 2 # return 2 only if some of the variables failed
