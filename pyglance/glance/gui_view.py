@@ -72,12 +72,16 @@ class GlanceGUIView (QtGui.QWidget) :
         # setup the rest of our window
         # TODO, this section is temporary, set up the tabs in a sub function?
         self.tabWidget = QtGui.QTabWidget()
+        
         tempWidget = QtGui.QWidget()
         tempWidget.setLayout(self._build_data_tab())
         self.tabWidget.addTab(tempWidget, "basic")
-        tempWidget = QtGui.QWidget()
-        tempWidget.setLayout(self._build_settings_tab())
-        self.tabWidget.addTab(tempWidget, "settings")
+        
+        # TODO, finish setting up the settings tab and add that back in
+        #tempWidget = QtGui.QWidget()
+        #tempWidget.setLayout(self._build_settings_tab())
+        #self.tabWidget.addTab(tempWidget, "settings")
+        
         tempLayout = QtGui.QGridLayout()
         tempLayout.addWidget(self.tabWidget)
         self.setLayout(tempLayout)
@@ -620,6 +624,8 @@ class GlanceGUIView (QtGui.QWidget) :
         if a list is given, then replace the list of options that are being displayed for that file.
         """
         
+        """ TODO, uncomment once that tab is set up
+        
         # if we got a new list, set up the appropriate drop down lists
         if lonlatList is not None :
             
@@ -636,6 +642,8 @@ class GlanceGUIView (QtGui.QWidget) :
         # set the selected longitude
         tempPosition = self.widgetInfo[filePrefix]['lonName'].findText(newLongitude)
         self.widgetInfo[filePrefix]['lonName'].setCurrentIndex(tempPosition)
+        
+        """
     
     def updateEpsilon (self, epsilon) :
         """
@@ -656,7 +664,7 @@ class GlanceGUIView (QtGui.QWidget) :
         update the epsilon for longitude and latitude displayed to the user
         """
         
-        self.llepsilonWidget.setText(str(newLonLatEpsilon))
+        #self.llepsilonWidget.setText(str(newLonLatEpsilon)) TODO, uncomment once that tab is set up
     
     def updateImageTypes (self, imageType, list=None) :
         """
@@ -679,6 +687,7 @@ class GlanceGUIView (QtGui.QWidget) :
         if the list is given, clear and reset the list of possible data forms
         """
         
+        """ TODO, uncomment once that tab is set up
         # replace the list if needed
         if list is not None :
             self.dataDisplayFormDropDown.clear()
@@ -687,6 +696,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # change the currently selected data form
         tempPosition = self.dataDisplayFormDropDown.findText(dataForm)
         self.dataDisplayFormDropDown.setCurrentIndex(tempPosition)
+        """
     
     ################# end data model update related methods #################
     
