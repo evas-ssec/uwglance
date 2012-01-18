@@ -64,7 +64,8 @@ glance_analysis_defaults = {'epsilon': 0.0,
                             'epsilon_failure_tolerance': 0.0,
                             'nonfinite_data_tolerance':  0.0,
                             'total_data_failure_tolerance': None,
-                            'minimum_acceptable_squared_correlation_coefficient': None
+                            'minimum_acceptable_squared_correlation_coefficient': None,
+                            'only_plot_on_fail': False
                             }
 
 def _clean_path(string_path) :
