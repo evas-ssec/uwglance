@@ -33,8 +33,8 @@ defaultValues   = {
                     'initAODVar':    'aod_traj',
                     'trajPressVar':  'ptraj',
                     'timeVar':       'time',
-                    'neName':        'TOP_RIGHT_LON_LAT', #TODO need to fix this? 'NE',
-                    'swName':        'BOTTOM_LEFT_LON_LAT', # TODO need to fix this? 'SW',
+                    'neName':        'TOP_RIGHT_LON_LAT', #TODO is this likely to change?
+                    'swName':        'BOTTOM_LEFT_LON_LAT', # TODO is this likely to change?
                     'windLonName':   'Longitude',
                     'windLatName':   'Latitude',
                     'windTimeName':  'time',
@@ -204,10 +204,21 @@ def _plot_pressure_data (baseMapInstance, pressureLat, pressureLon, pressureData
         baseMapInstance.scatter(pressX, pressY, s=3.0, c=pressureData, marker='o', cmap=colorMap, vmin=0, vmax=1000, lw=0)
         
         # create the pressure colorbar
+        # TODO, I have no idea why all this BS was necessary to get the colormap in v. 1.1.0 of matplotlib, but not v 1.0.1
+        tempMap = cm.ScalarMappable(cmap=colorMap)
+        tempMap.set_clim(vmin=0.0, vmax=1000.0)
+        tempMap.set_array(pressureData)
+        colorBarToReturn = colorbar(tempMap, format='%.5g', orientation='horizontal', shrink=0.25)
+        for tempText in colorBarToReturn.ax.get_xticklabels():
+            tempText.set_fontsize(5)
+        colorBarToReturn.set_label("Trajectory Pressure (mb)")
+        
+        """ TODO, this is the old version of how I made the pressure color bar that worked fine in v 1.0.1
         colorBarToReturn = colorbar(format='%.5g', orientation='horizontal', shrink=0.25)
         for tempText in colorBarToReturn.ax.get_xticklabels():
             tempText.set_fontsize(5)
         colorBarToReturn.set_label("Trajectory Pressure (mb)")
+        """
     
     return colorBarToReturn
 
@@ -340,7 +351,7 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
                           windsDataU=None, windsDataV=None, windsDataLon=None, windsDataLat=None,
                           backgroundDataSets={ }) :
     """
-    TODO, I'm still deciding how this funciton works so it may change
+    this function is pretty stable now... TODO, documentation forthcoming
     
     backgroundDataSets should be a dictionary in the form
     {
@@ -422,12 +433,6 @@ python -m glance.imapp_plot aodTraj A.nc
     # file generation related options
     parser.add_option('-p', '--outpath', dest="outpath", type='string', default='./',
                     help="set path to output directory")
-    
-    # file variable settings TODO, do we need these?
-    parser.add_option('-o', '--longitude', dest="longitudeVar", type='string',
-                    help="set name of longitude variable")
-    parser.add_option('-a', '--latitude', dest="latitudeVar", type='string',
-                    help="set name of latitude variable")
     
     # display related settings
     parser.add_option('-d', '--windsSubdivideFactor', dest="subdivideFactor", type='int',
@@ -640,12 +645,12 @@ python -m glance.imapp_plot aodTraj A.nc
         # if we need to jump to start at the first trajectory data after 0, do that now
         if options.doJump :
             startTimeTemp = trajectoryTimeData[0] if trajectoryTimeData[0] > 0 else trajectoryTimeData[1]
-            startTime = max(startTime, startTimeTemp)
+            startTime = int(max(startTime, startTimeTemp))
             # I am assuming that the time data will never be negative
-        endTime      = options.endTime   if options.endTime is not None else trajectoryTimeData[-1]
-        # as a sanity check, it's not really productive to make frames for times after our data ends
-        if endTime > trajectoryTimeData[-1] :
-            endTime = trajectoryTimeData[-1]
+        endTime      = options.endTime   if options.endTime is not None else int(trajectoryTimeData[-1])
+        # as a sanity check, it's not really productive to make frames without an end time or for times after our data ends
+        if (endTime is None) or (endTime > trajectoryTimeData[-1]) :
+            endTime = int(trajectoryTimeData[-1])
         
         # loop over time to create each frame
         initAODFlat =   initialAODdata.ravel()
