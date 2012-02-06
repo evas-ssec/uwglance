@@ -9,6 +9,9 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 
 import sys, os, logging
 
+from datetime import datetime
+from datetime import timedelta
+
 # these first two lines must stay before the pylab import
 import matplotlib
 matplotlib.use('Agg') # use the Anti-Grain Geometry rendering engine
@@ -24,8 +27,11 @@ import re
 import numpy as np
 
 import glance.data as dataobj
+from   glance.io   import UNITS_CONSTANT
 
 LOG = logging.getLogger(__name__)
+
+IMAPP_PLOT_VERSION = 0.1
 
 defaultValues   = {
                     'longitudeVar':  'xtraj',
@@ -45,7 +51,9 @@ defaultValues   = {
                     'optLonBase':    'Lon_',
                     'optLatBase':    'Lat_',
                     'figureName':    'frame.png',
-                    'figureDPI':     200
+                    'thumbPrefix':   'thumb',
+                    'figureDPI':     200,
+                    'thumbDPI':      90
                   }
 
 ACCEPTABLE_MAP_PROJECTIONS = ['cylindrical']
@@ -137,10 +145,26 @@ def _find_most_current_index_at_time (times_array, current_time) :
     
     return toReturn
 
+def _clean_lon_lat (longitudeData, latitudeData) :
+    """
+    if the longitude or latitude is outside of the expected positive range, move it back inside
+    (obviously there are valid negative longitudes, but basemap doesn't handle them well)
+    """
+    
+    while sum(longitudeData < 0) > 0 :
+        longitudeData[longitudeData < 0] += 360.0
+    while sum(longitudeData > 360.0) > 0 :
+        longitudeData[longitudeData > 360.0] %= 360.0
+    
+    # TODO, do the latitudes need to be fixed?
+    
+
 def _draw_contour_with_basemap (baseMapInstance, data, lonData, latData, levels=None, **kwargs) :
     """
     draw a contour plot of the data using the basemap and the provided lon and lat
     """
+    
+    _clean_lon_lat (lonData, latData)
     
     # translate into the coordinate system of the basemap
     tempX, tempY = baseMapInstance(lonData, latData)
@@ -166,6 +190,8 @@ def _draw_winds_with_basemap (baseMapInstance,
     if the value data isn't None, use it to control the color values plotted on the vectors
     """
     
+    _clean_lon_lat (lonData, latData)
+    
     # translate into the coordinate system of the basemap
     tempX, tempY = baseMapInstance(lonData, latData)
     
@@ -177,8 +203,10 @@ def _draw_winds_with_basemap (baseMapInstance,
         tempUData = uData.copy()
         tempVData = vData.copy()
         
-        kwargs['width'] = 0.001
-        kwargs['headwidth'] = 4
+        kwargs['scale']     = sum(~ uData.mask[0]) * 20 # this is proportional to the number of winds that are being shown
+        kwargs['width']     = 0.001 # this is relative to the width of the plot as a whole
+        kwargs['headwidth'] = 4 # this is relative to the size of the arrow, so 4 is good
+        kwargs['units']     = 'width' # this is relative to the width of the plot as a whole
         
         if valueData is None:
             p = baseMapInstance.quiver(tempX, tempY, tempUData, tempVData, **kwargs)
@@ -196,6 +224,8 @@ def _plot_pressure_data (baseMapInstance, pressureLat, pressureLon, pressureData
     
     # if we have pressure data plot that
     if pressureData is not None :
+        
+        _clean_lon_lat(pressureLon, pressureLat)
         
         # translate the longitude and latitude into map coordinates
         pressX, pressY =  baseMapInstance(pressureLon, pressureLat)
@@ -227,6 +257,8 @@ def _plot_initial_modis_aod (baseMapInstance, longitude, latitude, initAODdata, 
     plot initial modis aod points using the provided base map, return the created
     color bar so it can be moved around as needed
     """
+    
+    _clean_lon_lat (longitude, latitude)
     
     # translate the longitude and latitude into map coordinates
     initX,  initY  = baseMapInstance(longitude,  latitude)
@@ -349,7 +381,7 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
                           baseMapInstance=None, figureTitle="MODIS AOD & AOD Trajectories",
                           useDarkBackground=True, parallelWidth=None, meridianWidth=None,
                           windsDataU=None, windsDataV=None, windsDataLon=None, windsDataLat=None,
-                          backgroundDataSets={ }) :
+                          backgroundDataSets={ }, plotInitAOD=True) :
     """
     this function is pretty stable now... TODO, documentation forthcoming
     
@@ -392,11 +424,13 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     if pressColorBar is not None :
         pressColorBar.ax.set_position([0.4, -0.16, 0.25, 0.25])
     
-    # plot the initial modis AOD points after the pressure so the AOD points are always on top (and visible)
-    aodColorBar = _plot_initial_modis_aod(baseMapInstance, initLongitudeData, initLatitudeData, initAODdata)
-    # if we got a color bar back, make sure it's in the right place
-    if aodColorBar is not None :
-        aodColorBar.ax.set_position([0.1, -0.16, 0.25, 0.25])
+    # only plot the initial points if our flag says to
+    if plotInitAOD :
+        # plot the initial modis AOD points after the pressure so the AOD points are always on top (and visible)
+        aodColorBar = _plot_initial_modis_aod(baseMapInstance, initLongitudeData, initLatitudeData, initAODdata)
+        # if we got a color bar back, make sure it's in the right place
+        if aodColorBar is not None :
+            aodColorBar.ax.set_position([0.1, -0.16, 0.25, 0.25])
     
     # now that we've moved everything around, make sure our main image is in the right place
     # TODO, make sure this resizing/placement will work in more general cases
@@ -415,7 +449,8 @@ def main():
 run "%prog help" to list commands
 examples:
 
-python -m glance.imapp_plot aodTraj A.nc
+python -m glance.imapp_plot aodTraj traj.nc
+python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
 
 """
     # the following represent options available to the user on the command line:
@@ -442,6 +477,15 @@ python -m glance.imapp_plot aodTraj A.nc
                       default=5, help="the width in degrees between displayed meridians")
     parser.add_option('-r', '--parallelWidth', dest="parallelWidth", type='int',
                       default=5, help="the width in degrees between displayed parallels")
+    parser.add_option('-g', '--getRidOfInitialAOD', dest="hideInitAOD",
+                      action="store_true", help="remove the initial AOD points from all plots")
+    parser.add_option('-c', '--limitClouds', dest="limitClouds", action="store_true",
+                      help="if cloud effective emissivity data is provided, its display will be limited to only the first frame generated; " +
+                           "all other frames will not contain clouds data")
+    parser.add_option('-u', '--thumbnailFrameNumber', dest="thumbnailFrameNumber", type='int',
+                      default=0, help="which frame should be used for the thumbnail; the default is 0 (the first frame); " +
+                                      "1 would be the second frame generated and so on; if the frame requested is too high " +
+                                      "(i.e. it would fall beyond the set of frames to be generated) the first frame will be used")
     
     # time related settings
     parser.add_option('-s', '--startTime', dest="startTime", type='int',
@@ -457,9 +501,9 @@ python -m glance.imapp_plot aodTraj A.nc
     parser.add_option('-t', '--test', dest="self_test",
                 action="store_true", default=False, help="run internal unit tests")
     
-    # TODO will add this once we're out of alpha
-    #parser.add_option('-n', '--version', dest='version',
-    #                  action="store_true", default=False, help="view the imapp plot version")
+    # print out the version
+    parser.add_option('-n', '--version', dest='version',
+                      action="store_true", default=False, help="view the imapp plot version")
     
     
     # parse the uers options from the command line
@@ -484,6 +528,12 @@ python -m glance.imapp_plot aodTraj A.nc
     prior = None
     prior = dict(locals())
     
+    # print out the version if desired
+    if options.version :
+        print
+        print ("version " + str(IMAPP_PLOT_VERSION)) # this is not the optimal way to store the version, but it works for now
+        print
+    
     """
     The following functions represent available menu selections.
     """
@@ -494,9 +544,12 @@ python -m glance.imapp_plot aodTraj A.nc
         images of these trajectories on the Earth and save it to disk.
         
         optionally, if a second file with winds data and MODIS cloud effective
-        emissivity data is provided, this will also be plotted at comprable time
-        steps for each frame
+        emissivity data is provided, this additional data will also be plotted at
+        comprable time steps for each frame
         """
+        
+        savedThumb     = False
+        numImagesSaved = 0
         
         LOG.debug("will startTime be modified by jumping frames? " + str(options.doJump))
         LOG.debug("startTime:  " + str(options.startTime))
@@ -526,6 +579,11 @@ python -m glance.imapp_plot aodTraj A.nc
         latitudeData           = trajectoryFileObject.file_object[defaultValues['latitudeVar']]
         longitudeData          = trajectoryFileObject.file_object[defaultValues['longitudeVar']]
         trajectoryTimeData     = trajectoryFileObject.file_object[defaultValues['timeVar']]
+        
+        # get the base time information and translate it into a date time object
+        timeUnitsString     = trajectoryFileObject.file_object.get_attribute(defaultValues['timeVar'], UNITS_CONSTANT)
+        timeReferenceObject = datetime.datetime.strptime(timeUnitsString, "hours since %Y-%m-%d %H:%M:%S %Z")
+        LOG.debug("starting trajectory time: " + str(timeReferenceObject))
         
         # get information on where we should display the data
         northeastLon, northeastLat = trajectoryFileObject.file_object.get_global_attribute( defaultValues['neName'] )
@@ -564,74 +622,82 @@ python -m glance.imapp_plot aodTraj A.nc
                 # if the two viewing windows are not the same, we don't want to display this data TODO, confirm that this is the right strategy?
                 if ((optionalNELat != northeastLat) or (optionalNELon != northeastLon) or
                     (optionalSWLat != southwestLat) or (optionalSWLon != southwestLon)) :
-                    LOG.debug ("Incompatable viewing area given in optional file. Optional data will not be displayed.")
+                    LOG.warn ("Incompatable viewing area given in optional file. Optional data will be plotted but may not appear as expected.")
+                
+                # double check the map projection
+                _check_requested_projection(optionalFileObject.file_object.get_global_attribute("MAP_PROJECTION"), fileDescription="the optional data file")
+                
+                # otherwise try to get the data we need if possible
+                if ((defaultValues['windLonName']  in tempVarList) and (defaultValues['windLatName'] in tempVarList) and
+                    (defaultValues['windTimeName'] in tempVarList) and
+                    (defaultValues['windUName']    in tempVarList) and (defaultValues['windVName']   in tempVarList)) :
                     
-                else :
+                    # if we have all the winds related variables available, load the winds data
+                    # TODO, should the user be able to control these names?
+                    optionalDataWindsLatitude  = optionalFileObject.file_object[defaultValues['windLatName']]
+                    optionalDataWindsLongitude = optionalFileObject.file_object[defaultValues['windLonName']]
+                    optionalDataWindsTime      = optionalFileObject.file_object[defaultValues['windTimeName']]
+                    optionalDataWindU          = optionalFileObject.file_object[defaultValues['windUName']]
+                    optionalDataWindV          = optionalFileObject.file_object[defaultValues['windVName']]
+                    doOptionalWinds = True
                     
-                    # double check the map projection
-                    _check_requested_projection(optionalFileObject.file_object.get_global_attribute("MAP_PROJECTION"), fileDescription="the optional data file")
+                    # TODO, I'd really rather not do this, for the moment I don't have a choice
+                    tempLatSize =  optionalDataWindsLatitude.size
+                    tempLonSize = optionalDataWindsLongitude.size
+                    tempLat     =  optionalDataWindsLatitude
+                    tempLon     = optionalDataWindsLongitude
+                    optionalDataWindsLatitude  = np.transpose(np.repeat([tempLat], tempLonSize, axis=0))
+                    optionalDataWindsLongitude =              np.repeat([tempLon], tempLatSize, axis=0)
                     
-                    # otherwise try to get the data we need if possible
-                    if ((defaultValues['windLonName']  in tempVarList) and (defaultValues['windLatName'] in tempVarList) and
-                        (defaultValues['windTimeName'] in tempVarList) and
-                        (defaultValues['windUName']    in tempVarList) and (defaultValues['windVName']   in tempVarList)) :
-                        
-                        # if we have all the winds related variables available, load the winds data
-                        # TODO, should the user be able to control these names?
-                        optionalDataWindsLatitude  = optionalFileObject.file_object[defaultValues['windLatName']]
-                        optionalDataWindsLongitude = optionalFileObject.file_object[defaultValues['windLonName']]
-                        optionalDataWindsTime      = optionalFileObject.file_object[defaultValues['windTimeName']]
-                        optionalDataWindU          = optionalFileObject.file_object[defaultValues['windUName']]
-                        optionalDataWindV          = optionalFileObject.file_object[defaultValues['windVName']]
-                        doOptionalWinds = True
-                        
-                        # TODO, I'd really rather not do this, for the moment I don't have a choice
-                        tempLatSize =  optionalDataWindsLatitude.size
-                        tempLonSize = optionalDataWindsLongitude.size
-                        tempLat     =  optionalDataWindsLatitude
-                        tempLon     = optionalDataWindsLongitude
-                        optionalDataWindsLatitude  = np.transpose(np.repeat([tempLat], tempLonSize, axis=0))
-                        optionalDataWindsLongitude =              np.repeat([tempLon], tempLatSize, axis=0)
-                    
-                    # if any cloud effective emissivity swaths are available load them
-                    possibleEmissNames = _get_matching_terms_from_list(tempVarList, defaultValues['emissNameBase'])
-                    if len(possibleEmissNames) > 0 :
-                        LOG.debug("cloud effective emissivity variables found: " + str(possibleEmissNames))
-                        for emissName in possibleEmissNames :
-                            tempEmissData    = optionalFileObject.file_object[emissName]
-                            tempMissingValue = optionalFileObject.file_object.missing_value(emissName)
-                            listOfCloudEffectiveEmissivityPasses[emissName] = ma.masked_where(tempEmissData == tempMissingValue, tempEmissData)
-                        doOptionalCloudEffectiveEmiss = True
-                    
-                    # load optical depth land and ocean if it's present
-                    possibleOpticalDepthNames = _get_matching_terms_from_list(tempVarList, defaultValues['aodNameBase'])
-                    if len(possibleOpticalDepthNames) > 0 :
-                        LOG.debug("optical depth land and ocean variables found: " + str(possibleOpticalDepthNames))
-                        for aodName in possibleOpticalDepthNames :
-                            tempAODData      = optionalFileObject.file_object[aodName]
-                            tempMissingValue = optionalFileObject.file_object.missing_value(aodName)
-                            listOfOpticalDepthLandAndOcean[aodName] = ma.masked_where(tempAODData == tempMissingValue, tempAODData)
-                        doOptionalDepthLandAndOcean = True
-                    
-                    # if either the cloud effective emissivity or the optical depth land and ocean were loaded,
-                    # then we need to load the associated lat and lon variables
-                    if doOptionalCloudEffectiveEmiss or doOptionalDepthLandAndOcean :
-                        possibleOptionalLatNames = _get_matching_terms_from_list(tempVarList, defaultValues['optLatBase'])
-                        possibleOptionalLonNames = _get_matching_terms_from_list(tempVarList, defaultValues['optLonBase'])
-                        LOG.debug ("optional longitude variables found: " + str(possibleOptionalLonNames))
-                        LOG.debug ("optional latitude  variables found: " + str(possibleOptionalLatNames))
-                        # if we can't find lon/lat, we can't plot these! Note: this still fails if we have partial lon/lat, could compare sizes in FUTURE
-                        if (len(possibleOptionalLatNames) <= 0) or (len(possibleOptionalLonNames) <= 0) :
-                            LOG.warn("Unable to find corresponding longitude and latitude data for some optional variables. "
-                                     + "Data without corresponding longitude and latitude data will not be plotted.")
-                            doOptionalDepthLandAndOcean   = False
-                            doOptionalCloudEffectiveEmiss = False
-                        else :
-                            # if we found lon and lat, load them
-                            for lonName in possibleOptionalLonNames :
-                                listOfOptionalLon[lonName] = optionalFileObject.file_object[lonName]
-                            for latName in possibleOptionalLatNames :
-                                listOfOptionalLat[latName] = optionalFileObject.file_object[latName]
+                # if any cloud effective emissivity swaths are available load them
+                possibleEmissNames = _get_matching_terms_from_list(tempVarList, defaultValues['emissNameBase'])
+                if len(possibleEmissNames) > 0 :
+                    LOG.debug("cloud effective emissivity variables found: " + str(possibleEmissNames))
+                    for emissName in possibleEmissNames :
+                        tempEmissData    = optionalFileObject.file_object[emissName]
+                        tempMissingValue = optionalFileObject.file_object.missing_value(emissName)
+                        listOfCloudEffectiveEmissivityPasses[emissName] = ma.masked_where(tempEmissData == tempMissingValue, tempEmissData)
+                    doOptionalCloudEffectiveEmiss = True
+                
+                # load optical depth land and ocean if it's present
+                possibleOpticalDepthNames = _get_matching_terms_from_list(tempVarList, defaultValues['aodNameBase'])
+                if len(possibleOpticalDepthNames) > 0 :
+                    LOG.debug("optical depth land and ocean variables found: " + str(possibleOpticalDepthNames))
+                    for aodName in possibleOpticalDepthNames :
+                        tempAODData      = optionalFileObject.file_object[aodName]
+                        tempMissingValue = optionalFileObject.file_object.missing_value(aodName)
+                        listOfOpticalDepthLandAndOcean[aodName] = ma.masked_where(tempAODData == tempMissingValue, tempAODData)
+                    doOptionalDepthLandAndOcean = True
+                
+                # if either the cloud effective emissivity or the optical depth land and ocean were loaded,
+                # then we need to load the associated lat and lon variables
+                if doOptionalCloudEffectiveEmiss or doOptionalDepthLandAndOcean :
+                    possibleOptionalLatNames = _get_matching_terms_from_list(tempVarList, defaultValues['optLatBase'])
+                    possibleOptionalLonNames = _get_matching_terms_from_list(tempVarList, defaultValues['optLonBase'])
+                    LOG.debug ("optional longitude variables found: " + str(possibleOptionalLonNames))
+                    LOG.debug ("optional latitude  variables found: " + str(possibleOptionalLatNames))
+                    # if we can't find lon/lat, we can't plot these! Note: this still fails if we have partial lon/lat, could compare sizes in FUTURE
+                    if (len(possibleOptionalLatNames) <= 0) or (len(possibleOptionalLonNames) <= 0) :
+                        LOG.warn("Unable to find corresponding longitude and latitude data for some optional variables. "
+                                 + "Data without corresponding longitude and latitude data will not be plotted.")
+                        doOptionalDepthLandAndOcean   = False
+                        doOptionalCloudEffectiveEmiss = False
+                    else :
+                        # if we found lon and lat, load them
+                        for lonName in possibleOptionalLonNames :
+                            listOfOptionalLon[lonName] = optionalFileObject.file_object[lonName]
+                        for latName in possibleOptionalLatNames :
+                            listOfOptionalLat[latName] = optionalFileObject.file_object[latName]
+        
+        # matplotlib needs the longitudes between 0 and 360 to get mercater correct TODO, this may need to change in future
+        if northeastLon < 0 :
+            northeastLon = northeastLon + 360.0
+        elif northeastLon > 360.0 :
+            northeastLon = northeastLon % 360.0
+        if southwestLon < 0 :
+            southwestLon = southwestLon + 360.0
+        elif southwestLon > 360.0 :
+            southwestLon = southwestLon % 360.0
         
         # build a basemap
         LOG.info("Building basemap object.")
@@ -658,8 +724,11 @@ python -m glance.imapp_plot aodTraj A.nc
         initLatData =  latitudeData[0].ravel()
         for currentTime in range (startTime, endTime + 1) :
             
-            # TEMP for debugging during develpment
+            # this helps with clarity in debugging so that each frame has a separator in the output
             LOG.debug ("**********")
+            
+            # create a time delta object to represent how far we are from the reference time unit in the file
+            timeChangeObject = timedelta(0, 0, 0, 0, 0, currentTime) # the position we're filling is hours
             
             # get the time that represents the most current trajectory data
             mostCurrentTrajTimeIndex = _find_most_current_index_at_time (trajectoryTimeData, currentTime)
@@ -670,7 +739,7 @@ python -m glance.imapp_plot aodTraj A.nc
             thisFramePressures = None
             thisFramePressLon  = None
             thisFramePressLat  = None
-            if mostCurrentTrajTimeIndex >= firstTimeIncludedIndex :
+            if (mostCurrentTrajTimeIndex >= firstTimeIncludedIndex) and (firstTimeIncludedIndex >= 0) :
                 
                 # TODO , double check that this isn't off by one
                 LOG.debug("Most current time index: " + str(mostCurrentTrajTimeIndex))
@@ -714,7 +783,7 @@ python -m glance.imapp_plot aodTraj A.nc
             zCounter = 1
             
             # if we're doing cloud effective emissivity, add those to the background list
-            if doOptionalCloudEffectiveEmiss :
+            if doOptionalCloudEffectiveEmiss and ((not options.limitClouds) or (numImagesSaved is 0)) :
                 tempLevels = _make_range_with_masked_arrays(listOfCloudEffectiveEmissivityPasses.values(), LEVELS_FOR_BACKGROUND_PLOTS,
                                                             optional_bottom_boundry=0.0, optional_top_boundry=1.0)
                 for emissName in sorted(listOfCloudEffectiveEmissivityPasses.keys()) :
@@ -739,6 +808,10 @@ python -m glance.imapp_plot aodTraj A.nc
                                                     matplotlib.cm.jet, tempLevels]
                     zCounter = zCounter + 1
             
+            # build the title we'll use for our figure
+            timeTemp  = timeReferenceObject + timeChangeObject
+            titleTemp = "MODIS AOD & AOD Trajectories on " + timeTemp.strftime("%Y-%m-%d %HZ") # TODO, this is not quite the format they asked for, but close
+            
             # make the plot
             LOG.info("Creating trajectory plot for time " + str(float(currentTime)) + ".")
             tempFigure = _create_imapp_figure (initAODFlat,                     initLonData,                          initLatData,
@@ -746,13 +819,19 @@ python -m glance.imapp_plot aodTraj A.nc
                                                baseMapInstance=basemapObject, parallelWidth=parallelWidth, meridianWidth=meridianWidth,
                                                windsDataU=currentWindsU, windsDataV=currentWindsV,
                                                windsDataLon=optionalDataWindsLongitude, windsDataLat=optionalDataWindsLatitude,
-                                               figureTitle="MODIS AOD & AOD Trajectories on " + str(currentTime) + "Z",
-                                               backgroundDataSets=backgroundData)
+                                               figureTitle=titleTemp,
+                                               backgroundDataSets=backgroundData, plotInitAOD=(not options.hideInitAOD ) )
                                                # TODO, the figure title needs to have the dates in it and the day may roll over, so current time can't be put in directly
             
             # save the plot to disk
             LOG.info("Saving plot to disk.")
-            tempFigure.savefig(os.path.join(options.outpath, str(currentTime) + defaultValues['figureName']), dpi=defaultValues['figureDPI'])
+            figureNameAndPath = os.path.join(options.outpath, ("%02d" % currentTime) + defaultValues['figureName']) # the "%02d" % currentTime zero pads to 2 characters, FUTURE this is depreciated in python 3.0
+            tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
+            if (not savedThumb) or (numImagesSaved is options.thumbnailFrameNumber) :
+                thumbNameAndPath = os.path.join(options.outpath, defaultValues['thumbPrefix'] + defaultValues['figureName'])
+                tempFigure.savefig(thumbNameAndPath, dpi=defaultValues['thumbDPI']) # we are trying to make a thumbnail that's about 720 px wide by 576 px high
+                savedThumb = True
+            numImagesSaved += 1
             
             # get rid of the figure 
             plt.close(tempFigure)
