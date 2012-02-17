@@ -58,7 +58,7 @@ defaultValues   = {
 
 ACCEPTABLE_MAP_PROJECTIONS = ['cylindrical']
 
-LEVELS_FOR_BACKGROUND_PLOTS    = 20
+LEVELS_FOR_BACKGROUND_PLOTS    = 50
 DEFAULT_WINDS_SUBDIVIDE_FACTOR = 1
 
 # a custom colormap or the Trajectory Pressures
@@ -176,6 +176,7 @@ def _draw_contour_with_basemap (baseMapInstance, data, lonData, latData, levels=
             p = baseMapInstance.contourf(tempX, tempY, data, levels, **kwargs)
         else :
             p = baseMapInstance.contourf(tempX, tempY, data, **kwargs)
+        
     
     # TODO, do I need to return tempX and tempY in the future?
 
@@ -345,7 +346,8 @@ def _make_range_with_masked_arrays(list_of_masked_arrays, num_intervals, offset_
     (these may be used for plotting the data)
     if an offset is passed, the outtermost range will be expanded by that much
     
-    If optional top or bottom boundaries are given, the range will be expanded to include them.
+    If optional top or bottom boundaries are given, the edges of the range will be set to the given boundary
+    (this may cause data to be excluded from the range; no warning will be issued).
     
     note: the list of masked arrays may be 0 or more masked arrays, if it 0, this
     method returns None since no useful range can be created
@@ -364,9 +366,9 @@ def _make_range_with_masked_arrays(list_of_masked_arrays, num_intervals, offset_
     
     # if we were given optional boundaries, incorporate them
     if optional_top_boundry    is not None:
-        maxVal = max(maxVal, optional_top_boundry)
+        maxVal = optional_top_boundry
     if optional_bottom_boundry is not None:
-        minVal = min(minVal, optional_bottom_boundry)
+        minVal = optional_bottom_boundry
     
     # TODO, there's the possibility for failure here if all data is fully masked out?
     
@@ -423,6 +425,7 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     # if we got a color bar back, make sure it's in the right place
     if pressColorBar is not None :
         pressColorBar.ax.set_position([0.4, -0.16, 0.25, 0.25])
+        pressColorBar.ax.invert_xaxis() # we want to plot the color bar from high pressure to low, the reverse of the default
     
     # only plot the initial points if our flag says to
     if plotInitAOD :
@@ -799,6 +802,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
             if doOptionalDepthLandAndOcean :
                 tempLevels = _make_range_with_masked_arrays(listOfOpticalDepthLandAndOcean.values(), LEVELS_FOR_BACKGROUND_PLOTS,
                                                             optional_bottom_boundry=0.0, optional_top_boundry=1.0)
+                #print ("**** temp levels for AOD background: " + str(tempLevels))
                 for aodName in sorted(listOfOpticalDepthLandAndOcean.keys()) :
                     aodNumber = aodName.split('_')[-1] # get the number off the end of the name
                     # if the numbering is at all different between the variables, this will fail
