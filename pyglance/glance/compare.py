@@ -287,8 +287,9 @@ def _load_config_or_options(aPath, bPath, optionsSet, requestedVars = [ ]) :
     
     # set up the paths, they can only come from the command line
     paths = {}
-    paths['a']   = aPath 
-    paths['b']   = bPath
+    paths['a']   = aPath
+    if bPath is not None:
+        paths['b']   = bPath
     paths['out'] = optionsSet['outputpath']
     
     # the colocation selection can only come from the command line options
@@ -1255,6 +1256,334 @@ def _setup_dir_if_needed(dirPath, descriptionName) :
         LOG.info("Creating " + descriptionName + " directory.")
         os.makedirs(dirPath)
 
+def inspect_library_call (a_path, var_list=[ ],
+                            options_set={ },
+                            # todo, this doesn't yet do anything
+                            do_document=False,
+                            # todo, the output channel does nothing at the moment
+                            output_channel=sys.stdout) :
+    """
+    this method handles the actual work of the inspect command line tool
+    and can also be used as a library routine, pass in the slightly parsed
+    command line input, or call it as a library function... be sure to fill
+    out the options
+    
+    TODO at the moment the options are very brittle and need to be fully filled
+    or this method will fail badly (note: the addition of some glance defaults
+    has minimized the problem, but you still need to be careful when dealing with
+    optional boolean values. this needs more work.)
+    """
+    
+    # load the user settings from either the command line or a user defined config file
+    pathsTemp, runInfo, defaultValues, requestedNames, usedConfigFile = _load_config_or_options(a_path, None, # note, there is no B path
+                                                                                                options_set,
+                                                                                                requestedVars = var_list)
+    
+    # note some of this information for debugging purposes
+    LOG.debug('paths: ' +           str(pathsTemp))
+    LOG.debug('defaults: ' +        str(defaultValues))
+    LOG.debug('run information: ' + str(runInfo))
+    
+    # if we wouldn't generate anything, just stop now
+    if (not runInfo['shouldIncludeImages']) and (not runInfo['shouldIncludeReport']) :
+        LOG.warn("User selection of no image generation and no report generation will result in no " +
+                 "content being generated. Aborting generation function.")
+        return
+    
+    # hang onto info to identify who/what/when/where/etc. the report is being run by/for 
+    runInfo.update(_get_run_identification_info( ))
+    
+    # deal with the input and output files
+    if not (os.path.isdir(pathsTemp['out'])) :
+        LOG.info("Specified output directory (" + pathsTemp['out'] + ") does not exist.")
+        LOG.info("Creating output directory.")
+        os.makedirs(pathsTemp['out'])
+    # open the file
+    files = {}
+    LOG.info("Processing File A:")
+    aFile = dataobj.FileInfo(pathsTemp['a'])
+    files['file A'] = aFile.get_old_info_dictionary() # FUTURE move to actually using the file object to generate the report
+    if aFile.file_object is None:
+        LOG.warn("Unable to continue with examination because file (" + pathsTemp['a'] + ") could not be opened.")
+        sys.exit(1)
+    
+    # TODO, translate the copied code
+    
+    # get information about the names the user requested
+    finalNames, nameStats = _resolve_names(aFile.file_object, bFile.file_object,
+                                           defaultValues,
+                                           requestedNames, usedConfigFile)
+    
+    LOG.debug("output dir: " + str(pathsTemp['out']))
+    
+    # return for lon_lat_data variables will be in the form 
+    #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
+    # or { } if there is no lon/lat info
+    lon_lat_data = { }
+    spatialInfo  = { }
+    try :
+        lon_lat_data, spatialInfo = _handle_lon_lat_info (runInfo, aFile, bFile, pathsTemp['out'],
+                                                          should_make_images = runInfo["shouldIncludeImages"],
+                                                          fullDPI=runInfo['detail_DPI'], thumbDPI=runInfo['thumb_DPI'])
+    except VariableLoadError, vle :
+        LOG.warn("Error while loading longitude or latitude: ")
+        LOG.warn(vle.msg)
+        exit(1)
+    except VariableComparisonError, vce :
+        LOG.warn("Error while comparing longitude or latitude: ")
+        LOG.warn(vce.msg)
+        exit(1)
+    
+    # if there is an approved lon/lat shape, hang on to that for future checks
+    good_shape_from_lon_lat = None
+    if len(lon_lat_data.keys()) > 0:
+        good_shape_from_lon_lat = lon_lat_data['common']['lon'].shape
+    
+    # this will hold information for the summary report
+    # it will be in the form
+    # [displayName] = {"passEpsilonPercent":     percent ok with epsilon,
+    #                  "finite_similar_percent": percent with the same finiteness, 
+    #                  "epsilon":                epsilon value used}
+    variableComparisons = {}
+    
+    # go through each of the possible variables in our files
+    # and make a report section with images for whichever ones we can
+    for displayName in finalNames:
+        
+        # pull out the information for this variable analysis run
+        varRunInfo = finalNames[displayName].copy()
+        
+        # get the various names
+        technical_name, b_variable_technical_name, \
+                explanationName = _get_name_info_for_variable(displayName, varRunInfo)
+        
+        LOG.info('analyzing: ' + explanationName)
+        
+        # load the variable data
+        aData = _load_variable_data(aFile.file_object, technical_name,
+                                    dataFilter = varRunInfo['data_filter_function_a'] if 'data_filter_function_a' in varRunInfo else None,
+                                    variableToFilterOn = varRunInfo['variable_to_filter_on_a'] if 'variable_to_filter_on_a' in varRunInfo else None,
+                                    variableBasedFilter = varRunInfo['variable_based_filter_a'] if 'variable_based_filter_a' in varRunInfo else None,
+                                    fileDescriptionForDisplay = "file A")
+        bData = _load_variable_data(bFile.file_object, b_variable_technical_name,
+                                    dataFilter = varRunInfo['data_filter_function_b'] if 'data_filter_function_b' in varRunInfo else None,
+                                    variableToFilterOn = varRunInfo['variable_to_filter_on_b'] if 'variable_to_filter_on_b' in varRunInfo else None,
+                                    variableBasedFilter = varRunInfo['variable_based_filter_b'] if 'variable_based_filter_b' in varRunInfo else None,
+                                    fileDescriptionForDisplay = "file B")
+        
+        # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
+        include_images_for_this_variable = ((not('shouldIncludeImages' in runInfo)) or (runInfo['shouldIncludeImages']))
+        if 'shouldIncludeImages' in varRunInfo :
+            include_images_for_this_variable = varRunInfo['shouldIncludeImages']
+        do_not_test_with_lon_lat = (not include_images_for_this_variable) or (len(lon_lat_data.keys()) <= 0)
+        
+        # handle vector data
+        isVectorData = ( ('magnitudeName' in varRunInfo)  and ('directionName'  in varRunInfo) and
+                         ('magnitudeBName' in varRunInfo) and ('directionBName' in varRunInfo) )
+        
+        # check if this data can be displayed but
+        # don't compare lon/lat sizes if we won't be plotting
+        if ( (aData.shape == bData.shape) 
+             and 
+             ( do_not_test_with_lon_lat
+              or
+              ((aData.shape == good_shape_from_lon_lat) and (bData.shape == good_shape_from_lon_lat)) ) ) :
+            
+            # check to see if there is a directory to put information about this variable in,
+            # if not then create it
+            variableDir = os.path.join(pathsTemp['out'], './' + displayName)
+            varRunInfo['variable_dir'] = variableDir
+            varRunInfo['variable_report_path_escaped'] = quote(os.path.join(displayName, 'index.html'))
+            LOG.debug ("Directory selected for variable information: " + varRunInfo['variable_report_path_escaped'])
+            if not (os.path.isdir(variableDir)) :
+                LOG.debug("Variable directory (" + variableDir + ") does not exist.")
+                LOG.debug("Creating variable directory.")
+                os.makedirs(variableDir)
+            
+            # form the doc and config paths relative to where the variable is
+            upwardPath = './'
+            for number in range(len(displayName.split('/'))) : # TODO this is not general to windows
+                upwardPath = os.path.join(upwardPath, '../')
+            varRunInfo['doc_path'] = quote(os.path.join(upwardPath, 'doc.html'))
+            if 'config_file_name' in runInfo :
+                varRunInfo['config_file_path'] = quote(os.path.join(upwardPath, runInfo['config_file_name']))
+            
+            # figure out the masks we want, and then do our statistical analysis
+            mask_a_to_use = None
+            mask_b_to_use = None
+            if not do_not_test_with_lon_lat :
+                mask_a_to_use = lon_lat_data['a']['inv_mask']
+                mask_b_to_use = lon_lat_data['b']['inv_mask']
+            variable_stats = statistics.StatisticalAnalysis.withSimpleData(aData, bData,
+                                                                           varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b'],
+                                                                           mask_a_to_use, mask_b_to_use,
+                                                                           varRunInfo['epsilon'], varRunInfo['epsilon_percent']).dictionary_form()
+            
+            # add a little additional info to our variable run info before we squirrel it away
+            varRunInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
+            didPass, epsilon_failed_fraction, \
+                     non_finite_fail_fraction, \
+                     r_squared_value = _check_pass_or_fail(varRunInfo, variable_stats, defaultValues)
+            varRunInfo['did_pass'] = didPass
+            # update the overall pass status
+            if didPass is not None :
+                didPassAll = didPassAll & didPass
+            
+            # based on the settings and whether the variable passsed or failed,
+            # should we include images for this variable?
+            if ('only_plot_on_fail' in varRunInfo) and varRunInfo['only_plot_on_fail'] :
+                include_images_for_this_variable = include_images_for_this_variable and (not didPass)
+                varRunInfo['shouldIncludeImages'] = include_images_for_this_variable
+            
+            # to hold the names of any images created
+            image_names = {
+                            'original': [ ],
+                            'compared': [ ]
+                            }
+            
+            # create the images for this variable
+            if (include_images_for_this_variable) :
+                
+                plotFunctionGenerationObjects = [ ]
+                
+                # if the data is the same size, we can always make our basic statistical comparison plots
+                if (aData.shape == bData.shape) :
+                    plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
+                
+                # if the bin and tuple are defined, try to analyze the data as complex
+                # multidimentional information requiring careful sampling
+                if ('binIndex' in varRunInfo) and ('tupleIndex' in varRunInfo) :
+                    plotFunctionGenerationObjects.append(plotcreate.BinTupleAnalysisFunctionFactory())
+                    
+                else : # if it's not bin/tuple, there are lots of other posibilities
+                    
+                    # if it's vector data with longitude and latitude, quiver plot it on the Earth
+                    if isVectorData and (not do_not_test_with_lon_lat) :
+                        plotFunctionGenerationObjects.append(plotcreate.MappedQuiverPlotFunctionFactory())
+                    
+                    # if the data is one dimensional we can plot it as lines
+                    elif   (len(aData.shape) is 1) : 
+                        plotFunctionGenerationObjects.append(plotcreate.LinePlotsFunctionFactory())
+                    
+                    # if the data is 2D we have some options based on the type of data
+                    elif (len(aData.shape) is 2) :
+                        
+                        # if the data is not mapped to a longitude and latitude, just show it as an image
+                        if (do_not_test_with_lon_lat) :
+                            plotFunctionGenerationObjects.append(plotcreate.IMShowPlotFunctionFactory())
+                        
+                        # if it's 2D and mapped to the Earth, contour plot it on the earth
+                        else :
+                            plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
+                
+                # if there's magnitude and direction data, figure out the u and v, otherwise these will be None
+                aUData, aVData = _get_UV_info_from_magnitude_direction_info (aFile.file_object,
+                                                                             varRunInfo['magnitudeName'] if ('magnitudeName') in varRunInfo else None,
+                                                                             varRunInfo['directionName'] if ('directionName') in varRunInfo else None,
+                                                                             lon_lat_data['a']['inv_mask']
+                                                                             if ('a' in lon_lat_data) and ('inv_mask' in lon_lat_data['a']) else None)
+                bUData, bVData = _get_UV_info_from_magnitude_direction_info (bFile.file_object,
+                                                                             varRunInfo['magnitudeBName'] if ('magnitudeBName') in varRunInfo else None,
+                                                                             varRunInfo['directionBName'] if ('directionBName') in varRunInfo else None,
+                                                                             lon_lat_data['b']['inv_mask']
+                                                                             if ('b' in lon_lat_data) and ('inv_mask' in lon_lat_data['b']) else None)
+                
+                # plot our lon/lat related info
+                image_names['original'], image_names['compared'] = \
+                    plot.plot_and_save_comparison_figures \
+                            (aData, bData,
+                             plotFunctionGenerationObjects,
+                             varRunInfo['variable_dir'],
+                             displayName,
+                             varRunInfo['epsilon'],
+                             varRunInfo['missing_value'],
+                             missingValueAltInB = varRunInfo['missing_value_alt_in_b'] if 'missing_value_alt_in_b' in varRunInfo else None,
+                             lonLatDataDict=lon_lat_data,
+                             dataRanges     = varRunInfo['display_ranges']      if 'display_ranges'      in varRunInfo else None,
+                             dataRangeNames = varRunInfo['display_range_names'] if 'display_range_names' in varRunInfo else None,
+                             dataColors     = varRunInfo['display_colors']      if 'display_colors'      in varRunInfo else None,
+                             makeSmall=True,
+                             doFork=runInfo['doFork'],
+                             shouldClearMemoryWithThreads=runInfo['useThreadsToControlMemory'],
+                             shouldUseSharedRangeForOriginal=runInfo['useSharedRangeForOriginal'],
+                             doPlotSettingsDict = varRunInfo,
+                             aUData=aUData, aVData=aVData,
+                             bUData=bUData, bVData=bVData,
+                             binIndex=      varRunInfo['binIndex']        if 'binIndex'        in varRunInfo else None,
+                             tupleIndex=    varRunInfo['tupleIndex']      if 'tupleIndex'      in varRunInfo else None,
+                             binName=       varRunInfo['binName']         if 'binName'         in varRunInfo else 'bin',
+                             tupleName=     varRunInfo['tupleName']       if 'tupleName'       in varRunInfo else 'tuple',
+                             epsilonPercent=varRunInfo['epsilon_percent'] if 'epsilon_percent' in varRunInfo else None,
+                             fullDPI=       runInfo['detail_DPI'],
+                             thumbDPI=      runInfo['thumb_DPI'],
+                             units_a=       varRunInfo['units_a']         if 'units_a'         in varRunInfo else None,
+                             units_b=       varRunInfo['units_b']         if 'units_b'         in varRunInfo else None)
+                
+                LOG.info("\tfinished creating figures for: " + explanationName)
+            
+            # create the report page for this variable
+            if (runInfo['shouldIncludeReport']) :
+                
+                # hang on to our good % and other info to describe our comparison
+                epsilonPassedPercent = (1.0 -  epsilon_failed_fraction) * 100.0
+                finitePassedPercent  = (1.0 - non_finite_fail_fraction) * 100.0 
+                variableComparisons[displayName] = {'pass_epsilon_percent':   epsilonPassedPercent,
+                                                    'finite_similar_percent': finitePassedPercent,
+                                                    'r_squared_correlation':  r_squared_value,
+                                                    'variable_run_info':      varRunInfo
+                                                    }
+                
+                LOG.info ('\tgenerating report for: ' + explanationName) 
+                report.generate_and_save_variable_report(files,
+                                                         varRunInfo, runInfo,
+                                                         variable_stats,
+                                                         spatialInfo,
+                                                         image_names,
+                                                         varRunInfo['variable_dir'], "index.html")
+        
+        # if we can't compare the variable, we should tell the user 
+        else :
+            message = (explanationName + ' ' + 
+                     'could not be compared. This may be because the data for this variable does not match in shape ' +
+                     'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
+                     + str(bData.shape) + ')')
+            if do_not_test_with_lon_lat :
+                message = message + '.'
+            else :
+                message = (message + ' or the data may not match the shape of the selected '
+                     + 'longitude ' + str(good_shape_from_lon_lat) + ' and '
+                     + 'latitude '  + str(good_shape_from_lon_lat) + ' variables.')
+            LOG.warn(message)
+        
+    # the end of the loop to examine all the variables
+    
+    # generate our general report pages once we've analyzed all the variables
+    if (runInfo['shouldIncludeReport']) :
+        
+        # get the current time
+        runInfo['time'] = datetime.datetime.ctime(datetime.datetime.now())
+        
+        # make the main summary report
+        LOG.info ('generating summary report')
+        report.generate_and_save_summary_report(files,
+                                                pathsTemp['out'], 'index.html',
+                                                runInfo,
+                                                variableComparisons, 
+                                                spatialInfo,
+                                                nameStats)
+        
+        # make the glossary
+        LOG.info ('generating glossary')
+        report.generate_and_save_doc_page(statistics.StatisticalAnalysis.doc_strings(), pathsTemp['out'])
+    
+    returnCode = 0 if didPassAll else 2 # return 2 only if some of the variables failed
+    
+    # if we are reporting the pass / fail, return an appropriate status code
+    if do_pass_fail :
+        LOG.debug("Pass/Fail return code: " + str(returnCode))
+        return returnCode
+
+
 def reportGen_library_call (a_path, b_path, var_list=[ ],
                             options_set={ },
                             # todo, this doesn't yet do anything
@@ -1673,6 +2002,53 @@ def stats_library_call(afn, bfn, var_list=[ ],
         return status_code
     # note: if we aren't doing pass/fail, stats will not return anything
 
+def inspect_stats_library_call (afn, var_list=[ ], options_set={ }, do_document=False, output_channel=sys.stdout): 
+    """
+    this method handles the actual work of the inspect_stats command line tool and
+    can also be used as a library routine, simply pass in an output channel
+    and/or use the returned dictionary of statistics for your own form of
+    display.
+    TODO, should this move to a different file?
+    """
+    # unpack some options
+    missing_val  = options_set['missing']
+    
+    LOG.debug ("file a: " + afn)
+    
+    # open the file
+    filesInfo = _open_and_process_files([afn], 1)
+    aFile = filesInfo[afn]['fileObject']
+    
+    # figure out the variable names and their individual settings
+    if len(var_list) <= 0 :
+        var_list = ['.*']
+    names = _parse_varnames( filesInfo['commonVarNames'], var_list, epsilon=None, missing=missing_val )
+    LOG.debug(str(names))
+    doc_each  = do_document and len(names)==1
+    doc_atend = do_document and len(names)!=1
+    
+    for name, epsilon, missing in names:
+        aData = aFile[name]
+        amiss = missing
+        if missing is None:
+            amiss = aFile.missing_value(name)
+        LOG.debug('analyzing %s with missing data value %s' % (name,amiss))
+        print >> output_channel, '-'*32
+        print >> output_channel, name
+        print >> output_channel, ''
+        variable_stats = statistics.StatisticalInspectionAnalysis.withSimpleData(aData, amiss)
+        lal = list(variable_stats.dictionary_form().items())
+        lal.sort()
+        for dictionary_title, dict_data in lal:
+            print >> output_channel, '%s' %  dictionary_title
+            dict_data
+            for each_stat in sorted(list(dict_data)):
+                print >> output_channel, '  %s: %s' % (each_stat, dict_data[each_stat])
+                if doc_each: print >> output_channel, ('    ' + statistics.StatisticalAnalysis.doc_strings()[each_stat])
+            print >> output_channel, '' 
+    if doc_atend:
+        print >> output_channel, ('\n\n' + statistics.STATISTICS_DOC_STR)
+
 def main():
     import optparse
     usage = """
@@ -1683,7 +2059,7 @@ examples:
 python -m glance.compare info A.hdf
 python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0'
 python -m glance.compare plotDiffs A.hdf B.hdf
-python -m glance compare reportGen A.hdf B.hdf
+python -m glance.compare reportGen A.hdf B.hdf
 python -m glance 
 
 """
@@ -1873,6 +2249,77 @@ python -m glance
         b_path = _clean_path(args[1])
         
         return reportGen_library_call(a_path, b_path, args[2:], tempOptions)
+    
+    def inspectStats(*args):
+        """create statistics summary of variables from one file
+        Summarize data on variables in a file.
+        If no variable names are given, summarize all variables.
+        Variable names can be of the form varname::missing to use non-default missing value.
+        Variable names can be regular expressions, e.g. 'image.*' or '.*prof_retr.*::-999'
+        Missing can be empty to stay with default.
+        If _FillValue is an attribute of a variable, that will be used to find missing values where no value is given.
+        Run with -v to get more detailed information on inspect_stats.
+        Examples:
+         python -m glance.compare    inspect_stats A.hdf
+         python -m glance.compare    inspect_stats A.hdf baseline_cmask_seviri_cloud_mask
+         python -m glance.compare -w inspect_stats A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
+        """ 
+        afn = args[0]
+        do_doc = (options.verbose or options.debug)
+        
+        tempOptions = { }
+        tempOptions['missing']       = options.missing
+        # add more if needed for stats
+        
+        inspect_stats_library_call(_clean_path(afn), var_list=args[1:], options_set=tempOptions, do_document=do_doc)
+    
+#    def inspect_report(*args) :
+#        """inspect the contents of a file
+#        This option creates a report and or images examining variables in a file.
+#        
+#        An html report and images detailing the variables in the file will be generated and saved to disk.
+#        The images will be embedded in the report or visible as separate .png files.
+#        
+#        Variables to be compared may be specified after the names of the input file. If no variables
+#        are specified, all variables that match the shape of the longitude and latitude will be compared.
+#        Specified variables that do not exist or do not match the correct data shape will be ignored.
+#        
+#        The user may also use the notation variable_name::missing_value to specify the missing_value which indicates
+#        fill data. If this value is absent (in the case of variable_name:: or just variable_name) glance with attempt
+#        to load the missing value from the file (failing that, no missing values will be analyzed).
+#        
+#        The html report and any created images will be stored in the provided path, or if no path is provided,
+#        they will be stored in the current directory.
+#        
+#        If for some reason you would prefer to generate the report without images, use the --reportonly option. This
+#        option will generate the html report but omit the images. This may be significantly faster, depending on
+#        your system, but the information may be quite a bit more difficult to interpret.
+#        
+#        The longitude and latitude variables may be specified with --longitude and --latitude
+#        If no longitude or latitude are specified the pixel_latitude and pixel_longitude variables will be used by default.
+#        If no longitude or latitude mappings are desired, the --nolonlat option will disable this spatial mapping.
+#        
+#        Examples:
+#         python -m glance.compare inspect_report A.hdf variable_name_1:: variable_name_2 variable_name_3::missing3 variable_name_4::missing4
+#         python -m glance.compare --outputpath=/path/where/output/will/be/placed/ inspect_report A.hdf 
+#         python -m glance.compare inspect_report --longitude=lon_variable_name --latitude=lat_variable_name A.hdf variable_name
+#         python -m glance.compare inspect_report --reportonly A.hdf
+#        """
+#        
+#        tempOptions = { }
+#        tempOptions['outputpath']    = _clean_path(options.outputpath)
+#        tempOptions['configFile']    = _clean_path(options.configFile)
+#        tempOptions['imagesOnly']    = options.imagesOnly
+#        tempOptions['htmlOnly']      = options.htmlOnly
+#        tempOptions['doFork']        = False
+#        tempOptions['noLonLatVars']  = options.noLonLatVars
+#        tempOptions['latitudeVar']   = options.latitudeVar
+#        tempOptions['longitudeVar']  = options.longitudeVar
+#        tempOptions['missing']       = options.missing
+#        
+#        a_path = _clean_path(args[0])
+#        
+#        return inspect_library_call(a_path, args[1:], tempOptions)
     
     def colocateData(*args) :
         """colocate data in two files

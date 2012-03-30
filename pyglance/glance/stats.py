@@ -129,6 +129,56 @@ class MissingValueStatistics (StatisticalData) :
         
         return MissingValueStatistics._doc_strings
 
+class MissingValueInspectionStatistics (StatisticalData) :
+    """
+    A class representing information about where fill values are found
+    in a data.
+    
+    includes the following statistics:
+    
+    missing_count         -    count of points that are missing in the a data set
+    missing_fraction      - fraction of points that are missing in the a data set
+    """
+    
+    _doc_strings = {
+                    'missing_count':         "number of values flagged missing",
+                    'missing_fraction':      "fraction of values flagged missing",
+                    }
+    
+    def __init__(self, dataObject) :
+        """
+        build our fill value related statistics based on the data set
+        """
+        self.title = 'Missing Value Statistics'
+        
+        # pull out a mask for later use
+        missing_mask          = dataObject.masks.missing_mask
+        
+        # figure out some basic statistics
+        self.missing_count    = np.sum(missing_mask)
+        self.missing_fraction = float(self.missing_count) / float(missing_mask.size)
+    
+    def dictionary_form(self) :
+        """
+        get a dictionary form of the statistics
+        """
+        
+        toReturn = {
+                    'missing_count':         self.missing_count,
+                    'missing_fraction':      self.missing_fraction,
+                    }
+        
+        return toReturn
+    
+    @staticmethod
+    def doc_strings( ) :
+        """
+        get documentation strings that match the
+        dictionary form of the statistics
+        """
+        
+        return MissingValueInspectionStatistics._doc_strings
+
 class FiniteDataStatistics (StatisticalData) :
     """
     A class representing information about where finite values are found
@@ -217,6 +267,56 @@ class FiniteDataStatistics (StatisticalData) :
         
         return FiniteDataStatistics._doc_strings
 
+class FiniteDataInspectionStatistics (StatisticalData) :
+    """
+    A class representing information about where finite values are found
+    in a data set.
+    
+    includes the following statistics:
+    
+    finite_count              - the number   of finite data values in the data set
+    finite_fraction           - the fraction of finite data values in the data set
+    """
+    
+    _doc_strings = {
+                    'finite_count': "number of finite values",
+                    'finite_fraction': "fraction of finite values (out of all data points in set)",
+                    }
+    
+    def __init__(self, dataObject) :
+        """
+        build our finite data related statistics based on the data set
+        """
+        self.title = 'Finite Data Statistics'
+        
+        # pull out some data we will use later
+        is_finite_mask       = dataObject.masks.valid_mask
+        
+        # figure out some basic statistics
+        self.finite_count    = np.sum(is_finite_mask)
+        self.finite_fraction = float(self.finite_count) / float(is_finite_mask.size)
+    
+    def dictionary_form(self) :
+        """
+        get a dictionary form of the statistics
+        """
+        
+        toReturn = {
+                    'finite_count':              self.finite_count,
+                    'finite_fraction':           self.finite_fraction,
+                    }
+        
+        return toReturn
+    
+    @staticmethod
+    def doc_strings( ) :
+        """
+        get documentation strings that match the
+        dictionary form of the statistics
+        """
+        
+        return FiniteDataInspectionStatistics._doc_strings
+
 class NotANumberStatistics (StatisticalData) :
     """
     A class representing information about where non-finite values are found
@@ -291,6 +391,56 @@ class NotANumberStatistics (StatisticalData) :
         """
         
         return NotANumberStatistics._doc_strings
+
+class NotANumberInspectionStatistics (StatisticalData) :
+    """
+    A class representing information about where non-finite values are found
+    in a data set.
+    
+    includes the following statistics:
+    
+    nan_count         - the number   of non finite values that are present in the data set
+    nan_fraction      - the fraction of non finite values that are present in the data set
+    """
+    
+    _doc_strings = {
+                    'nan_count': "number of NaNs",
+                    'nan_fraction': "fraction of NaNs",
+                    }
+    
+    def __init__(self, dataObject) :
+        """
+        build our nonfinite data related statistics based on the data set
+        """
+        self.title = 'NaN Statistics'
+        
+        # pull out a mask we will use
+        nan_mask = dataObject.masks.non_finite_mask
+        
+        # get some basic statistics
+        self.nan_count = np.sum(nan_mask)
+        self.nan_fraction = float(self.nan_count) / float(nan_mask.size)
+    
+    def dictionary_form(self) :
+        """
+        get a dictionary form of the statistics
+        """
+        
+        toReturn = {
+                    'nan_count':         self.nan_count,
+                    'nan_fraction':      self.nan_fraction,
+                    }
+        
+        return toReturn
+    
+    @staticmethod
+    def doc_strings( ) :
+        """
+        get documentation strings that match the
+        dictionary form of the statistics
+        """
+        
+        return NotANumberInspectionStatistics._doc_strings
 
 class GeneralStatistics (StatisticalData) :
     """
@@ -398,6 +548,83 @@ class GeneralStatistics (StatisticalData) :
         """
         
         return GeneralStatistics._doc_strings
+
+class GeneralInspectionStatistics (StatisticalData) :
+    """
+    A class representing general information about a data set.
+    
+    includes the following statistics:
+    
+    missing_value   - the fill data value
+    max             - the maximum value
+    min             - the minimum value
+    num_data_points - the total number of data points
+    shape           - the shape of the data
+    spatially_invalid_pts_ignored - number of points corresponding to invalid lat/lon in the set
+                                    (optional if no /lon lat mapped)
+    """
+    
+    _doc_strings = {
+                    'missing_value': 'the value that is considered \"missing\" data when it is found in the data',
+                    'max': 'the maximum finite, non-missing value found in the data',
+                    'min': 'the minimum finite, non-missing value found in the data',
+                    'num_data_points': "number of data points (may be valid or invalid data)",
+                    'shape': "shape of the data",
+                    'spatially_invalid_pts_ignored': 'number of points with invalid latitude/longitude information ' +
+                                                     'in the data that were' +
+                                                     ' ignored for the purposes of data analysis and presentation',
+                    }
+    
+    def __init__(self, dataObject) :
+        """
+        build our general statistics based on the data set
+        """
+        self.title = 'General Statistics'
+        
+        # pull out some masks for later use
+        missing_mask = dataObject.masks.missing_mask
+        ignore_mask  = dataObject.masks.ignore_mask
+        good_mask    = dataObject.masks.valid_mask
+        
+        #assert(missing_mask.shape == ignore_mask.shape)
+        #assert(ignore_mask.shape  == good_mask.shape  )
+        
+        # get the number of data points
+        total_num_values = missing_mask.size
+        
+        # fill in our statistics
+        self.missing_value   = dataObject.select_fill_value()
+        self.max             = delta.max_with_mask(dataObject.data, good_mask)
+        self.min             = delta.min_with_mask(dataObject.data, good_mask)
+        self.num_data_points = total_num_values
+        self.shape           = missing_mask.shape
+        # also calculate the invalid points
+        self.spatially_invalid_pts_ignored = np.sum(ignore_mask)
+    
+    def dictionary_form(self) :
+        """
+        get a dictionary form of the statistics
+        """
+        
+        toReturn = {
+                    'missing_value':   self.missing_value,
+                    'max':             self.max,
+                    'max':             self.max,
+                    'num_data_points': self.num_data_points,
+                    'shape':           self.shape,
+                    'spatially_invalid_pts_ignored': self.spatially_invalid_pts_ignored,
+                    }
+        
+        return toReturn
+    
+    @staticmethod
+    def doc_strings( ) :
+        """
+        get documentation strings that match the
+        dictionary form of the statistics
+        """
+        
+        return GeneralInspectionStatistics._doc_strings
 
 class NumericalComparisonStatistics (StatisticalData) :
     """
@@ -708,6 +935,107 @@ class StatisticalAnalysis (StatisticalData) :
         toReturn.update(NotANumberStatistics.doc_strings())
         toReturn.update(MissingValueStatistics.doc_strings())
         toReturn.update(FiniteDataStatistics.doc_strings())
+        
+        return toReturn
+
+class StatisticalInspectionAnalysis (StatisticalData) :
+    """
+    This class represents a complete statistical analysis of a data set.
+    
+    It includes the following sets of statistics:
+    
+    general      - a GeneralInspectionStatistics object
+    notANumber   - a NotANumberInspectionStatistics object
+    missingValue - a MissingValueInspectionStatistics object
+    finiteData   - a FiniteDataInspectionStatistics object
+    
+    It can also provide a dictionary form of the statistics or the
+    documentation of the statistics.
+    """
+    
+    def __init__ (self) :
+        """
+        this is a blank constructor to support our new class method creation pattern
+        """
+        self.title = "Statistical Summary"
+    
+    @classmethod
+    def withSimpleData (in_class,
+                        dataSet,
+                        missingValue=None,
+                        ignoreMask=None) :
+        """
+        do a full statistical analysis of the data, after building the data object
+        """
+        
+        new_object  = in_class()
+        
+        dataObject = dataobj.DataObject(dataSet, fillValue=missingValue, ignoreMask=ignoreMask)
+        dataObject.self_analysis()
+        
+        new_object._create_stats(dataObject)
+        
+        return new_object
+    
+    @classmethod
+    def withDataObjects (in_class,
+                         dataObject) :
+        """
+        do a full statistical analysis of the data, using the given data object
+        """
+        
+        new_object = in_class()
+        
+        dataObject.self_analysis()
+        new_object._create_stats(dataObject)
+        
+        return new_object
+    
+    def _create_stats(self, dataObject) :
+        """
+        build and set all of the statistics sets
+        """
+        
+        self.general      = GeneralInspectionStatistics(dataObject)
+        self.notANumber   = NotANumberInspectionStatistics(dataObject)
+        self.missingValue = MissingValueInspectionStatistics(dataObject)
+        self.finiteData   = FiniteDataInspectionStatistics(dataObject)
+    
+    
+    def dictionary_form(self) :
+        """
+        get a dictionary form of the statistics
+        """
+        toReturn = { }
+        
+        # build a dictionary of all our statistics
+        toReturn[self.general.title]      = self.general.dictionary_form()
+        toReturn[self.notANumber.title]   = self.notANumber.dictionary_form()
+        toReturn[self.missingValue.title] = self.missingValue.dictionary_form()
+        toReturn[self.finiteData.title]   = self.finiteData.dictionary_form()
+        
+        return toReturn
+    
+    def doc_strings(self) :
+        """
+        get documentation strings that match the
+        dictionary form of the statistics
+        """
+        return StatisticalAnalysis.doc_strings( )
+    
+    # TODO, use this method instead of the dictionary at the bottom of this module
+    @staticmethod
+    def doc_strings( ) :
+        """
+        get documentation strings that match the
+        dictionary form of the statistics
+        """
+        
+        toReturn = { }
+        toReturn.update(GeneralInspectionStatistics.doc_strings())
+        toReturn.update(NotANumberInspectionStatistics.doc_strings())
+        toReturn.update(MissingValueInspectionStatistics.doc_strings())
+        toReturn.update(FiniteDataInspectionStatistics.doc_strings())
         
         return toReturn
 
