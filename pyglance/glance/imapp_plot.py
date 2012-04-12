@@ -159,6 +159,31 @@ def _clean_lon_lat (longitudeData, latitudeData) :
     # TODO, do the latitudes need to be fixed?
     
 
+def _modify_view_window_longitudes(upperRightLon, lowerLeftLon) :
+    """
+    """
+    
+    # matplotlib needs the longitudes between 0 and 360 to get mercater correct TODO, this may need to change in future
+    modifiedViewWindow = False
+    if upperRightLon < 0 :
+        upperRightLon = upperRightLon + 360.0
+        modifiedViewWindow = True
+    elif (upperRightLon > 360.0) and ((upperRightLon % 360.0) > lowerLeftLon) :
+        upperRightLon = upperRightLon % 360.0
+        modifiedViewWindow = True
+    if (lowerLeftLon < 0) and ((lowerLeftLon + 360.0) < upperRightLon) :
+        lowerLeftLon = lowerLeftLon + 360.0
+        modifiedViewWindow = True
+    elif lowerLeftLon > 360.0 :
+        lowerLeftLon = lowerLeftLon % 360.0
+        modifiedViewWindow = True
+    if modifiedViewWindow :
+        LOG.debug ("Viewing window after modification: ")
+        LOG.debug ("    Upper right longitude: " + str(upperRightLon))
+        LOG.debug ("    Lower left longitude:  " + str(lowerLeftLon))
+    
+    return upperRightLon, lowerLeftLon
+
 def _draw_contour_with_basemap (baseMapInstance, data, lonData, latData, levels=None, **kwargs) :
     """
     draw a contour plot of the data using the basemap and the provided lon and lat
@@ -541,6 +566,14 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
     The following functions represent available menu selections.
     """
     
+    # FUTURE, overshooting tops support will be added in the future
+    #def otPlot(*args):
+    #    """plot Overshooting Tops informational images
+    #    Given a file with overshooting tops data, plot out *** TODO, details on the plots?
+    #    """
+        
+        
+    
     def aodTraj(*args):
         """plot AOD trajectory frames
         Given a file with trajectory possitions and pressures over time, plot out
@@ -585,7 +618,15 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         
         # get the base time information and translate it into a date time object
         timeUnitsString     = trajectoryFileObject.file_object.get_attribute(defaultValues['timeVar'], UNITS_CONSTANT)
-        timeReferenceObject = datetime.datetime.strptime(timeUnitsString, "hours since %Y-%m-%d %H:%M:%S %Z")
+        try :
+            timeReferenceObject = datetime.datetime.strptime(timeUnitsString, "hours since %Y-%m-%d %H:%M:%S %Z")
+        except ValueError :
+            LOG.warn ("Unable to parse datetime from file. Trying alternate datetime format.")
+            try :
+                timeReferenceObject = datetime.datetime.strptime(timeUnitsString, "hours since %Y%m%d %H:%M:%S %Z")
+            except ValueError :
+                LOG.warn ("Unable to parse date time with alternate form. Aborting attempt to parse file.")
+                raise
         LOG.debug("starting trajectory time: " + str(timeReferenceObject))
         
         # get information on where we should display the data
@@ -692,21 +733,14 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
                         for latName in possibleOptionalLatNames :
                             listOfOptionalLat[latName] = optionalFileObject.file_object[latName]
         
-        # matplotlib needs the longitudes between 0 and 360 to get mercater correct TODO, this may need to change in future
-        if northeastLon < 0 :
-            northeastLon = northeastLon + 360.0
-        elif northeastLon > 360.0 :
-            northeastLon = northeastLon % 360.0
-        if southwestLon < 0 :
-            southwestLon = southwestLon + 360.0
-        elif southwestLon > 360.0 :
-            southwestLon = southwestLon % 360.0
+        # make sure the view window longitudes are in ranges that matplotlib will accept
+        northeastLon, southwestLon = _modify_view_window_longitudes(northeastLon, southwestLon)
         
         # build a basemap
         LOG.info("Building basemap object.")
         projectionName = 'merc' # use the Mercator Projection; TODO at some point this will need to be checked with a global attribute
         basemapObject  = Basemap (projection=projectionName,llcrnrlat=southwestLat,urcrnrlat=northeastLat,
-                                  llcrnrlon=southwestLon, urcrnrlon=northeastLon, lat_ts=20, resolution='l') # TODO do I need to use lat_ts=20, ?
+                                  llcrnrlon=southwestLon, urcrnrlon=northeastLon, lat_ts=20, resolution='l')
         
         # sort out the times we're using
         timeWindow = options.timeWindow

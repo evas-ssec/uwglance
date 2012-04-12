@@ -2060,7 +2060,8 @@ python -m glance.compare info A.hdf
 python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0'
 python -m glance.compare plotDiffs A.hdf B.hdf
 python -m glance.compare reportGen A.hdf B.hdf
-python -m glance 
+python -m glance.compare gui
+python -m glance.compare inspectStats A.hdf
 
 """
     
@@ -2258,11 +2259,11 @@ python -m glance
         Variable names can be regular expressions, e.g. 'image.*' or '.*prof_retr.*::-999'
         Missing can be empty to stay with default.
         If _FillValue is an attribute of a variable, that will be used to find missing values where no value is given.
-        Run with -v to get more detailed information on inspect_stats.
+        Run with -v to get more detailed information on the statistics provided.
         Examples:
-         python -m glance.compare    inspect_stats A.hdf
-         python -m glance.compare    inspect_stats A.hdf baseline_cmask_seviri_cloud_mask
-         python -m glance.compare -w inspect_stats A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
+         python -m glance.compare    inspectStats A.hdf
+         python -m glance.compare    inspectStats A.hdf baseline_cmask_seviri_cloud_mask
+         python -m glance.compare -w inspectStats A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
         """ 
         afn = args[0]
         do_doc = (options.verbose or options.debug)
