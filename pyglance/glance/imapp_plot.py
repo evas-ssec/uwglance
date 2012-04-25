@@ -145,23 +145,27 @@ def _find_most_current_index_at_time (times_array, current_time) :
     
     return toReturn
 
-def _clean_lon_lat (longitudeData, latitudeData) :
+def _clean_lon_lat (longitudeData, latitudeData, correctNegativeLongitudes=True) :
     """
     if the longitude or latitude is outside of the expected positive range, move it back inside
     (obviously there are valid negative longitudes, but basemap doesn't handle them well)
     """
     
-    while sum(longitudeData < 0) > 0 :
-        longitudeData[longitudeData < 0] += 360.0
-    while sum(longitudeData > 360.0) > 0 :
-        longitudeData[longitudeData > 360.0] %= 360.0
+    if correctNegativeLongitudes :
+        while sum(longitudeData < 0) > 0 :
+            longitudeData[longitudeData < 0] += 360.0
+    longitudeData[longitudeData > 360.0] %= 360.0
     
     # TODO, do the latitudes need to be fixed?
     
 
 def _modify_view_window_longitudes(upperRightLon, lowerLeftLon) :
     """
+    Right now matplotlib is not dealing well with windows where the coordinates are not monotinically increasing from left to right
+    So in some cases the corner points (and the data longitudes) will need to be massaged to make it happy
     """
+    
+    shouldNegativeLongitudeDataBeCorrected = upperRightLon < 0 and lowerLeftLon > 0
     
     # matplotlib needs the longitudes between 0 and 360 to get mercater correct TODO, this may need to change in future
     modifiedViewWindow = False
@@ -182,14 +186,14 @@ def _modify_view_window_longitudes(upperRightLon, lowerLeftLon) :
         LOG.debug ("    Upper right longitude: " + str(upperRightLon))
         LOG.debug ("    Lower left longitude:  " + str(lowerLeftLon))
     
-    return upperRightLon, lowerLeftLon
+    return upperRightLon, lowerLeftLon, shouldNegativeLongitudeDataBeCorrected
 
-def _draw_contour_with_basemap (baseMapInstance, data, lonData, latData, levels=None, **kwargs) :
+def _draw_contour_with_basemap (baseMapInstance, data, lonData, latData, levels=None, correctLongitudes=False, **kwargs) :
     """
     draw a contour plot of the data using the basemap and the provided lon and lat
     """
     
-    _clean_lon_lat (lonData, latData)
+    _clean_lon_lat (lonData, latData, correctNegativeLongitudes=correctLongitudes)
     
     # translate into the coordinate system of the basemap
     tempX, tempY = baseMapInstance(lonData, latData)
@@ -209,6 +213,7 @@ def _draw_winds_with_basemap (baseMapInstance,
                               uData,   vData,
                               lonData, latData,
                               valueData=None,
+                              correctLongitudes=False,
                               **kwargs) :
     """
     draw the given wind vectors using the provided basemap
@@ -216,7 +221,7 @@ def _draw_winds_with_basemap (baseMapInstance,
     if the value data isn't None, use it to control the color values plotted on the vectors
     """
     
-    _clean_lon_lat (lonData, latData)
+    _clean_lon_lat (lonData, latData, correctNegativeLongitudes=correctLongitudes)
     
     # translate into the coordinate system of the basemap
     tempX, tempY = baseMapInstance(lonData, latData)
@@ -241,7 +246,7 @@ def _draw_winds_with_basemap (baseMapInstance,
     
     # TODO, do I need to return tempX and tempY in the future?
 
-def _plot_pressure_data (baseMapInstance, pressureLat, pressureLon, pressureData=None, colorMap=dark_trajectory_pressure_color_map) :
+def _plot_pressure_data (baseMapInstance, pressureLat, pressureLon, pressureData=None, colorMap=dark_trajectory_pressure_color_map, correctLongitudes=False) :
     """
     plot the pressure data and return the color bar so it can be moved around as needed
     """
@@ -251,7 +256,7 @@ def _plot_pressure_data (baseMapInstance, pressureLat, pressureLon, pressureData
     # if we have pressure data plot that
     if pressureData is not None :
         
-        _clean_lon_lat(pressureLon, pressureLat)
+        _clean_lon_lat(pressureLon, pressureLat, correctNegativeLongitudes=correctLongitudes)
         
         # translate the longitude and latitude into map coordinates
         pressX, pressY =  baseMapInstance(pressureLon, pressureLat)
@@ -278,13 +283,13 @@ def _plot_pressure_data (baseMapInstance, pressureLat, pressureLon, pressureData
     
     return colorBarToReturn
 
-def _plot_initial_modis_aod (baseMapInstance, longitude, latitude, initAODdata, colorMap=cm.jet) :
+def _plot_initial_modis_aod (baseMapInstance, longitude, latitude, initAODdata, colorMap=cm.jet, correctLongitudes=False) :
     """
     plot initial modis aod points using the provided base map, return the created
     color bar so it can be moved around as needed
     """
     
-    _clean_lon_lat (longitude, latitude)
+    _clean_lon_lat (longitude, latitude, correctNegativeLongitudes=correctLongitudes)
     
     # translate the longitude and latitude into map coordinates
     initX,  initY  = baseMapInstance(longitude,  latitude)
@@ -324,7 +329,7 @@ def _build_basic_figure_with_map (baseMapInstance, parallelWidth=5.0, meridianWi
         parallels = np.arange(-90.,  90., parallelWidth)
         baseMapInstance.drawparallels(parallels,labels=[1,0,0,1], color=lineColor, linewidth=0.5)
     if meridianWidth is not None :
-        meridians = np.arange(  0., 360., meridianWidth)
+        meridians = np.arange(  -180., 360., meridianWidth)
         baseMapInstance.drawmeridians(meridians,labels=[1,0,0,1], color=lineColor, linewidth=0.5)
         # baseMapInstance.drawmeridians([80, 85, 90],labels=[1,0,0,1], color=lineColor, linewidth=0.5)
     
@@ -408,7 +413,7 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
                           baseMapInstance=None, figureTitle="MODIS AOD & AOD Trajectories",
                           useDarkBackground=True, parallelWidth=None, meridianWidth=None,
                           windsDataU=None, windsDataV=None, windsDataLon=None, windsDataLat=None,
-                          backgroundDataSets={ }, plotInitAOD=True) :
+                          backgroundDataSets={ }, plotInitAOD=True, correctNegativeLongitudes=True) :
     """
     this function is pretty stable now... TODO, documentation forthcoming
     
@@ -434,7 +439,8 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     # plot out any background data sets that we have
     for orderKey in sorted(backgroundDataSets.keys()) :
         tempDataSet, tempLatitude, tempLongitude, tempColorMap, tempLevelsList = backgroundDataSets[orderKey]
-        _draw_contour_with_basemap (baseMapInstance, tempDataSet, tempLongitude, tempLatitude, cmap=tempColorMap, levels=tempLevelsList, lw=0, antialiased=False)
+        _draw_contour_with_basemap (baseMapInstance, tempDataSet, tempLongitude, tempLatitude, cmap=tempColorMap, levels=tempLevelsList,
+                                    correctLongitudes=correctNegativeLongitudes, lw=0, antialiased=False)
                                                                                 # lw is line width, use 0 to hide the lines between contours
                                                                                 # there appears to be a bug in sub-pixel anti-aliasing that is making
                                                                                 # contour lines show up even with lw=0, so turn that off for now :(
@@ -443,10 +449,11 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     # if we have winds to draw, draw those first so they're on the bottom under all the other data
     if ((windsDataU is not None) and (windsDataV is not None) and (windsDataLon is not None) and (windsDataLat is not None)) :
         tempColor = 'w' if useDarkBackground else 'k' # plot our winds in a color that will show up on the background
-        _draw_winds_with_basemap (baseMapInstance, windsDataU,   windsDataV, windsDataLon, windsDataLat, color=tempColor)
+        _draw_winds_with_basemap (baseMapInstance, windsDataU,   windsDataV, windsDataLon, windsDataLat, color=tempColor, correctLongitudes=correctNegativeLongitudes)
     
     # plot the pressure data if appropriate
-    pressColorBar = _plot_pressure_data(baseMapInstance, pressLatitudeData, pressLongitudeData, pressureData=pressureData, colorMap=color_map_to_use)
+    pressColorBar = _plot_pressure_data(baseMapInstance, pressLatitudeData, pressLongitudeData, pressureData=pressureData,
+                                        colorMap=color_map_to_use, correctLongitudes=correctNegativeLongitudes)
     # if we got a color bar back, make sure it's in the right place
     if pressColorBar is not None :
         pressColorBar.ax.set_position([0.4, -0.16, 0.25, 0.25])
@@ -455,7 +462,7 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     # only plot the initial points if our flag says to
     if plotInitAOD :
         # plot the initial modis AOD points after the pressure so the AOD points are always on top (and visible)
-        aodColorBar = _plot_initial_modis_aod(baseMapInstance, initLongitudeData, initLatitudeData, initAODdata)
+        aodColorBar = _plot_initial_modis_aod(baseMapInstance, initLongitudeData, initLatitudeData, initAODdata, correctLongitudes=correctNegativeLongitudes)
         # if we got a color bar back, make sure it's in the right place
         if aodColorBar is not None :
             aodColorBar.ax.set_position([0.1, -0.16, 0.25, 0.25])
@@ -467,6 +474,42 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     # set up the figure title
     # TODO compose the figure title with time/date info?
     axes.set_title(figureTitle)
+    
+    return figure
+
+def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, latitudeData, colormap=cm.jet) :
+    """
+    Plot the thermal couplet centers using a mask that identifies where they are
+    TODO, this is not finished at all
+    """
+    
+    # build the basic map plot plot
+    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=False,)
+    
+    # build extra info to go to the map plotting function
+    kwargs = { } 
+    
+    # if we've got a color map, pass it to the list of things we want to tell the plotting function
+    kwargs['cmap'] = colormap
+    
+    if (centersMask is not None) :
+        # draw our data
+        centersLon = longitudeData[centersMask]
+        centersLat =  latitudeData[centersMask]
+        tempX, tempY = basemapObject(centersLon, centersLat)
+        p = basemapObject.plot(tempX, tempY, 'bs')
+        
+        # if our colorbar has limits set those
+        #if colorbarLimits is not None :
+        #    clim(vmin=colorbarLimits[0], vmax=colorbarLimits[-1])
+        # make a color bar
+        #cbar = colorbar(format='%.3g')
+        # add the units to the colorbar
+        #if str.lower(str(units)) != "none" :
+        #    cbar.set_label(units)
+    
+    # and some informational stuff
+    axes.set_title("Overshooting Tops/Thermal Couplets")
     
     return figure
 
@@ -566,13 +609,81 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
     The following functions represent available menu selections.
     """
     
-    # FUTURE, overshooting tops support will be added in the future
-    #def otPlot(*args):
-    #    """plot Overshooting Tops informational images
-    #    Given a file with overshooting tops data, plot out *** TODO, details on the plots?
-    #    """
+    """TODO this is still being finished
+    def otPlot(*args):
+        plot Overshooting Tops informational images
+        Given a file with overshooting tops data, plot out *** TODO, details on the plots?
+        TODO fix initial comment quotes
         
+        # setup the output directory now
+        if not (os.path.isdir(options.outpath)) :
+            LOG.info("Specified output directory (" + options.outpath + ") does not exist.")
+            LOG.info("Creating output directory.")
+            os.makedirs(options.outpath)
         
+        # open the file
+        LOG.info("Opening overshooting tops data file.")
+        otFilePath = args[0]
+        otFileObject = dataobj.FileInfo(otFilePath)
+        if otFileObject is None:
+            LOG.warn("Overshooting tops file (" + otFilePath + ") could not be opened.")
+            LOG.warn("Aborting attempt to plot overshooting tops data.")
+            sys.exit(1)
+        
+        # load the required variables
+        # TODO, allow the user control over the names?
+        LOG.info("Loading variable data from overshooting tops data file.")
+        otQAFlag  = otFileObject.file_object["ot_overshooting_top_qa_flag"]
+        otPQIFlag = otFileObject.file_object["ot_overshooting_top_pqi_flag"]
+        # TODO, what else do I need?
+        
+        # create some masks to identify things about the data
+        centersMask = otQAFlag  == 0
+        goodData    = otPQIFlag == 1
+        
+        # get more display information TODO, this may not be used?
+        parallelWidth = options.parallelWidth
+        meridianWidth = options.meridianWidth
+        
+        # get the longitude and latitude information, then use that to figure out the viewing window
+        longitudeData = otFileObject.file_object["pixel_longitude"]
+        latitudeData  = otFileObject.file_object["pixel_latitude"]
+        minLongitude = np.min(longitudeData)
+        maxLongitude = np.max(longitudeData)
+        minLatitude  = np.min(latitudeData)
+        maxLatitude  = np.max(latitudeData)
+        
+        # do some more lon / lat calculations
+        latRange  = maxLatitude  - minLatitude
+        lonRange  = maxLongitude - minLongitude
+        centerLat = minLatitude  + (latRange / 2.0)
+        centerLon = minLongitude + (lonRange / 2.0)
+        
+        # make sure the view window longitudes are in ranges that matplotlib will accept
+        minLongitude, maxLongitude, shouldModifyNegativeLons = _modify_view_window_longitudes(minLongitude, maxLongitude)
+        # TODO, haven't hooked up the boolean to control modification of negative longitudes yet
+        
+        # build a basemap
+        LOG.info("Building basemap object.")
+        projectionName = 'lcc' # use the Lambert Conformal projection; TODO at some point this will need to be checked with a global attribute
+        basemapObject  = Basemap (projection=projectionName,
+                                  llcrnrlat=minLatitude,  urcrnrlat=maxLatitude,
+                                  llcrnrlon=minLongitude, urcrnrlon=maxLongitude,
+                                  lat_0=centerLat, lon_0=centerLon,
+                                  lat_ts=20, resolution='l') # TODO, this may need to be called differently
+        
+        # create a plot of the centers of the thermal couplets
+        LOG.info ("Creating plot of Overshooting Top center locations.")
+        tempFigure = _create_thermal_couplets_figure(basemapObject, centersMask & goodData, longitudeData, latitudeData) # TODO, more will be needed here?
+        
+        # save the plot and then get rid of the local copy
+        LOG.info("Saving plot to disk.")
+        figureNameAndPath = os.path.join(options.outpath, "coupletCenters" + defaultValues['figureName']) # TODO, need a constant other than 'figureName'
+        tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
+        plt.close(tempFigure)
+        del(tempFigure)
+        
+        """
     
     def aodTraj(*args):
         """plot AOD trajectory frames
@@ -734,7 +845,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
                             listOfOptionalLat[latName] = optionalFileObject.file_object[latName]
         
         # make sure the view window longitudes are in ranges that matplotlib will accept
-        northeastLon, southwestLon = _modify_view_window_longitudes(northeastLon, southwestLon)
+        northeastLon, southwestLon, doLonCorrections = _modify_view_window_longitudes(northeastLon, southwestLon)
         
         # build a basemap
         LOG.info("Building basemap object.")
@@ -858,7 +969,8 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
                                                windsDataU=currentWindsU, windsDataV=currentWindsV,
                                                windsDataLon=optionalDataWindsLongitude, windsDataLat=optionalDataWindsLatitude,
                                                figureTitle=titleTemp,
-                                               backgroundDataSets=backgroundData, plotInitAOD=(not options.hideInitAOD ) )
+                                               backgroundDataSets=backgroundData, plotInitAOD=(not options.hideInitAOD ),
+                                               correctNegativeLongitudes=doLonCorrections)
                                                # TODO, the figure title needs to have the dates in it and the day may roll over, so current time can't be put in directly
             
             # save the plot to disk
