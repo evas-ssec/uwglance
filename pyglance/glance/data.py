@@ -332,6 +332,9 @@ class DiffInfoObject (object) :
                                                                                      aDataObject.select_fill_value(),
                                                                                      bDataObject.select_fill_value())
         
+        # we can't continue if we don't have a fill value
+        assert(fill_data_value is not None)
+        
         # construct our diff'ed data set
         raw_diff = np.zeros(shape, dtype=sharedType)
         raw_diff[~valid_in_both] = fill_data_value # throw away invalid data
