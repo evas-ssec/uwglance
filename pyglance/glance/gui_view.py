@@ -9,10 +9,6 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 
 import sys, os.path, logging
 
-PYQT4_HAX = '/sw/lib/qt4-mac/lib/python2.6/site-packages'
-if os.path.isdir(PYQT4_HAX):
-    sys.path.append(PYQT4_HAX)
-
 from PyQt4 import QtGui, QtCore
 
 from functools import partial
