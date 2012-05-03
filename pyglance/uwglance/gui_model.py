@@ -188,6 +188,13 @@ class GlanceGUIModel (object) :
         # get the list of variables, and pick one
         variableList = sorted(newFile.file_object()) # gets a list of all the variables in the file
         tempVariable = str(variableList[0])
+        tempIndex = 0
+        # don't automatically select the nwp variables if possible
+        while (tempVariable.find("nwp_") >= 0) :
+            tempIndex    = tempIndex + 1
+            tempVariable = variableList[tempIndex]
+        
+        LOG.debug ("selected variable: " + str(tempVariable))
         
         # save all of the data related to this file for later use
         self.fileData[filePrefix].file          = newFile

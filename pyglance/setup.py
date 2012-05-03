@@ -11,21 +11,21 @@ distribution:
 python setup.py develop --install-dir=$HOME/Library/Python
 python setup.py sdist
 python setup.py bdist_egg
-(cd dist; rsync -Cuav * larch.ssec.wisc.edu:/var/apache/larch/htdocs/eggs/repos/glance)
+(cd dist; rsync -Cuav * larch.ssec.wisc.edu:/var/apache/larch/htdocs/eggs/repos/uwglance)
 
 use: 
 python setup.py install --install-dir=$HOME/Library/Python
-easy_install -d $HOME/Library/Python -vi http://larch.ssec.wisc.edu/eggs/repos glance
+easy_install -d $HOME/Library/Python -vi http://larch.ssec.wisc.edu/eggs/repos uwglance
 """
 
 # changed to support egg distribution
 from setuptools import setup, find_packages
 
-setup( name="glance", 
+setup( name="uwglance", 
        version="0.2.7.08", 
        zip_safe = False,
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
-       packages = ['glance'], #find_packages('.'),
+       packages = ['uwglance'], #find_packages('.'),
        install_requires=[ 'numpy', 'matplotlib', 'mako>=0.4.1' ],
        package_data = {'': ['*.txt', '*.gif']}
        )

@@ -151,6 +151,10 @@ class GlanceGUIFigures (object) :
             
             tempFigure = figures.create_simple_figure(aDataObject.data, aVarName + "\nin File A",
                                                       invalidMask=~aDataObject.masks.valid_mask, colorMap=cm.jet, units=aUnitsText)
+            # TODO, this is a hack to show AWIPS data, make an option for this at some point on the second tab
+            #tempFigure = figures.create_simple_figure(aDataObject.data.astype(np.uint8), aVarName + "\nin File A",
+            #                                          invalidMask=~aDataObject.masks.valid_mask, colorMap=cm.bone, units=aUnitsText)
+            
             
         elif imageType == model.ORIGINAL_B :
             
