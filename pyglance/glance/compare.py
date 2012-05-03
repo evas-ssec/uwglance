@@ -19,8 +19,14 @@ from subprocess import check_call as sh
 from urllib import quote
 
 import matplotlib
+# this is a hack to keep glance from needing pyqt unless you run the gui
 if "gui" in sys.argv[1:] :
-    matplotlib.use('Qt4Agg')
+    try :
+        matplotlib.use('Qt4Agg')
+        import glance.gui_controller as gui_control
+    except ImportError :
+        print ("*** Unable to import PyQt4. Please install PyQt4 and add it to your PYTHONPATH in order to use the Glance GUI. ***")
+        raise
 else :
     matplotlib.use('Agg')
 
@@ -32,8 +38,6 @@ import glance.report as report
 import glance.stats  as statistics
 import glance.plotcreatefns as plotcreate
 import glance.collocation   as collocation
-
-import glance.gui_controller as gui_control
 
 LOG = logging.getLogger(__name__)
 
