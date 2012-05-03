@@ -9,10 +9,6 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys
 
-PYQT4_HAX = '/sw/lib/qt4-mac/lib/python2.6/site-packages'
-if os.path.isdir(PYQT4_HAX):
-    sys.path.append(PYQT4_HAX)
-
 # these first two lines must stay before the pylab import
 import matplotlib
 #matplotlib.use('Qt4Agg') # use the Anti-Grain Geometry rendering engine
