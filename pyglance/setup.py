@@ -25,7 +25,7 @@ setup( name="uwglance",
        version="0.3", 
        zip_safe = False,
        entry_points = { 'console_scripts': [ 'glance = glance.compare:main' ] },
-       packages = ['uwglance'], #find_packages('.'),
+       packages = ['glance'], #find_packages('.'),
        install_requires=[ 'numpy', 'matplotlib', 'mako>=0.4.1' ],
        package_data = {'': ['*.txt', '*.gif']}
        )

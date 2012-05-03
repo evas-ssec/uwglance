@@ -844,7 +844,7 @@ def _get_run_identification_info( ) :
     return info_to_return
 
 def _get_glance_version_string() :
-    version_num = pkg_resources.require('glance')[0].version
+    version_num = pkg_resources.require('uwglance')[0].version
     
     return "glance, version " + str(version_num) 
 
