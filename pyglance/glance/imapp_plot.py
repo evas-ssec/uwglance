@@ -165,8 +165,6 @@ def _modify_view_window_longitudes(upperRightLon, lowerLeftLon) :
     So in some cases the corner points (and the data longitudes) will need to be massaged to make it happy
     """
     
-    shouldNegativeLongitudeDataBeCorrected = upperRightLon < 0 and lowerLeftLon > 0
-    
     # matplotlib needs the longitudes between 0 and 360 to get mercater correct TODO, this may need to change in future
     modifiedViewWindow = False
     if upperRightLon < 0 :
@@ -186,7 +184,7 @@ def _modify_view_window_longitudes(upperRightLon, lowerLeftLon) :
         LOG.debug ("    Upper right longitude: " + str(upperRightLon))
         LOG.debug ("    Lower left longitude:  " + str(lowerLeftLon))
     
-    return upperRightLon, lowerLeftLon, shouldNegativeLongitudeDataBeCorrected
+    return upperRightLon, lowerLeftLon, modifiedViewWindow
 
 def _draw_contour_with_basemap (baseMapInstance, data, lonData, latData, levels=None, correctLongitudes=False, **kwargs) :
     """
@@ -870,6 +868,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         initAODFlat =   initialAODdata.ravel()
         initLonData = longitudeData[0].ravel()
         initLatData =  latitudeData[0].ravel()
+        
         for currentTime in range (startTime, endTime + 1) :
             
             # this helps with clarity in debugging so that each frame has a separator in the output
