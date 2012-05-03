@@ -31,7 +31,7 @@ from   glance.io   import UNITS_CONSTANT
 
 LOG = logging.getLogger(__name__)
 
-IMAPP_PLOT_VERSION = 0.1
+IMAPP_PLOT_VERSION = 0.3
 
 defaultValues   = {
                     'longitudeVar':  'xtraj',
