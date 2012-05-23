@@ -27,7 +27,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
             % if 'version' in runInfo :
                 report produced with ${runInfo['version']} <br>
             % endif
-            comparison generated ${runInfo['time']} by user ${runInfo['user']} on ${runInfo['machine']}
+            analysis generated ${runInfo['time']} by user ${runInfo['user']} on ${runInfo['machine']}
         </p>
         
         </%block>
@@ -117,7 +117,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
                     longitude: ${runInfo['longitude']}<br>
                 % endif
                 
-                % if ('lon_lat_epsilon' in runInfo) and (runInfo['lon_lat_epsilon'] > 0.0) :
+                % if ('lon_lat_epsilon' in runInfo) and (runInfo['lon_lat_epsilon'] >= 0.0) :
                     longitude/latitude comparison epsilon: ${runInfo['lon_lat_epsilon']}<br>
                 % endif
             </p>

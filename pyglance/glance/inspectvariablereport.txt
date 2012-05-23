@@ -1,0 +1,53 @@
+<%doc>
+This Mako template is intended to create a variable specific report page for Glance.
+
+Created by Eva Schiffer May 2012.
+Copyright (c) 2012 University of Wisconsin SSEC. All rights reserved.
+</%doc>
+
+<%!
+    import glance.report as report
+%>
+
+<%inherit file="variablereport.txt"/>
+
+<%block name="title">
+    <%
+        variableName = runInfo['variable_name']
+        variableDisplayName = variableName
+        if (runInfo.has_key('display_name')):
+            variableDisplayName = runInfo['display_name']
+    %>
+    ${variableDisplayName} Variable Analysis
+</%block>
+
+## additional filtering information specific to the variable being analyzed
+<%block name="additionalFilterInfo">
+    ## display info about the basic data filters if the data was filtered
+    % if ('data_filter_function_a' in runInfo) and (not (runInfo['data_filter_function_a'] is None)) :
+        Note: The data for this variable was filtered.<br>
+        <% wasFiltered = True %>
+    % endif
+</%block>
+
+
+## this is the summary of how the data was compared
+<%block name="comparisonSummary">
+
+<h3>Analysis Information</h3>
+
+## comparison parameters
+<p>
+    ## display the variable names
+    variable name: ${runInfo['variable_name']} <br>
+    
+    ## display the missing value
+    "missing" data value: ${str(runInfo['missing_value'])}<br>
+    
+    ## if there are units available, display those
+    % if ('units_a' in runInfo) and (runInfo['units_a'] is not None) :
+        units in A: ${str(runInfo['units_a'])}<br>
+    % endif
+</p>
+
+</%block>

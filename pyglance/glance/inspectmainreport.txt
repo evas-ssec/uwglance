@@ -1,0 +1,81 @@
+<%doc>
+This Mako template is intended to create a summary report page for Glance.
+
+Created by Eva Schiffer Nov 2011.
+Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
+</%doc>
+
+<%!
+    import glance.report as report
+%>
+
+<%inherit file="basereport.txt"/>
+
+<%block name="title">File Analysis Summary</%block>
+
+## there isn't any disparity to display here because there's only one file
+<%block name="spatialInvalidity"></%block>
+
+## this is the main body block that includes most of the info
+<%block name="comparedData">
+    
+    ## list all of the variables that were examined (if any)
+    <%block name="analyzedVariablesList">
+    
+    % if len(variables.keys()) > 0 : 
+    
+        <h3>Analyzed Variables</h3>
+        
+        ## report on all the variables that were analyzed
+        <blockquote>
+            <p>
+                ## TODO replace the table with floating boxes at some point
+                <table> 
+                    % for variableKey in sorted(list(variables)) :
+                        <%
+                            # get some information about the variable, for convenience
+                            tempVariableInfo = variables[variableKey]
+                            tempVarRunInfo   = tempVariableInfo['variable_run_info']
+                            
+                            technicalName  = tempVarRunInfo['variable_name']
+                            varDisplayName = technicalName
+                            if 'display_name' in tempVarRunInfo :
+                                varDisplayName = tempVarRunInfo['display_name']
+                        %>
+                        <tr>
+                            <td>
+                                ## for spacing
+                            </td>
+                            <td>
+                                Variable: <a href="${tempVarRunInfo['variable_report_path_escaped']}">${varDisplayName}</a> <br>
+                            </td>
+                        </tr>
+                    % endfor
+                </table>
+            </p>
+        </blockquote>
+    
+    % endif
+    
+    </%block>
+    
+    ## report the names of variables shared between the two files, if any
+    <%block name="allVariablesList">
+    
+    <% possVars = varNames['possibleNames'] %>
+    % if len(possVars) > 0 :
+        <h3>Possible Variables</h3>
+        <p>
+            The following variables were present in the file: <br>
+            <blockquote>
+                % for varName in possVars :
+                    ${varName} <br>
+                % endfor
+            </blockquote>
+        </p>
+    % endif
+    
+    </%block>
+    
+</%block>
+

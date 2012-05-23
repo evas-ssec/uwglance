@@ -169,7 +169,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                      binName='bin', tupleName='tuple',
                                      epsilonPercent=None,
                                      fullDPI=None, thumbDPI=None,
-                                     units_a=None, units_b=None) :
+                                     units_a=None, units_b=None,
+                                     useBData=True) :
     """
     Plot images for a set of figures based on the data sets and settings
     passed in. The images will be saved to disk according to the settings.
@@ -225,6 +226,9 @@ def plot_and_save_comparison_figures (aData, bData,
     doPlotSettingsDict - a dictionary containting settings to turn off individual plots
                          if an entry for a plot is not pressent or set to True,
                          then the plot will be created
+    useBData -           should the b data be expected or not? when this is false,
+                         b data will not be used and no lon/lat data for b will be
+                         expected either
     
     ** May fail due to a known bug on MacOSX systems.
     """
@@ -241,31 +245,24 @@ def plot_and_save_comparison_figures (aData, bData,
     spaciallyInvalidMaskA = None
     spaciallyInvalidMaskB = None
     if (lonLatDataDict is not None) and (len(lonLatDataDict.keys()) > 0):
-        spaciallyInvalidMaskA = lonLatDataDict['a']['inv_mask']
-        spaciallyInvalidMaskB = lonLatDataDict['b']['inv_mask']
+        if useBData :
+            spaciallyInvalidMaskA = lonLatDataDict['a']['inv_mask']
+            spaciallyInvalidMaskB = lonLatDataDict['b']['inv_mask']
+        else :
+            spaciallyInvalidMaskA = lonLatDataDict['inv_mask']
     
     # compare the two data sets to get our difference data and mismatch info
     aDataObject = dataobj.DataObject(aData, fillValue=missingValue,       ignoreMask=spaciallyInvalidMaskA)
-    bDataObject = dataobj.DataObject(bData, fillValue=missingValueAltInB, ignoreMask=spaciallyInvalidMaskB)
-    diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon, epsilonPercent=epsilonPercent)
-    #TODO, for the moment, unpack these values into local variables
-    rawDiffData    = diffInfo.diff_data_object.data
-    goodMask       = diffInfo.diff_data_object.masks.valid_mask
-    goodInAMask    = diffInfo.a_data_object.masks.valid_mask
-    goodInBMask    = diffInfo.b_data_object.masks.valid_mask
-    mismatchMask   = diffInfo.diff_data_object.masks.mismatch_mask
-    outsideEpsilonMask = diffInfo.diff_data_object.masks.outside_epsilon_mask
-    aNotFiniteMask = diffInfo.a_data_object.masks.non_finite_mask
-    bNotFiniteMask = diffInfo.b_data_object.masks.non_finite_mask
-    aMissingMask   = diffInfo.a_data_object.masks.missing_mask
-    bMissingMask   = diffInfo.b_data_object.masks.missing_mask
-    spaciallyInvalidMaskA = diffInfo.a_data_object.masks.ignore_mask
-    spaciallyInvalidMaskB = diffInfo.b_data_object.masks.ignore_mask
+    bDataObject = None
+    diffInfo    = None
+    if useBData :
+        bDataObject = dataobj.DataObject(bData, fillValue=missingValueAltInB, ignoreMask=spaciallyInvalidMaskB)
+        diffInfo = dataobj.DiffInfoObject(aDataObject, bDataObject, epsilonValue=epsilon, epsilonPercent=epsilonPercent)
+    else :
+        aDataObject.self_analysis() # if we aren't going to do a diff, make sure basic analysis is done
     
-    absDiffData = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
-    
-    # from this point on, we will be forking to create child processes so we can parallelize our image and
-    # report generation
+    # from this point on, we're forking to create child processes to parallelize image and report generation
+    # and to help control memory leak creeping that matplotlib causes
     isParent = True 
     childPids = [ ]
     
@@ -276,10 +273,9 @@ def plot_and_save_comparison_figures (aData, bData,
         # generate our plotting functions
         moreFunctions = factoryObject.create_plotting_functions (
                                        # the most basic data set needed
-                                       aData, bData,
+                                       aDataObject, bDataObject,
                                        variableDisplayName,
                                        epsilon,
-                                       goodInAMask, goodInBMask,
                                        doPlotSettingsDict,
                                        
                                        # where the names of the created figures will be stored
@@ -293,11 +289,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                        dataColors=dataColors,
                                        shouldUseSharedRangeForOriginal=shouldUseSharedRangeForOriginal,
                                        
-                                       # parameters that are only used if the data can be compared
-                                       # point by point
-                                       absDiffData=absDiffData, rawDiffData=rawDiffData,
-                                       goodInBothMask=goodMask,
-                                       mismatchMask=mismatchMask, outsideEpsilonMask=outsideEpsilonMask,
+                                       # a comparison of the data if the data comparison info is needed
+                                       differences=diffInfo,
                                        
                                        # only used for plotting quiver data
                                        aUData=aUData, aVData=aVData,

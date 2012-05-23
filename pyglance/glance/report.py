@@ -266,5 +266,152 @@ def generate_and_save_variable_report(files,
     
     return
 
+def generate_and_save_inspect_variable_report(files,
+                                              variableRunInfo, # contains variable specific run information
+                                              generalRunInfo,  # contains run information not related to the variable
+                                              statGroups,
+                                              spatial,
+                                              imageNames,
+                                              outputPath, reportFileName
+                                              ) :
+    """
+    given a file and information about one of the variables in that file,
+    generate an html report about that variable and store it the outputPath/reportFileName provided
+    
+    statGroups is a dictionary in the form
+         statGroups['stat group display name'] = {a dictionary of stats/values to show}
+    ie. there may be many different groups of stats that should each be displayed
+    
+    generalRunInfo is a dictionary in the form
+        generalRunInfo = {  'machine': currentMachine,
+                            'user': currentUser,
+                            'version': a version string describing glance,
+                            'latitude': latitudeName,
+                            'longitude': longitudeName,
+                            'shouldIncludeImages': shouldIncludeImages,
+                            }
+    
+    variableRunInfo is a dictionary in the form
+        variableRunInfo = { 'variable_name': variableName,
+                            'missing_value': missingDataValue,
+                            'display_name': displayName,
+                            'time': currentTime
+                            }
+                            
+    files is a dictionary in the form
+        files = {'file A': {'path': fileAName,
+                            #'displayName': fileADisplayName, # TODO
+                            'lastModifiedTime': lastModifiedTimeA,
+                            'md5sum': aMD5SUM
+                            },
+                    }
+                    
+    spatial is a dictionary in the form
+        spatial = {
+                    'numInvPts': number of spatially invalid points only in A (and not corrspondingly in B),
+                    'perInvPts': percent of spatially invalid points in A (out of all pts in A)
+                                
+                  }
+    
+    imageNames is a dictionary in the form
+        imageNames = {
+                      'original' : [list, of, file-names, of, original, images],
+                      'compared' : [list, of, file-names, of, analyzed, images]
+        }
+    note: the assumption will be made that smaller versions of these images exist
+    in the form small.filename 
+    
+    """
+    
+    # pack up all the data for a report on a particular variable
+    
+    # information about the run in general
+    runInfo = generalRunInfo.copy()
+    runInfo.update(variableRunInfo)
+    
+    # put all the info together in the kwargs
+    kwargs = { 'runInfo': runInfo,
+               'files' : files,
+               'statGroups': statGroups,
+               'spatial': spatial,
+               'imageNames': imageNames
+               }
+    
+    _make_and_save_page((outputPath + "/" + reportFileName), 'inspectvariablereport.txt', **kwargs)
+    
+    return
+
+def generate_and_save_inspection_summary_report(files,
+                                                outputPath, reportFileName,
+                                                runInfo,
+                                                variables,
+                                                spatial={},
+                                                varNames={}) :
+    """
+    given two files, and information about them, save a summary of their comparison
+    The summary report, in html format will be saved to the given outputPath/outputFile
+    
+    Variables should be a dictionary keyed on the name of each compared variable and containing the
+    % of data values that were judged to be "similar enough" between file A and B (according
+    to the epsilon originally inputed for the comparison) and the epsilon used for the comparison
+        variables[var_name] = {"pass_epsilon_percent": percent "similar enough" according to epsilon,
+                               "variable_run_info": variable Run Info <- as defined for a variable report
+                               }
+    more keys can be added in the future if more detailed data reporting is desired on the main report page
+    
+    runInfo should be information about the run in the form
+        runInfo = {'machine': currentMachine,
+                   'user': currentUser,
+                   'time': currentTime,
+                   'version': a version string describing glance,
+                   'latitude': latitudeName,
+                   'longitude': longitudeName,
+                   'shouldIncludeImages': shouldIncludeImages,      # this key/value is optional, defaults to True
+                   }
+                   
+    files is a dictionary in the form
+        files = {'file A': {'path': fileAName,
+                            #'displayName': fileADisplayName, # TODO
+                            'lastModifiedTime': lastModifiedTimeA,
+                            'md5sum': aMD5SUM
+                            },
+                    }
+    
+    spatial is a dictionary in the form
+        spatial = {
+                   'numInvPts': number of spatially invalid points only in A (and not corrspondingly in B),
+                   'perInvPts': percent of spatially invalid points in A (out of all pts in A)
+                   }
+    
+    varNames should be information about the variables present in the file, in the form
+    more information may be added to this dictionary in the future
+        varNames = {'possibleNames': listOfAllVarsInFile,
+                    }
+    """
+    
+    # pack up all the data needed to build the summary report
+    
+    # TODO, more automated defaults
+    varNameDefaults = { 'possibleNames': [ ],}
+    varNamesToUse = varNameDefaults
+    varNamesToUse.update(varNames)
+    
+    # build the full kwargs with all the info
+    kwargs = { 'runInfo': runInfo,
+               'files': files,
+               'spatial': spatial,
+               'varNames': varNamesToUse,
+               'variables': variables 
+               }
+              
+    _make_and_save_page((outputPath + "/" + reportFileName), 'inspectmainreport.txt', **kwargs)
+    
+    # copy the original configuration file, TODO should I move this to a list input in the parameters?
+    if ('config_file_path' in runInfo) :
+        originalConfigFile = runInfo['config_file_path']
+        shutil.copy(originalConfigFile, outputPath)
+    
+    return
+
 if __name__=='__main__':
     sys.exit(main())

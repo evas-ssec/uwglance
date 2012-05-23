@@ -562,6 +562,9 @@ class GeneralInspectionStatistics (StatisticalData) :
     shape           - the shape of the data
     spatially_invalid_pts_ignored - number of points corresponding to invalid lat/lon in the set
                                     (optional if no /lon lat mapped)
+    mean            - the mean of the data values
+    median          - the median of the data values
+    std_val         - the standard deviation of the data values
     """
     
     _doc_strings = {
@@ -573,6 +576,9 @@ class GeneralInspectionStatistics (StatisticalData) :
                     'spatially_invalid_pts_ignored': 'number of points with invalid latitude/longitude information ' +
                                                      'in the data that were' +
                                                      ' ignored for the purposes of data analysis and presentation',
+                    'mean': "the mean of all finite, non-missing values in the data",
+                    'median': "the median of all finite, non-missing values in the data",
+                    'std_val': "the standard deviation of all finite, non-missing values in the data",
                     }
     
     def __init__(self, dataObject) :
@@ -585,6 +591,8 @@ class GeneralInspectionStatistics (StatisticalData) :
         missing_mask = dataObject.masks.missing_mask
         ignore_mask  = dataObject.masks.ignore_mask
         good_mask    = dataObject.masks.valid_mask
+        # grab the valid data for some calculations
+        tempGoodData = dataObject.data[good_mask]
         
         #assert(missing_mask.shape == ignore_mask.shape)
         #assert(ignore_mask.shape  == good_mask.shape  )
@@ -594,12 +602,17 @@ class GeneralInspectionStatistics (StatisticalData) :
         
         # fill in our statistics
         self.missing_value   = dataObject.select_fill_value()
-        self.max             = delta.max_with_mask(dataObject.data, good_mask)
-        self.min             = delta.min_with_mask(dataObject.data, good_mask)
+        self.max             =    np.max(tempGoodData)
+        self.min             =    np.min(tempGoodData)
+        self.mean            =   np.mean(tempGoodData)
+        self.median          = np.median(tempGoodData)
+        self.std_val         =    np.std(tempGoodData)
         self.num_data_points = total_num_values
         self.shape           = missing_mask.shape
         # also calculate the invalid points
         self.spatially_invalid_pts_ignored = np.sum(ignore_mask)
+        
+        
     
     def dictionary_form(self) :
         """
@@ -609,7 +622,10 @@ class GeneralInspectionStatistics (StatisticalData) :
         toReturn = {
                     'missing_value':   self.missing_value,
                     'max':             self.max,
-                    'max':             self.max,
+                    'min':             self.min,
+                    'mean':            self.mean,
+                    'median':          self.median,
+                    'std_val':         self.std_val,
                     'num_data_points': self.num_data_points,
                     'shape':           self.shape,
                     'spatially_invalid_pts_ignored': self.spatially_invalid_pts_ignored,

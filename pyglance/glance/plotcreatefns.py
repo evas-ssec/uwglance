@@ -95,7 +95,7 @@ def _make_shared_range(aData, goodInAMask, bData, goodInBMask, shouldUseSharedRa
     
     return sharedRange
 
-def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, variableDisplayName=None) :
+def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask=None, variableDisplayName=None) :
     """
     Determine the appropriate axes for the given data (in longitude and latitude) and create the appropriate basemap.
     
@@ -107,14 +107,20 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, variableDis
         nameMessage = " (" + variableDisplayName + ")"
     
     # figure out the bounding axis
-    aAxis = get_visible_axes(lonLatDataDict['a']['lon'], lonLatDataDict['a']['lat'], goodInAMask)
-    bAxis = get_visible_axes(lonLatDataDict['b']['lon'], lonLatDataDict['b']['lat'], goodInBMask)
-    fullAxis = [min(aAxis[0], bAxis[0]), max(aAxis[1], bAxis[1]),
-                min(aAxis[2], bAxis[2]), max(aAxis[3], bAxis[3])]
+    aAxis        = get_visible_axes(lonLatDataDict['a']['lon'], lonLatDataDict['a']['lat'], goodInAMask)
+    fullAxis     = aAxis
+    bAxis        = None
+    if goodInBMask is not None :
+        bAxis    = get_visible_axes(lonLatDataDict['b']['lon'], lonLatDataDict['b']['lat'], goodInBMask)
+        fullAxis = [min(aAxis[0], bAxis[0]), max(aAxis[1], bAxis[1]),
+                    min(aAxis[2], bAxis[2]), max(aAxis[3], bAxis[3])]
+    else :
+        LOG.debug("No file b valid mask provided, using visible axes boundaries from file a.")
     
     LOG.debug("Visible axes for file A variable data" + nameMessage + " are: " + str(aAxis))
-    LOG.debug("Visible axes for file B variable data" + nameMessage + " are: " + str(bAxis))
-    LOG.debug("Visible axes shared for both file's variable data" + nameMessage + " are: " + str(fullAxis))
+    if goodInBMask is not None : 
+        LOG.debug("Visible axes for file B variable data" + nameMessage + " are: " + str(bAxis))
+        LOG.debug("Visible axes shared for both file's variable data" + nameMessage + " are: " + str(fullAxis))
     
     if (fullAxis[0] is None) or (fullAxis[1] is None) or (fullAxis[2] is None) or (fullAxis[3] is None) :
         LOG.warn("Unable to display figures for variable" + nameMessage + " because of inability to identify" +
@@ -123,7 +129,12 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask, variableDis
     
     # create our basemap
     LOG.info('\t\tloading base map data')
-    baseMapInstance, fullAxis = maps.create_basemap(lonLatDataDict['common']['lon'], lonLatDataDict['common']['lat'],
+    lonToUse = lonLatDataDict['a']['lon']
+    latToUse = lonLatDataDict['a']['lat']
+    if goodInBMask is not None :
+        lonToUse = lonLatDataDict['common']['lon']
+        latToUse = lonLatDataDict['common']['lat']
+    baseMapInstance, fullAxis = maps.create_basemap(lonToUse, latToUse,
                                                     fullAxis, select_projection(fullAxis))
     
     return fullAxis, baseMapInstance
@@ -142,10 +153,9 @@ class PlottingFunctionFactory :
                                    self,
                                    
                                    # the most basic data set needed
-                                   aData, bData,
+                                   aData, bData, # these should be data objects from glance.data
                                    variableDisplayName,
                                    epsilon,
-                                   goodInAMask, goodInBMask,
                                    doPlotSettingsDict,
                                    
                                    # where the names of the created figures will be stored
@@ -158,11 +168,9 @@ class PlottingFunctionFactory :
                                    dataRanges=None, dataRangeNames=None, dataColors=None,
                                    shouldUseSharedRangeForOriginal=True,
                                    
-                                   # parameters that are only used if the data can be compared
-                                   # point by point
-                                   absDiffData=None, rawDiffData=None,
-                                   goodInBothMask=None,
-                                   mismatchMask=None, outsideEpsilonMask=None,
+                                   # a comparison of the data if the data comparison info is needed
+                                   # this should be a DiffInfoObject from glance.data
+                                   differences=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -191,7 +199,6 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    aData, bData,
                                    variableDisplayName,
                                    epsilon,
-                                   goodInAMask, goodInBMask,
                                    doPlotSettingsDict,
                                    
                                    # where the names of the created figures will be stored
@@ -204,11 +211,9 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    dataRanges=None, dataRangeNames=None, dataColors=None,
                                    shouldUseSharedRangeForOriginal=True,
                                    
-                                   # parameters that are only used if the data can be compared
-                                   # point by point
-                                   absDiffData=None, rawDiffData=None,
-                                   goodInBothMask=None,
-                                   mismatchMask=None, outsideEpsilonMask=None,
+                                   # a comparison of the data if the data comparison info is needed
+                                   # this should be a DiffInfoObject from glance.data
+                                   differences=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -224,6 +229,17 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    units_a=None, units_b=None
                                    
                                    ) :
+        
+        #TODO, for the moment, unpack these values into local variables; FUTURE use the objects directly and as needed
+        goodInAMask        = differences.a_data_object.masks.valid_mask
+        goodInBMask        = differences.b_data_object.masks.valid_mask
+        rawDiffData        = differences.diff_data_object.data
+        absDiffData        = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+        goodInBothMask     = differences.diff_data_object.masks.valid_mask
+        mismatchMask       = differences.diff_data_object.masks.mismatch_mask
+        outsideEpsilonMask = differences.diff_data_object.masks.outside_epsilon_mask
+        aData              = aData.data
+        bData              = bData.data
         
         functionsToReturn = { }
         
@@ -284,7 +300,6 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    aData, bData,
                                    variableDisplayName,
                                    epsilon,
-                                   goodInAMask, goodInBMask,
                                    doPlotSettingsDict,
                                    
                                    # where the names of the created figures will be stored
@@ -297,11 +312,9 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    dataRanges=None, dataRangeNames=None, dataColors=None,
                                    shouldUseSharedRangeForOriginal=True,
                                    
-                                   # parameters that are only used if the data can be compared
-                                   # point by point
-                                   absDiffData=None, rawDiffData=None,
-                                   goodInBothMask=None,
-                                   mismatchMask=None, outsideEpsilonMask=None,
+                                   # a comparison of the data if the data comparison info is needed
+                                   # this should be a DiffInfoObject from glance.data
+                                   differences=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -317,6 +330,17 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    units_a=None, units_b=None
                                    
                                    ) :
+        
+        #TODO, for the moment, unpack these values into local variables; FUTURE use the objects directly and as needed
+        goodInAMask        = differences.a_data_object.masks.valid_mask
+        goodInBMask        = differences.b_data_object.masks.valid_mask
+        rawDiffData        = differences.diff_data_object.data
+        absDiffData        = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+        goodInBothMask     = differences.diff_data_object.masks.valid_mask
+        mismatchMask       = differences.diff_data_object.masks.mismatch_mask
+        outsideEpsilonMask = differences.diff_data_object.masks.outside_epsilon_mask
+        aData              = aData.data
+        bData              = bData.data
         
         # the default for plotting geolocated data
         mappedPlottingFunction = figures.create_mapped_figure
@@ -463,7 +487,6 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    aData, bData,
                                    variableDisplayName,
                                    epsilon,
-                                   goodInAMask, goodInBMask,
                                    doPlotSettingsDict,
                                    
                                    # where the names of the created figures will be stored
@@ -476,11 +499,9 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    dataRanges=None, dataRangeNames=None, dataColors=None,
                                    shouldUseSharedRangeForOriginal=True,
                                    
-                                   # parameters that are only used if the data can be compared
-                                   # point by point
-                                   absDiffData=None, rawDiffData=None,
-                                   goodInBothMask=None,
-                                   mismatchMask=None, outsideEpsilonMask=None,
+                                   # a comparison of the data if the data comparison info is needed
+                                   # this should be a DiffInfoObject from glance.data
+                                   differences=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -496,6 +517,17 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    units_a=None, units_b=None
                                    
                                    ) :
+        
+        #TODO, for the moment, unpack these values into local variables; FUTURE use the objects directly and as needed
+        goodInAMask        = differences.a_data_object.masks.valid_mask
+        goodInBMask        = differences.b_data_object.masks.valid_mask
+        rawDiffData        = differences.diff_data_object.data
+        absDiffData        = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+        goodInBothMask     = differences.diff_data_object.masks.valid_mask
+        mismatchMask       = differences.diff_data_object.masks.mismatch_mask
+        outsideEpsilonMask = differences.diff_data_object.masks.outside_epsilon_mask
+        aData              = aData.data
+        bData              = bData.data
         
         # the default for plotting geolocated data
         mappedPlottingFunction = figures.create_quiver_mapped_figure
@@ -648,7 +680,6 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    aData, bData,
                                    variableDisplayName,
                                    epsilon,
-                                   goodInAMask, goodInBMask,
                                    doPlotSettingsDict,
                                    
                                    # where the names of the created figures will be stored
@@ -661,11 +692,9 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    dataRanges=None, dataRangeNames=None, dataColors=None,
                                    shouldUseSharedRangeForOriginal=True,
                                    
-                                   # parameters that are only used if the data can be compared
-                                   # point by point
-                                   absDiffData=None, rawDiffData=None,
-                                   goodInBothMask=None,
-                                   mismatchMask=None, outsideEpsilonMask=None,
+                                   # a comparison of the data if the data comparison info is needed
+                                   # this should be a DiffInfoObject from glance.data
+                                   differences=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -689,6 +718,18 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
         
         The file name is only the name of the file, not the full path.
         """
+        
+        #TODO, for the moment, unpack these values into local variables; FUTURE use the objects directly and as needed
+        goodInAMask        = differences.a_data_object.masks.valid_mask
+        goodInBMask        = differences.b_data_object.masks.valid_mask
+        rawDiffData        = differences.diff_data_object.data
+        absDiffData        = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+        goodInBothMask     = differences.diff_data_object.masks.valid_mask
+        mismatchMask       = differences.diff_data_object.masks.mismatch_mask
+        outsideEpsilonMask = differences.diff_data_object.masks.outside_epsilon_mask
+        aData              = aData.data
+        bData              = bData.data
+        
         assert(aData is not None)
         assert(bData is not None)
         assert(len(aData.shape) is 1)
@@ -753,7 +794,6 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                    aData, bData,
                                    variableDisplayName,
                                    epsilon,
-                                   goodInAMask, goodInBMask,
                                    doPlotSettingsDict,
                                    
                                    # where the names of the created figures will be stored
@@ -766,11 +806,9 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                    dataRanges=None, dataRangeNames=None, dataColors=None,
                                    shouldUseSharedRangeForOriginal=True,
                                    
-                                   # parameters that are only used if the data can be compared
-                                   # point by point
-                                   absDiffData=None, rawDiffData=None,
-                                   goodInBothMask=None,
-                                   mismatchMask=None, outsideEpsilonMask=None,
+                                   # a comparison of the data if the data comparison info is needed
+                                   # this should be a DiffInfoObject from glance.data
+                                   differences=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -794,6 +832,17 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
         
         The file name is only the name of the file, not the full path.
         """
+        
+        #TODO, for the moment, unpack these values into local variables; FUTURE use the objects directly and as needed
+        goodInAMask        = differences.a_data_object.masks.valid_mask
+        goodInBMask        = differences.b_data_object.masks.valid_mask
+        rawDiffData        = differences.diff_data_object.data
+        absDiffData        = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+        goodInBothMask     = differences.diff_data_object.masks.valid_mask
+        mismatchMask       = differences.diff_data_object.masks.mismatch_mask
+        outsideEpsilonMask = differences.diff_data_object.masks.outside_epsilon_mask
+        aData              = aData.data
+        bData              = bData.data
         
         # confirm that our a and b data are minimally ok
         assert(aData is not None)
@@ -945,7 +994,6 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    aData, bData,
                                    variableDisplayName,
                                    epsilon,
-                                   goodInAMask, goodInBMask,
                                    doPlotSettingsDict,
                                    
                                    # where the names of the created figures will be stored
@@ -958,11 +1006,9 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    dataRanges=None, dataRangeNames=None, dataColors=None,
                                    shouldUseSharedRangeForOriginal=True,
                                    
-                                   # parameters that are only used if the data can be compared
-                                   # point by point
-                                   absDiffData=None, rawDiffData=None,
-                                   goodInBothMask=None,
-                                   mismatchMask=None, outsideEpsilonMask=None,
+                                   # a comparison of the data if the data comparison info is needed
+                                   # this should be a DiffInfoObject from glance.data
+                                   differences=None,
                                    
                                    # only used for plotting quiver data
                                    aUData=None, aVData=None,
@@ -986,6 +1032,17 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
         
         The file name is only the name of the file, not the full path.
         """
+        
+        #TODO, for the moment, unpack these values into local variables; FUTURE use the objects directly and as needed
+        goodInAMask        = differences.a_data_object.masks.valid_mask
+        goodInBMask        = differences.b_data_object.masks.valid_mask
+        rawDiffData        = differences.diff_data_object.data
+        absDiffData        = np.abs(rawDiffData) # we also want to show the distance between our two, not just which one's bigger/smaller
+        goodInBothMask     = differences.diff_data_object.masks.valid_mask
+        mismatchMask       = differences.diff_data_object.masks.mismatch_mask
+        outsideEpsilonMask = differences.diff_data_object.masks.outside_epsilon_mask
+        aData              = aData.data
+        bData              = bData.data
         
         assert(aData is not None)
         assert(bData is not None)
@@ -1063,6 +1120,300 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                                                             colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=units_a)),
                                               "mismatch data in " + variableDisplayName,
                                               "Mismatch.png", compared_fig_list)
+        
+        return functionsToReturn
+
+# ********** below here are the inspection plotting functions **********
+# note: for all of these the epsilons are meaningless, for some the bData has optional effects that won't come up when they're used for inspection reports
+
+"""
+This class creates the most basic of histogram plots based on one data set.
+"""
+class DataHistogramPlotFunctionFactory (PlottingFunctionFactory) :
+    def create_plotting_functions (
+                                   self,
+                                   
+                                   # the most basic data set needed
+                                   aData, bData, # Note, bData is not used
+                                   variableDisplayName,
+                                   epsilon,
+                                   doPlotSettingsDict,
+                                   
+                                   # where the names of the created figures will be stored
+                                   original_fig_list, compared_fig_list,
+                                   
+                                   # parameters that are only needed for geolocated data
+                                   lonLatDataDict=None,
+                                   
+                                   # only used if we are plotting a contour
+                                   dataRanges=None, dataRangeNames=None, dataColors=None,
+                                   shouldUseSharedRangeForOriginal=True,
+                                   
+                                   # no comparison is needed for this call, should be None
+                                   differences=None,
+                                   
+                                   # only used for plotting quiver data
+                                   aUData=None, aVData=None,
+                                   bUData=None, bVData=None,
+                                   
+                                   # only used for line plots
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
+                                   
+                                   ) :
+        
+        functionsToReturn = { }
+        
+        # right now this function is not intended to handle both types of data; in the FUTURE this may change
+        assert (aData is not None)
+        assert (bData is     None)
+        
+        # make the histogram plot; TODO, for now reuse this setting in FUTURE, should a new one be made to control this?
+        if ('do_plot_histogram' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_histogram']) :
+            
+            goodInAMask = aData.masks.valid_mask
+            assert(goodInAMask.shape == aData.data.shape)
+            
+            # setup the data bins for the histogram
+            numBinsToUse = 50
+            valuesForHist = aData.data[goodInAMask]
+            functionsToReturn['histogram'] = ((lambda : figures.create_histogram(valuesForHist, numBinsToUse,
+                                                                         ("Values of\n" + variableDisplayName),
+                                                                         ('Value of Data Point'),
+                                                                         ('Number of Data Points with a Given Value'),
+                                                                         True, units=units_a)),
+                                              "histogram of the values in " + variableDisplayName,
+                                              "HistA.png", original_fig_list)
+        
+        return functionsToReturn
+
+"""
+This class creates a simple imshow plot of 2D data
+"""
+class InspectIMShowPlotFunctionFactory (PlottingFunctionFactory) :
+    def create_plotting_functions (
+                                   self,
+                                   
+                                   # the most basic data set needed
+                                   aData, bData, # bData is not expected and will not be used
+                                   variableDisplayName,
+                                   epsilon,
+                                   doPlotSettingsDict,
+                                   
+                                   # where the names of the created figures will be stored
+                                   original_fig_list, compared_fig_list,
+                                   
+                                   # parameters that are only needed for geolocated data
+                                   lonLatDataDict=None,
+                                   
+                                   # only used if we are plotting a contour
+                                   dataRanges=None, dataRangeNames=None, dataColors=None,
+                                   shouldUseSharedRangeForOriginal=True,
+                                   
+                                   # no comparison is needed for this call, should be None
+                                   differences=None,
+                                   
+                                   # only used for plotting quiver data
+                                   aUData=None, aVData=None,
+                                   bUData=None, bVData=None,
+                                   
+                                   # only used for line plots
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
+                                   
+                                   ) :
+        """
+        This method generates imshow plotting functions for two dimensional data
+        and returns them in a dictionary of tupples, where each tupple is in the form:
+        
+            returnDictionary['descriptive name'] = (function, title, file_name, list_this_figure_should_go_into)
+        
+        The file name is only the name of the file, not the full path.
+        """
+        
+        assert(aData      is not None)
+        assert(aData.data is not None)
+        assert(bData      is     None)
+        
+        functionsToReturn = { }
+        
+        # make the original data plots
+        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+            
+            goodInAMask = aData.masks.valid_mask
+            
+            assert(goodInAMask is not None)
+            assert(aData.data.shape == goodInAMask.shape)
+            
+            functionsToReturn['originalA'] = ((lambda: figures.create_simple_figure(aData.data, variableDisplayName + "\nin File",
+                                                                            invalidMask=~goodInAMask,
+                                                                            units=units_a)),
+                                              variableDisplayName + " in file",
+                                              "origA.png",  original_fig_list)
+        
+        return functionsToReturn
+
+"""
+This class creates simple line plots based on simple one dimentional data.
+"""
+class InspectLinePlotsFunctionFactory (PlottingFunctionFactory) :
+    def create_plotting_functions (
+                                   self,
+                                   
+                                   # the most basic data set needed
+                                   aData, bData, # bData will not be used
+                                   variableDisplayName,
+                                   epsilon,
+                                   doPlotSettingsDict,
+                                   
+                                   # where the names of the created figures will be stored
+                                   original_fig_list, compared_fig_list,
+                                   
+                                   # parameters that are only needed for geolocated data
+                                   lonLatDataDict=None,
+                                   
+                                   # only used if we are plotting a contour
+                                   dataRanges=None, dataRangeNames=None, dataColors=None,
+                                   shouldUseSharedRangeForOriginal=True,
+                                   
+                                   # no comparison is needed for this call, should be None
+                                   differences=None,
+                                   
+                                   # only used for plotting quiver data
+                                   aUData=None, aVData=None,
+                                   bUData=None, bVData=None,
+                                   
+                                   # only used for line plots
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
+                                   
+                                   ) :
+        """
+        This method generates line plotting functions for one dimensional data
+        and returns them in a dictionary of tupples, where each tupple is in the form:
+        
+            returnDictionary['descriptive name'] = (function, title, file_name, list_this_figure_should_go_into)
+        
+        The file name is only the name of the file, not the full path.
+        """
+        
+        assert(aData      is not None)
+        assert(aData.data is not None)
+        assert(bData      is     None)
+        #assert(len(aData.data.shape) is 1)
+        
+        functionsToReturn = { }
+        
+        # make the original data plots
+        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+            
+            aDataTemp =  aData.data
+            aMaskTemp = ~aData.masks.valid_mask
+            if len(aDataTemp.shape) > 1 :
+                aDataTemp = aDataTemp.ravel()
+                aMaskTemp = aMaskTemp.ravel()
+            aList = [(aDataTemp, aMaskTemp, 'b', 'A data', None, units_a)]
+            
+            functionsToReturn['originalA'] = ((lambda: figures.create_line_plot_figure(aList,
+                                                                                variableDisplayName + "\nin File")),
+                                              variableDisplayName + " in file",
+                                              "lineA.png",  original_fig_list)
+        
+        return functionsToReturn
+
+"""
+This class creates contour plots mapped onto a region of the earth.
+"""
+class InspectMappedContourPlotFunctionFactory (PlottingFunctionFactory) :
+    def create_plotting_functions (
+                                   self,
+                                   
+                                   # the most basic data set needed
+                                   aData, bData, # bData will not be used
+                                   variableDisplayName,
+                                   epsilon,
+                                   doPlotSettingsDict,
+                                   
+                                   # where the names of the created figures will be stored
+                                   original_fig_list, compared_fig_list,
+                                   
+                                   # parameters that are only needed for geolocated data
+                                   lonLatDataDict=None,
+                                   
+                                   # only used if we are plotting a contour
+                                   dataRanges=None, dataRangeNames=None, dataColors=None,
+                                   shouldUseSharedRangeForOriginal=True,
+                                   
+                                   # this isn't needed for this method, should be None
+                                   differences=None,
+                                   
+                                   # only used for plotting quiver data
+                                   aUData=None, aVData=None,
+                                   bUData=None, bVData=None,
+                                   
+                                   # only used for line plots
+                                   binIndex=None, tupleIndex=None,
+                                   binName=None,  tupleName=None,
+                                   
+                                   # the optional epsilon for comparison of a percent of A
+                                   epsilonPercent=None,
+                                   # the optional units for display
+                                   units_a=None, units_b=None
+                                   
+                                   ) :
+        
+        # for simplicity, get the valid mask for a
+        goodInAMask = aData.masks.valid_mask
+        
+        # the default for plotting geolocated data
+        mappedPlottingFunction = figures.create_mapped_figure
+        
+        functionsToReturn = { }
+        
+        assert(lonLatDataDict is not None)
+        assert(goodInAMask    is not None)
+        
+        print ("lon lat dictionary form: " + str(lonLatDataDict))
+        
+        # figure out which part of the earth is visible and construct a basemap using that
+        fullAxis, baseMapInstance = _make_axis_and_basemap({'a':lonLatDataDict},
+                                                           goodInAMask, None, # there is no b mask
+                                                           variableDisplayName)
+        
+        # make the original data plot
+        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+            
+            assert('lat' in lonLatDataDict)
+            assert('lon' in lonLatDataDict)
+            assert(lonLatDataDict['lat'].shape == lonLatDataDict['lon'].shape)
+            
+            functionsToReturn['originalA'] = ((lambda : mappedPlottingFunction(aData.data,
+                                                                               lonLatDataDict['lat'], 
+                                                                               lonLatDataDict['lon'],
+                                                                               baseMapInstance, fullAxis,
+                                                                               (variableDisplayName + "\nin File"),
+                                                                               invalidMask=(~goodInAMask),
+                                                                               dataRanges=dataRanges,
+                                                                               dataRangeNames=dataRangeNames,
+                                                                               dataRangeColors=dataColors,
+                                                                               units=units_a)),
+                                              variableDisplayName + " in file",
+                                              "mapA.png",  original_fig_list)
         
         return functionsToReturn
 
