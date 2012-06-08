@@ -2245,10 +2245,31 @@ python -m glance.compare inspectStats A.hdf
         tempOptions['usePassFail']   = options.usePassFail
         # add more if needed for stats
         
+        # if we were given an output path use that to create the stats
+        toPrintTo = sys.stdout
+        outpath = _clean_path(options.outputpath)
+        fileForOutput = None
+        if outpath != _clean_path('./') :
+            
+            # if needed, create the directory
+            if not (os.path.isdir(outpath)) :
+                LOG.info ("Specified output directory (" + outpath + ") does not exist.")
+                LOG.info ("Creating output directory.")
+                os.makedirs(outpath)
+            
+            # open the file for writing, get rid of whatever's there
+            fileForOutput = open(outpath + "/stats.txt", "w") # TODO, forming the path this way won't work on windows?
+            toPrintTo     = fileForOutput
+            
+        
         status_result = stats_library_call(_clean_path(afn), _clean_path(bfn),
                                            var_list=args[2:],
                                            options_set=tempOptions,
-                                           do_document=do_doc)
+                                           do_document=do_doc,
+                                           output_channel=toPrintTo)
+        
+        if fileForOutput is not None :
+            fileForOutput.close()
         
         if status_result is not None :
             return status_result
@@ -2350,7 +2371,28 @@ python -m glance.compare inspectStats A.hdf
         tempOptions['missing']       = options.missing
         # add more if needed for stats
         
-        inspect_stats_library_call(_clean_path(afn), var_list=args[1:], options_set=tempOptions, do_document=do_doc)
+        # if we were given an output path use that to create the stats
+        toPrintTo = sys.stdout
+        outpath = _clean_path(options.outputpath)
+        fileForOutput = None
+        if outpath != _clean_path('./') :
+            
+            # if needed, create the directory
+            if not (os.path.isdir(outpath)) :
+                LOG.info ("Specified output directory (" + outpath + ") does not exist.")
+                LOG.info ("Creating output directory.")
+                os.makedirs(outpath)
+            
+            # open the file for writing, get rid of whatever's there
+            fileForOutput = open(outpath + "/stats.txt", "w") # TODO, forming the path this way won't work on windows?
+            toPrintTo     = fileForOutput
+        
+        inspect_stats_library_call(_clean_path(afn), var_list=args[1:],
+                                   options_set=tempOptions, do_document=do_doc,
+                                   output_channel=toPrintTo)
+        
+        if fileForOutput is not None :
+            fileForOutput.close()
     
     def inspectReport(*args) :
         """inspect the contents of a file

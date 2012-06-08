@@ -69,11 +69,13 @@ class GlanceGUIView (QtGui.QWidget) :
         # TODO, this section is temporary, set up the tabs in a sub function?
         self.tabWidget = QtGui.QTabWidget()
         
+        # add the main tab that allows for basic control
         tempWidget = QtGui.QWidget()
         tempWidget.setLayout(self._build_data_tab())
         self.tabWidget.addTab(tempWidget, "basic")
         
-        # TODO, finish setting up the settings tab and add that back in
+        # TODO uncomment this to work on the settings tab
+        # add a tab that allows more detailed, optional settings
         #tempWidget = QtGui.QWidget()
         #tempWidget.setLayout(self._build_settings_tab())
         #self.tabWidget.addTab(tempWidget, "settings")

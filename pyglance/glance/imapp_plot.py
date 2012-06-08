@@ -607,11 +607,11 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
     The following functions represent available menu selections.
     """
     
-    """TODO this is still being finished
     def otPlot(*args):
+        """
         plot Overshooting Tops informational images
         Given a file with overshooting tops data, plot out *** TODO, details on the plots?
-        TODO fix initial comment quotes
+        """
         
         # setup the output directory now
         if not (os.path.isdir(options.outpath)) :
@@ -680,8 +680,6 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
         plt.close(tempFigure)
         del(tempFigure)
-        
-        """
     
     def aodTraj(*args):
         """plot AOD trajectory frames
