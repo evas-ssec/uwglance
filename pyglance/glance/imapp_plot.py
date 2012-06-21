@@ -93,6 +93,23 @@ color_data = {
               }
 light_trajectory_pressure_color_map = matplotlib.colors.LinearSegmentedColormap('lightTrajPressCM', color_data, 256)
 
+lightningColorMapData = { 'red':   ((0.0,  1.00, 1.00),
+                                    (0.25, 1.00, 1.00),
+                                    (0.5,  1.00, 1.00),
+                                    (0.75, 1.00, 0.00),
+                                    (1.00, 0.00, 0.00)),
+                          'green': ((0.0,  0.00, 0.00),
+                                    (0.25, 0.00, 0.00),
+                                    (0.5,  0.00, 1.00),
+                                    (0.75, 1.00, 0.55),
+                                    (1.00, 0.55, 0.55)),
+                          'blue':  ((0.0,  1.00, 1.00),
+                                    (0.25, 1.00, 0.00),
+                                    (0.5,  0.00, 0.00),
+                                    (0.75, 0.00, 0.00),
+                                    (1.00, 0.00, 0.00)) }
+lightningColorMap = colors.LinearSegmentedColormap('lightningColorMap', lightningColorMapData, 256)
+
 def _check_requested_projection (projection, doWarn=True, fileDescription="") :
     """
     Check the requested projection, issuing a warning if it is not available and doWarn is true
@@ -475,14 +492,16 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     
     return figure
 
-def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, latitudeData, colormap=cm.jet) :
+def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, latitudeData, colormap=cm.jet,
+                                    plotWarningCircles=False, warningDistance=25.0, useDarkBackground=False, title="Overshooting Tops/Thermal Couplets",
+                                    datetime=None) :
     """
     Plot the thermal couplet centers using a mask that identifies where they are
     TODO, this is not finished at all
     """
     
     # build the basic map plot plot
-    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=False,)
+    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=useDarkBackground,)
     
     # build extra info to go to the map plotting function
     kwargs = { } 
@@ -495,19 +514,75 @@ def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, l
         centersLon = longitudeData[centersMask]
         centersLat =  latitudeData[centersMask]
         tempX, tempY = basemapObject(centersLon, centersLat)
-        p = basemapObject.plot(tempX, tempY, 'bs')
         
-        # if our colorbar has limits set those
-        #if colorbarLimits is not None :
-        #    clim(vmin=colorbarLimits[0], vmax=colorbarLimits[-1])
-        # make a color bar
-        #cbar = colorbar(format='%.3g')
-        # add the units to the colorbar
-        #if str.lower(str(units)) != "none" :
-        #    cbar.set_label(units)
+        # if we're just plotting the positions of the centers, do that
+        if not plotWarningCircles :
+            p = basemapObject.plot(tempX, tempY, 'bo', markersize=3.0)
+        else : # otherwise we must be plotting circles to warn where something could happen!
+            # TODO, this is not really the way this should work in the long run
+            degreesToUse = (warningDistance / 111.0) / 2.0 # TODO this is a very rough approximation of 1 degree latitude = 111 km, if needed do more complex math
+            for centerNum in range(len(centersLat)) :
+                p = basemapObject.tissot(centersLon[centerNum], centersLat[centerNum], degreesToUse, 100, facecolor='yellow', alpha=0.5, lw=0)
     
     # and some informational stuff
-    axes.set_title("Overshooting Tops/Thermal Couplets")
+    tempTitle = title
+    if datetime is not None :
+        tempTitle = title + ": " + datetime.strftime("%Y-%m-%d at %H:%M UTC")
+    axes.set_title(tempTitle)
+    
+    return figure
+
+def _create_lightning_risk_figure(basemapObject, riskAreasInfoList,
+                                  warningDistance=10.0, useDarkBackground=True, title="Lightning Risk",
+                                  colorbarLabel="Lightning Risk within 10 km of overshooting top (%)",
+                                  datetime=None) :
+    """
+    Plot areas of lightning risk colored based on the % chance of cloud-to-ground lightning
+    
+    the riskAreasInfoList should be a list with entries in the form (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith)
+    
+    TODO, this is not finished at all
+    """
+    
+    # build the basic map plot plot
+    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=useDarkBackground,)
+    
+    # build extra info to go to the map plotting function
+    kwargs = { } 
+    
+    # hang on to info about the percentages and their colors
+    riskPercentsColors = { }
+    # we're going to need to loop through all the sets to plot them
+    for (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith) in riskAreasInfoList :
+        riskPercentsColors[percentageChance] = colorToPlotIn
+        # TODO, this is not really the way this should work in the long run
+        degreesToUse = (warningDistance / 111.0) # TODO this is a very rough approximation of 1 degree latitude = 111 km, if needed do more complex math
+        for centerNum in range(len(lonArray)) :
+            p = basemapObject.tissot(lonArray[centerNum], latArray[centerNum], degreesToUse, 100, facecolor=colorToPlotIn, alpha=alphaToPlotWith, lw=0)
+    
+    # TODO, use riskPercentsColors to build a colorbar?
+    
+    percentages = sorted(riskPercentsColors.keys())
+    
+    tempMap = cm.ScalarMappable(cmap=lightningColorMap)
+    tempMap.set_clim(vmin=0.0, vmax=1.0)
+    tempMap.set_array([0.0, 1.0])
+    # this unfortunately leaves black tick marks on the bar itself, but it does let me separate it into four sections
+    colorBarToReturn = colorbar(tempMap, format='%.5g', orientation='horizontal', shrink=0.5, ticks=[(1./8.), (3./8.), (5./8.), (7./8.)])
+    colorBarToReturn.ax.set_xticklabels(["70", "65", "50", "35"]) 
+    # TODO, for some reason python doesn't think that colorbar has an update_ticks?
+    #colorBarToReturn.locator   = matplotlib.ticker.FixedLocator([(1./8.), (3./8.), (5./8.), (7./8.)])
+    #colorBarToReturn.formatter = matplotlib.ticker.FixedFormatter(["70", "65", "50", "35"])
+    #colorBarToReturn.update_ticks()
+    #for tempText in colorBarToReturn.ax.get_xticklabels():
+    #    tempText.set_fontsize(5)
+    colorBarToReturn.set_label(colorbarLabel, fontsize=8)
+    
+    # and some informational stuff
+    tempTitle = title
+    if datetime is not None :
+        tempTitle = title + ": " + datetime.strftime("%Y-%m-%d at %H:%M UTC")
+    axes.set_title(tempTitle)
     
     return figure
 
@@ -638,6 +713,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # create some masks to identify things about the data
         centersMask = otQAFlag  == 0
         goodData    = otPQIFlag == 1
+        goodCenters = centersMask & goodData
         
         # get more display information TODO, this may not be used?
         parallelWidth = options.parallelWidth
@@ -646,20 +722,43 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # get the longitude and latitude information, then use that to figure out the viewing window
         longitudeData = otFileObject.file_object["pixel_longitude"]
         latitudeData  = otFileObject.file_object["pixel_latitude"]
-        minLongitude = np.min(longitudeData)
-        maxLongitude = np.max(longitudeData)
-        minLatitude  = np.min(latitudeData)
-        maxLatitude  = np.max(latitudeData)
+        missingLonVal = otFileObject.file_object.missing_value("pixel_longitude")
+        missingLatVal = otFileObject.file_object.missing_value("pixel_latitude")
+        tempMaskLon   = (longitudeData != missingLonVal) & goodCenters # for now only look at good data
+        tempMaskLat   = (latitudeData  != missingLatVal) & goodCenters # for now only look at good data
+        lonTemp       = longitudeData[tempMaskLon]
+        latTemp       = latitudeData [tempMaskLat]
+        minLongitude = np.min(lonTemp)
+        maxLongitude = np.max(lonTemp)
+        minLatitude  = np.min(latTemp)
+        maxLatitude  = np.max(latTemp)
         
         # do some more lon / lat calculations
         latRange  = maxLatitude  - minLatitude
         lonRange  = maxLongitude - minLongitude
         centerLat = minLatitude  + (latRange / 2.0)
         centerLon = minLongitude + (lonRange / 2.0)
-        
+        # TEMP expand the range by a bit to alow space around our good data points
+        minLatitude  = minLatitude  - (latRange / 4.0)
+        maxLatitude  = maxLatitude  + (latRange / 4.0)
+        minLongitude = minLongitude - (lonRange / 4.0)
+        maxLongitude = maxLongitude + (lonRange / 4.0)
         # make sure the view window longitudes are in ranges that matplotlib will accept
         minLongitude, maxLongitude, shouldModifyNegativeLons = _modify_view_window_longitudes(minLongitude, maxLongitude)
+        
         # TODO, haven't hooked up the boolean to control modification of negative longitudes yet
+        
+        # get the base time information and translate it into a date time object
+        dateString = otFileObject.file_object.get_global_attribute("Image_Date")
+        timeString = otFileObject.file_object.get_global_attribute("Image_Time")
+        dateTimeStringTemp = str(dateString) + "." + str(timeString)
+        timeReferenceObject = None
+        try :
+            timeReferenceObject = datetime.strptime(dateTimeStringTemp, "1%y%j.%H%M%S")
+        except ValueError :
+            LOG.warn ("Unable to parse datetime from file. No datetime information will be displayed on images.")
+            timeReferenceObject = None
+        LOG.debug("image time information: " + str(timeReferenceObject))
         
         # build a basemap
         LOG.info("Building basemap object.")
@@ -672,11 +771,45 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         
         # create a plot of the centers of the thermal couplets
         LOG.info ("Creating plot of Overshooting Top center locations.")
-        tempFigure = _create_thermal_couplets_figure(basemapObject, centersMask & goodData, longitudeData, latitudeData) # TODO, more will be needed here?
+        tempFigure = _create_thermal_couplets_figure(basemapObject, goodCenters, longitudeData, latitudeData, datetime=timeReferenceObject) # TODO, more will be needed here?
         
         # save the plot and then get rid of the local copy
         LOG.info("Saving plot to disk.")
         figureNameAndPath = os.path.join(options.outpath, "coupletCenters" + defaultValues['figureName']) # TODO, need a constant other than 'figureName'
+        tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
+        plt.close(tempFigure)
+        del(tempFigure)
+        
+        # create a plot of the turbulence around the centers
+        LOG.info ("Creating plot of Turbulence Risk.")
+        tempFigure = _create_thermal_couplets_figure(basemapObject, goodCenters, longitudeData, latitudeData,
+                                                     plotWarningCircles=True, useDarkBackground=True, title="Turbulence Risk", datetime=timeReferenceObject) # TODO, more will be needed here?
+        
+        # save the plot and then get rid of the local copy
+        LOG.info("Saving plot to disk.")
+        figureNameAndPath = os.path.join(options.outpath, "turbulenceRisk" + defaultValues['figureName']) # TODO, need a constant other than 'figureName'
+        tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
+        plt.close(tempFigure)
+        del(tempFigure)
+        
+        # create a plot of the lightning risks near the centers
+        LOG.info ("Creating plot of Lightning Risk.")
+        tempLon  = longitudeData[goodCenters]
+        tempLat  =  latitudeData[goodCenters]
+        LOG.debug ("Number of OT centers: " + str(tempLat.size))
+        # the riskAreas should be a list with entries in the form (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith)
+        # TODO this is temp test code to make dummy data and is very fragile
+        riskAreas = [ ]
+        if tempLat.size > 0 :
+            riskAreas = [(tempLon[  : 5], tempLat[  : 5], 65, 'red',     0.75),
+                         (tempLon[ 5:10], tempLat[ 5:10], 50, 'yellow',  0.75),
+                         (tempLon[10:20], tempLat[10:20], 70, 'magenta', 0.75),
+                         (tempLon[20:  ], tempLat[20:  ], 35, 'green',   0.75)] # TODO, this is just some dummy data to test it
+        tempFigure = _create_lightning_risk_figure(basemapObject, riskAreas, datetime=timeReferenceObject)
+        
+        # save the plot and then get rid of the local copy
+        LOG.info("Saving plot to disk.")
+        figureNameAndPath = os.path.join(options.outpath, "lightningRisk" + defaultValues['figureName']) # TODO, need a constant other than 'figureName'
         tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
         plt.close(tempFigure)
         del(tempFigure)
