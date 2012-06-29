@@ -145,12 +145,26 @@ class GlanceGUIController (object) :
         
         self.model.updateSettingsDataSelection(newImageType=new_image_type)
     
+    def userSelectedColormap (self, new_colormap) :
+        """
+        the user has selected a new colormap
+        """
+        
+        self.model.updateSettingsDataSelection(newColormap=new_colormap)
+    
     def userSelectedDataForm (self, new_data_form) :
         """
         the user has selected a new data form
         """
         
         self.model.updateSettingsDataSelection(newDataForm=new_data_form)
+    
+    def userToggledSharedRange(self, should_use_shared_range) :
+        """
+        the user has toggled whether or not the original data should use a shared range
+        """
+        
+        self.model.updateSettingsDataSelection(useSharedRangeForOriginals=should_use_shared_range)
     
     def userRequestsStats (self) :
         """

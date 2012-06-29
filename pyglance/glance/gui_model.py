@@ -12,6 +12,7 @@ import numpy as np
 
 import glance.data as dataobjects
 import glance.io   as io
+from   glance.gui_constants import *
 
 LOG = logging.getLogger(__name__)
 
@@ -24,50 +25,6 @@ The model allows outside objects to register to listen for data updates or for
 errors. It's expected that error handlers will manage either logging or displaying
 errors appropriately. 
 """
-
-# constants for the possible image types
-ORIGINAL_A = "Original A Data"
-ORIGINAL_B = "Original B Data"
-ABS_DIFF   = "Abs. Difference"
-RAW_DIFF   = "Raw Difference"
-HISTOGRAM  = "Histogram"
-MISMATCH   = "Mismatch Areas"
-SCATTER    = "Scatter Plot"
-HEX_PLOT   = "Hex Plot"
-
-# a list of all the image types, for convenience
-IMAGE_TYPES = [ORIGINAL_A,
-               ORIGINAL_B,
-               ABS_DIFF,
-               RAW_DIFF,
-               HISTOGRAM,
-               MISMATCH,
-               SCATTER,
-               HEX_PLOT
-              ]
-
-# a list of image types that require both the A and B data
-COMPARISON_IMAGES = [ABS_DIFF,
-                     RAW_DIFF,
-                     HISTOGRAM,
-                     MISMATCH,
-                     SCATTER,
-                     HEX_PLOT
-                    ]
-
-# constants for possible types of data handling
-SIMPLE_2D = "Simple Two Dimensional"
-MAPPED_2D = "Mapped Two Dimensional"
-ONLY_1D   = "One Dimensional"
-
-# a list of data handling types, for conveinence
-DATA_FORMS = [SIMPLE_2D,
-              MAPPED_2D,
-              ONLY_1D]
-
-# the default names that the model will try to select for the latitude and longitude
-DEFAULT_LONGITUDE = 'pixel_longitude'
-DEFAULT_LATITUDE  = 'pixel_latitude'
 
 class UnableToReadFile(Exception):
     """
@@ -133,7 +90,11 @@ class GlanceGUIModel (object) :
     self.epsilonPercent - the epsilon percent value for comparison
     self.llEpsilon      - the epsilon used for judging the longitude and latitude data
     self.imageType      - the image type that should be created when files are compared
+    self.colormap       - the colormap to use for plotting (if one is needed)
     self.dataForm       - the form the data should be considered to be
+    self.useSharedRange - True if images for the original data should be displayed in a range
+                          that includeds the data from both files, False if not
+    
     self.dataListeners  - objects that want to be notified when data changes
     self.errorHandlers  - objects that want to be notified when there's a serious error
     """
@@ -153,7 +114,9 @@ class GlanceGUIModel (object) :
         self.epsilonPercent = None
         self.llEpsilon      = 0.0
         self.imageType      = IMAGE_TYPES[0]
+        self.colormap       = COLORMAP_NAMES[0]
         self.dataForm       = SIMPLE_2D
+        self.useSharedRange = False
         
         # this represents all the people who want to hear about data updates
         # these people can register and will get data related messages
@@ -293,7 +256,9 @@ class GlanceGUIModel (object) :
             dataListener.updateEpsilonPercent(self.epsilonPercent)
             dataListener.updateLLEpsilon(self.llEpsilon)
             dataListener.updateImageTypes(self.imageType, list=IMAGE_TYPES)
+            dataListener.updateColormaps(self.colormap, list=COLORMAP_NAMES)
             dataListener.updateDataForms(self.dataForm, list=DATA_FORMS)
+            dataListener.updateUseSharedRange(self.useSharedRange)
     
     def updateFileDataSelection (self, file_prefix, newVariableText=None, newOverrideValue=None, newFillValue=np.nan) :
         """
@@ -348,7 +313,8 @@ class GlanceGUIModel (object) :
         return self.fileData[file_prefix].var_data_cache[self.fileData[file_prefix].variable].select_fill_value()
     
     def updateSettingsDataSelection (self, newEpsilonValue=np.nan, newImageType=None, newDataForm=None,
-                                     newEpsilonPercent=np.nan, newllEpsilon=np.nan) :
+                                     newEpsilonPercent=np.nan, newllEpsilon=np.nan,
+                                     useSharedRangeForOriginals=None, newColormap=None) :
         """
         someone has changed one or more of the general settings related data values
         
@@ -382,11 +348,25 @@ class GlanceGUIModel (object) :
                 self.imageType = newImageType
                 didUpdate = True
         
+        # update the colormap if needed
+        if (newColormap is not None) and (newColormap != self.colormap) :
+            if newColormap in COLORMAP_NAMES :
+                LOG.debug("Setting colormap to: " + newColormap)
+                self.colormap = newColormap
+                didUpdate = True
+        
         # update the data form if needed
         if (newDataForm is not None) and (newDataForm != self.dataForm) :
             if newDataForm in DATA_FORMS :
                 LOG.debug("Setting data form to: " + newDataForm)
                 self.dataForm = newDataForm
+                didUpdate = True
+        
+        # update the shared range settings if needed
+        if (useSharedRangeForOriginals is not None) and (useSharedRangeForOriginals != self.useSharedRange) :
+            if useSharedRangeForOriginals is True or useSharedRangeForOriginals is False :
+                LOG.debug("Setting use shared range for originals to: " + str(useSharedRangeForOriginals))
+                self.useSharedRange = useSharedRangeForOriginals
                 didUpdate = True
         
         # let our data listeners know about any changes
@@ -396,7 +376,9 @@ class GlanceGUIModel (object) :
                 listener.updateEpsilonPercent(self.epsilonPercent)
                 listener.updateLLEpsilon(self.llEpsilon)
                 listener.updateImageTypes(self.imageType)
+                listener.updateColormaps(self.colormap)
                 listener.updateDataForms(self.dataForm)
+                listener.updateUseSharedRange(self.useSharedRange)
     
     def updateLonLatSelections (self, file_prefix, new_latitude_name=None, new_longitude_name=None) :
         """

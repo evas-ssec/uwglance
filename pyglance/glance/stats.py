@@ -1058,7 +1058,8 @@ class StatisticalInspectionAnalysis (StatisticalData) :
 # -------------------------- documentation -----------------------------
 
 # TODO, can this be moved?
-STATISTICS_DOC_STR = '\n'.join( '%s:\n    %s' % x for x in sorted(list(StatisticalAnalysis.doc_strings().items())) ) + '\n'
+STATISTICS_DOC_STR      = '\n'.join( '%s:\n    %s' % x for x in sorted(list(          StatisticalAnalysis.doc_strings().items())) ) + '\n'
+INSP_STATISTICS_DOC_STR = '\n'.join( '%s:\n    %s' % x for x in sorted(list(StatisticalInspectionAnalysis.doc_strings().items())) ) + '\n'
 
 if __name__=='__main__':
     import doctest

@@ -57,6 +57,10 @@ UNITS_CONSTANT = "units"
 fillValConst1 = '_FillValue'
 fillValConst2 = 'missing_value'
 
+ADD_OFFSET_STR   = 'add_offset'
+SCALE_FACTOR_STR = 'scale_factor'
+SCALE_METHOD_STR = 'scaling_method'
+
 class IOUnimplimentedError(Exception):
     """
     The exception raised when a requested io operation is not yet available.
@@ -68,24 +72,128 @@ class IOUnimplimentedError(Exception):
     def __str__(self):
         return self.msg
 
-class hdf(SD):
+class CaseInsensitiveAttributeCache (object) :
+    """
+    A cache of attributes for a single file and all of it's variables.
+    This cache is considered uncased, it will store all attributes it caches
+    in lower case and will lower case any strings it is asked to search for
+    in the cache.
+    When variable or global attribute sets are not yet loaded and something
+    from that part of the file is requested the cache will transparently load
+    attributes from the file behind the scenes and build the cache for that
+    part of the file.
+    """
+    
+    def __init__(self, fileObject) :
+        """
+        set up the empty cache and hang on to the file object we'll be caching
+        """
+        
+        self.fileToCache             = fileObject
+        self.globalAttributesLower   = None
+        self.variableAttributesLower = { }
+    
+    def _load_global_attributes_if_needed (self) :
+        """
+        load up the global attributes if they need to be cached
+        """
+        
+        # load the attributes from the file if they aren't cached
+        if self.globalAttributesLower is None :
+            LOG.debug ("Loading file global attributes into case-insensitive cache.")
+            tempAttrs                  = self.fileToCache.get_global_attributes(caseInsensitive=False)
+            self.globalAttributesLower = dict((k.lower(), v) for k, v in tempAttrs.items())
+    
+    def _load_variable_attributes_if_needed (self, variableName) :
+        """
+        load up the variable attributes if they need to be cached
+        """
+        
+        # make a lower cased version of the variable name
+        tempVariableName = variableName.lower()
+        
+        # load the variable's attributes from the file if they aren't cached
+        if tempVariableName not in self.variableAttributesLower.keys() :
+            LOG.debug ("Loading attributes for variable \"" + variableName + "\" into case-insensitive cache.")
+            tempAttrs = self.fileToCache.get_variable_attributes(variableName, caseInsensitive=False)
+            # now if there are any attributes, make a case insensitive version
+            self.variableAttributesLower[tempVariableName] = dict((k.lower(), v) for k, v in tempAttrs.items())
+    
+    def get_variable_attribute (self, variableName, attributeName) :
+        """
+        get the specified attribute for the specified variable,
+        if this variable's attributes have not yet been loaded
+        they will be loaded and cached
+        """
+        
+        self._load_variable_attributes_if_needed(variableName)
+        
+        toReturn = None
+        tempVariableName  =  variableName.lower()
+        tempAttributeName = attributeName.lower()
+        if (tempVariableName in self.variableAttributesLower) and (tempAttributeName in self.variableAttributesLower[tempVariableName]) :
+            toReturn = self.variableAttributesLower[tempVariableName][tempAttributeName]
+        else:
+            LOG.debug ("Attribute \"" + attributeName + "\" was not present for variable \"" + variableName + "\".")
+        
+        return toReturn
+    
+    def get_variable_attributes (self, variableName) :
+        """
+        get the variable attributes for the variable name given
+        """
+        
+        self._load_variable_attributes_if_needed(variableName)
+        
+        toReturn = self.variableAttributesLower[variableName.lower()] if (variableName.lower() in self.variableAttributesLower) else None
+        
+        return toReturn
+    
+    def get_global_attribute (self, attributeName) :
+        """
+        get a global attribute with the given name
+        """
+        
+        self._load_global_attributes_if_needed()
+        
+        toReturn = self.globalAttributesLower[attributeName.lower()] if (attributeName.lower() in self.globalAttributesLower) else None
+        
+        return toReturn
+    
+    def get_global_attributes (self) :
+        """
+        get the global attributes,
+        """
+        
+        self._load_global_attributes_if_needed()
+        
+        toReturn = self.globalAttributesLower
+        
+        return toReturn
+
+class hdf (object):
     """wrapper for HDF4 dataset for comparison
     __call__ yields sequence of variable names
     __getitem__ returns individual variables ready for slicing to numpy arrays
     """
     
+    _hdf = None
+    
     def __init__(self, filename, allowWrite=False):
+        
         if pyhdf is None:
             LOG.error('pyhdf is not installed and is needed in order to read hdf4 files')
             assert(pyhdf is not None)
         mode = SDC.READ
         if allowWrite:
             mode = mode | SDC.WRITE
-        super(self.__class__,self).__init__(filename, mode)
+        
+        self._hdf = SD(filename, mode)
+        self.attributeCache = CaseInsensitiveAttributeCache(self)
 
     def __call__(self):
         "yield names of variables to be compared"
-        return self.datasets().keys()
+        return self._hdf.datasets().keys()
     
     # this returns a numpy array with a copy of the full, scaled
     # data for this variable, if the data type must be changed to allow
@@ -98,31 +206,25 @@ class hdf(SD):
         data_type = None 
         scaling_method = None
         
-        #print ("***** getting " + name + " from file")
-        
         # get the variable object and use it to
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
-        #print ("****** variable object gotten")
         raw_data_copy = variable_object[:]
-        #print ("****** raw data loaded")
         try :
             # TODO, this currently won't work with geocat data, work around it for now
             scale_factor, scale_factor_error, add_offset, add_offset_error, data_type = SDS.getcal(variable_object)
         except HDF4Error:
-            # load just the scale factor and add offset
-            temp_attributes = variable_object.attributes()
-            if ('add_offset' in temp_attributes) :
-                add_offset = temp_attributes['add_offset']
+            # load just the scale factor and add offset information by hand
+            temp = self.attributeCache.get_variable_attributes(name)
+            if ADD_OFFSET_STR in temp.keys() :
+                add_offset = temp[ADD_OFFSET_STR]
                 data_type = np.dtype(type(add_offset))
-            if ('scale_factor' in temp_attributes) :
-                scale_factor = temp_attributes['scale_factor']
+            if SCALE_FACTOR_STR in temp.keys() :
+                scale_factor = temp[SCALE_FACTOR_STR]
                 data_type = np.dtype(type(scale_factor))
-            if ('scaling_method' in temp_attributes) :
-                scaling_method = temp_attributes['scaling_method']
+            if SCALE_METHOD_STR in temp.keys() :
+                scaling_method = temp[SCALE_METHOD_STR]
         SDS.endaccess(variable_object)
-        
-        #print ("***** scaling information loaded")
         
         # don't do lots of work if we don't need to scale things
         if (scale_factor == 1.0) and (add_offset == 0.0) :
@@ -151,24 +253,17 @@ class hdf(SD):
         missing_mask[raw_data_copy == missing_val] = True
         
         # create the scaled version of the data
-        scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        #scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
+        scaled_data_copy                = np.array(raw_data_copy, dtype=data_type)
         scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
         
         return scaled_data_copy 
     
     def get_variable_object(self, name):
-        return self.select(name)
+        return self._hdf.select(name)
     
     def missing_value(self, name):
-        variable_object = self.select(name)
         
-        to_return = None
-        if hasattr(variable_object, fillValConst1) :
-            to_return = getattr(variable_object, fillValConst1, None)
-        SDS.endaccess(variable_object)
-        
-        return to_return
+        return self.get_attribute(name, fillValConst1)
     
     def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
         """
@@ -193,59 +288,88 @@ class hdf(SD):
         
         return
     
-    def get_variable_attributes (self, variableName) :
+    def get_variable_attributes (self, variableName, caseInsensitive=True) :
         """
         returns all the attributes associated with a variable name
         """
         
-        return self.get_variable_object(variableName).attributes()
+        toReturn = None
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_variable_attributes(variableName)
+        else :
+            toReturn = self.get_variable_object(variableName).attributes()
+        
+        return toReturn
     
-    def get_attribute(self, variableName, attributeName) :
+    def get_attribute(self, variableName, attributeName, caseInsensitive=True) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
         toReturn = None
-        temp_attributes = self.get_variable_attributes(variableName)
         
-        if attributeName in temp_attributes :
-            toReturn = temp_attributes[attributeName]
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_variable_attribute(variableName, attributeName)
+        else :
+            temp_attributes = self.get_variable_attributes(variableName, caseInsensitive=False)
+            
+            if attributeName in temp_attributes :
+                toReturn = temp_attributes[attributeName]
         
         return toReturn
     
-    def get_global_attribute(self, attributeName) :
+    def get_global_attributes(self, caseInsensitive=True) :
+        """
+        get a list of all the global attributes for this file or None
+        """
+        
+        toReturn = None
+        
+        if caseInsensitive :
+            self.attributeCache.get_global_attributes()
+        else :
+            toReturn = self._hdf.attributes()
+        
+        return toReturn
+    
+    def get_global_attribute(self, attributeName, caseInsensitive=True) :
         """
         returns the value of a global attribute if it is available or None
         """
         
         toReturn = None
         
-        if attributeName in self.attributes() :
-            toReturn = self.attributes()[attributeName]
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_global_attribute(attributeName)
+        else :
+            if attributeName in self._hdf.attributes() :
+                toReturn = self._hdf.attributes()[attributeName]
         
         return toReturn
 
-class nc(CDF):
+class nc (object):
     """wrapper for NetCDF3/4/opendap dataset for comparison
     __call__ yields sequence of variable names
     __getitem__ returns individual variables ready for slicing to numpy arrays
     """
+    
+    _nc = None
     
     def __init__(self, filename, allowWrite=False):
         
         if pycdf is None:
             LOG.error('pycdf is not installed and is needed in order to read NetCDF files')
             assert(pycdf is not None)
-
         
         mode = NC.NOWRITE
         if allowWrite :
             mode = NC.WRITE
         
-        super(self.__class__,self).__init__(filename, mode)
+        self._nc = CDF(filename, mode)
+        self.attributeCache = CaseInsensitiveAttributeCache(self)
 
     def __call__(self):
         "yield names of variables to be compared"
-        return self.variables().keys()
+        return self._nc.variables().keys()
     
     # this returns a numpy array with a copy of the full, scaled
     # data for this variable, if the data type must be changed to allow
@@ -262,11 +386,12 @@ class nc(CDF):
         variable_object = self.get_variable_object(name)
         raw_data_copy = variable_object[:]
         # load the scale factor and add offset
-        temp_attributes = variable_object.attributes()
-        if ('scale_factor' in temp_attributes) :
-            scale_factor = temp_attributes['scale_factor']
-        if ('add_offset' in temp_attributes) :
-            add_offset = temp_attributes['add_offset']
+        
+        temp = self.attributeCache.get_variable_attributes(name)
+        if SCALE_FACTOR_STR in temp.keys() :
+            scale_factor = temp[SCALE_FACTOR_STR]
+        if ADD_OFFSET_STR in temp.keys() :
+            add_offset = temp[ADD_OFFSET_STR]
         # todo, does cdf have an equivalent of endaccess to close the variable?
         
         # don't do lots of work if we don't need to scale things
@@ -280,17 +405,27 @@ class nc(CDF):
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        #scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
         scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
         
         return scaled_data_copy 
     
     def get_variable_object(self, name):
-        return self.var(name)
+        return self._nc.var(name)
     
     def missing_value(self, name):
         
-        variable_object = self.var(name)
+        toReturn = None
+        
+        temp = self.attributeCache.get_variable_attribute(name, fillValConst1)
+        if temp is not None :
+            toReturn = temp
+        else :
+            temp = self.attributeCache.get_variable_attribute(name, fillValConst2)
+            if temp is not None :
+                toReturn = temp
+        
+        """ todo, why was the getattr method being used with 3 params? I can't find this documented anywhere...
+        variable_object = self._nc.var(name)
         
         to_return = None
         if hasattr(variable_object, fillValConst1) \
@@ -298,8 +433,9 @@ class nc(CDF):
            hasattr(variable_object, fillValConst2) :
             to_return = getattr(variable_object, fillValConst1,
                                 getattr(variable_object, fillValConst2, None))
+        """
         
-        return to_return
+        return toReturn
     
     def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
         """
@@ -310,10 +446,10 @@ class nc(CDF):
         be created
         """
         
-        self.redef()
+        self._nc.redef()
         
         # if the variable already exists, stop with a warning
-        if variablename in self.variables().keys() :
+        if variablename in self._nc.variables().keys() :
             LOG.warn("New variable name requested (" + variablename + ") is already present in file. " +
                      "Skipping generation of new variable.")
             return None
@@ -340,14 +476,14 @@ class nc(CDF):
         dimensions = [ ]
         dimensionNum = 0
         for dimSize in data.shape :
-            dimensions.append(self.def_dim(variablename + '-index' + str(dimensionNum), dimSize))
+            dimensions.append(self._nc.def_dim(variablename + '-index' + str(dimensionNum), dimSize))
             dimensionNum = dimensionNum + 1
         
         # create the new variable
         #print('variable name: ' + variablename)
         #print('data type:     ' + str(dataType))
         #print('dimensions:    ' + str(dimensions))
-        newVariable = self.def_var(variablename, dataType, tuple(dimensions))
+        newVariable = self._nc.def_var(variablename, dataType, tuple(dimensions))
         
         # if a missing value was given, use that
         if missingvalue is not None :
@@ -360,7 +496,7 @@ class nc(CDF):
             for attribute in attributes.keys() :
                 newVariable.__setattr__(attribute, attributes[attribute])
         
-        self.enddef()
+        self._nc.enddef()
         
         # if data was given, use that
         if data is not None :
@@ -375,46 +511,75 @@ class nc(CDF):
         """
         variableObject = self.get_variable_object(variableName)
         
-        self.redef()
+        self._nc.redef()
         
         variableObject.__setattr__(newAttributeName, newAttributeValue)
+        # TODO, this will cause our attribute cache to be wrong!
+        # TODO, for now, brute force clear the cache
+        self.attributeCache = CaseInsensitiveAttributeCache(self)
         
-        self.enddef()
+        self._nc.enddef()
         
         return
     
-    def get_variable_attributes (self, variableName) :
+    def get_variable_attributes (self, variableName, caseInsensitive=True) :
         """
         returns all the attributes associated with a variable name
         """
         
-        return self.get_variable_object(variableName).attributes()
+        toReturn = None
+        
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_variable_attributes(variableName)
+        else :
+            toReturn = self.get_variable_object(variableName).attributes()
+        
+        return toReturn
     
-    def get_attribute(self, variableName, attributeName) :
+    def get_attribute(self, variableName, attributeName, caseInsensitive=True) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
         toReturn = None
         
-        temp_attributes = self.get_variable_attributes(variableName)
-        
-        if attributeName in temp_attributes :
-            toReturn = temp_attributes[attributeName]
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_variable_attribute(variableName, attributeName)
+        else :
+            temp_attributes = self.get_variable_attributes(variableName, caseInsensitive=False)
+            
+            if attributeName in temp_attributes :
+                toReturn = temp_attributes[attributeName]
         
         return toReturn
     
-    def get_global_attribute(self, attributeName) :
+    def get_global_attributes(self, caseInsensitive=True) :
+        """
+        get a list of all the global attributes for this file or None
+        """
+        
+        toReturn = None
+        
+        if caseInsensitive :
+            self.attributeCache.get_global_attributes()
+        else :
+            toReturn = self._nc.attributes()
+        
+        return toReturn
+    
+    def get_global_attribute(self, attributeName, caseInsensitive=True) :
         """
         returns the value of a global attribute if it is available or None
         """
         
         toReturn = None
         
-        if attributeName in self.attributes() :
-            toReturn = self.attributes()[attributeName]
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_global_attribute(attributeName)
+        else :
+            if attributeName in self._nc.attributes() :
+                toReturn = self._nc.attributes()[attributeName]
         
         return toReturn
-
 
 nc4 = nc
 cdf = nc
@@ -428,6 +593,8 @@ class h5(object):
     _h5 = None
     
     def __init__(self, filename, allowWrite=False):
+        self.attributeCache = CaseInsensitiveAttributeCache(self)
+        
         mode = 'r'
         if allowWrite :
             mode = 'r+'
@@ -484,10 +651,11 @@ class h5(object):
         #print ('*************************')
         
         # load the scale factor and add offset
-        if ('scale_factor' in variable_object.attrs) :
-            scale_factor = variable_object.attrs['scale_factor']
-        if ('add_offset' in variable_object.attrs) :
-            add_offset = variable_object.attrs['add_offset']
+        temp = self.attributeCache.get_variable_attributes(name)
+        if (SCALE_FACTOR_STR in temp.keys()) :
+            scale_factor = temp[SCALE_FACTOR_STR]
+        if (ADD_OFFSET_STR in temp.keys()) :
+            add_offset = temp[ADD_OFFSET_STR]
         # todo, does cdf have an equivalent of endaccess to close the variable?
         
         # don't do lots of work if we don't need to scale things
@@ -501,7 +669,6 @@ class h5(object):
         
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
-        #scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] - add_offset) * scale_factor #TODO, type truncation issues?
         scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
         
         return scaled_data_copy
@@ -547,39 +714,64 @@ class h5(object):
         
         return
     
-    def get_variable_attributes (self, variableName) :
+    def get_variable_attributes (self, variableName, caseInsensitive=True) :
         """
         returns all the attributes associated with a variable name
         """
         
-        return self.get_variable_object(variableName).attrs
+        toReturn = None
+        
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_variable_attributes(variableName)
+        else :
+            toReturn = self.get_variable_object(variableName).attrs
+        
+        return toReturn
     
-    def get_attribute(self, variableName, attributeName) :
+    def get_attribute(self, variableName, attributeName, caseInsensitive=True) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
         toReturn = None
         
-        temp_attrs = self.get_variable_attributes(variableName)
-        
-        if (attributeName in temp_attrs) :
-            toReturn = temp_attrs[attributeName]
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_variable_attribute(variableName, attributeName)
+        else :
+            temp_attrs = self.get_variable_attributes(variableName, caseInsensitive=False)
+            
+            if (attributeName in temp_attrs) :
+                toReturn = temp_attrs[attributeName]
         
         return toReturn
     
-    def get_global_attribute(self, attributeName) :
+    def get_global_attributes(self, caseInsensitive=True) :
+        """
+        get a list of all the global attributes for this file or None
+        """
+        
+        toReturn = None
+        
+        if caseInsensitive :
+            self.attributeCache.get_global_attributes()
+        else :
+            toReturn = self._h5.attrs
+        
+        return toReturn
+    
+    def get_global_attribute(self, attributeName, caseInsensitive=True) :
         """
         returns the value of a global attribute if it is available or None
         """
         
         toReturn = None
         
-        if attributeName in self._h5.attrs :
-            toReturn = self._h5.attrs[attributeName]
+        if caseInsensitive :
+            toReturn = self.attributeCache.get_global_attribute(attributeName)
+        else :
+            if attributeName in self._h5.attrs :
+                toReturn = self._h5.attrs[attributeName]
         
         return toReturn
-
-
 
 
 class aeri(object):
@@ -667,7 +859,7 @@ class aeri(object):
         
         return
     
-    def get_variable_attributes (self, variableName) :
+    def get_variable_attributes (self, variableName, caseInsensitive=True) :
         """
         returns all the attributes associated with a variable name
         """
@@ -678,7 +870,7 @@ class aeri(object):
         
         return toReturn
     
-    def get_attribute(self, variableName, attributeName) :
+    def get_attribute(self, variableName, attributeName, caseInsensitive=True) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
@@ -689,7 +881,19 @@ class aeri(object):
         
         return toReturn
     
-    def get_global_attribute(self, attributeName) :
+    def get_global_attributes(self, caseInsensitive=True) :
+        """
+        get a list of all the global attributes for this file or None
+        """
+        
+        toReturn = None
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in AERI files. None will be used.')
+        
+        return toReturn
+    
+    def get_global_attribute(self, attributeName, caseInsensitive=True) :
         """
         returns the value of a global attribute if it is available or None
         """
@@ -782,7 +986,7 @@ class jpss_adl(object):
         
         return
     
-    def get_variable_attributes (self, variableName) :
+    def get_variable_attributes (self, variableName, caseInsensitive=True) :
         """
         returns all the attributes associated with a variable name
         """
@@ -793,7 +997,7 @@ class jpss_adl(object):
         
         return toReturn
     
-    def get_attribute(self, variableName, attributeName) :
+    def get_attribute(self, variableName, attributeName, caseInsensitive=True) :
         """
         returns the value of the attribute if it is available for this variable, or None
         """
@@ -804,9 +1008,21 @@ class jpss_adl(object):
         
         return toReturn
     
-    def get_global_attribute(self, attributeName) :
+    def get_global_attribute(self, attributeName, caseInsensitive=True) :
         """
         returns the value of a global attribute if it is available or None
+        """
+        
+        toReturn = None
+        
+        # TODO
+        LOG.warn('Glance does not yet support attribute retrieval in JPSS ADL files. None will be used.')
+        
+        return toReturn
+    
+    def get_global_attributes(self, caseInsensitive=True) :
+        """
+        get a list of all the global attributes for this file or None
         """
         
         toReturn = None

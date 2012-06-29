@@ -24,13 +24,14 @@ import numpy as np
 import glance.data      as dataobjects
 import glance.figures   as figures
 import glance.gui_model as model
+from   glance.gui_constants import *
 
 LOG = logging.getLogger(__name__)
 
-# the number of bins to use for histograms
-DEFAULT_NUM_BINS = 50
-
-NO_DATA_MESSAGE = "Requested data was not available or did not exist."
+# colormaps that are available in the GUI
+# TODO, if this changes the list of colormap names in the constants module needs to be kept up
+AVAILABLE_COLORMAPS = {CM_RAINBOW:       cm.jet,
+                       CM_GRAY:          cm.gray}
 
 class GlanceGUIFigures (object) :
     """

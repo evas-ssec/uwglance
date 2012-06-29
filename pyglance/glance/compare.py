@@ -1831,6 +1831,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             if not do_not_test_with_lon_lat :
                 mask_a_to_use = lon_lat_data['a']['inv_mask']
                 mask_b_to_use = lon_lat_data['b']['inv_mask']
+            LOG.debug("Analyzing " + displayName + " statistically.")
             variable_stats = statistics.StatisticalAnalysis.withSimpleData(aData, bData,
                                                                            varRunInfo['missing_value'], varRunInfo['missing_value_alt_in_b'],
                                                                            mask_a_to_use, mask_b_to_use,
@@ -2122,10 +2123,10 @@ def inspect_stats_library_call (afn, var_list=[ ], options_set={ }, do_document=
             dict_data
             for each_stat in sorted(list(dict_data)):
                 print >> output_channel, '  %s: %s' % (each_stat, dict_data[each_stat])
-                if doc_each: print >> output_channel, ('    ' + statistics.StatisticalAnalysis.doc_strings()[each_stat])
+                if doc_each: print >> output_channel, ('    ' + statistics.StatisticalInspectionAnalysis.doc_strings()[each_stat])
             print >> output_channel, '' 
     if doc_atend:
-        print >> output_channel, ('\n\n' + statistics.STATISTICS_DOC_STR)
+        print >> output_channel, ('\n\n' + statistics.INSP_STATISTICS_DOC_STR)
 
 def main():
     import optparse

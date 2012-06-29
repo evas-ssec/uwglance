@@ -1388,7 +1388,7 @@ class InspectMappedContourPlotFunctionFactory (PlottingFunctionFactory) :
         assert(lonLatDataDict is not None)
         assert(goodInAMask    is not None)
         
-        print ("lon lat dictionary form: " + str(lonLatDataDict))
+        #print ("lon lat dictionary form: " + str(lonLatDataDict))
         
         # figure out which part of the earth is visible and construct a basemap using that
         fullAxis, baseMapInstance = _make_axis_and_basemap({'a':lonLatDataDict},

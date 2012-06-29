@@ -24,6 +24,39 @@ The GUI's most complex responsibility is keeping the user from entering
 garbage data into the UI.
 """
 
+class _DoubleOrNoneValidator (QtGui.QDoubleValidator) :
+    """
+    This validator accepts doubles like it's parent class or None.
+    """
+    
+    def __init__(self, parent=None) :
+        super(self.__class__, self).__init__(parent)
+    
+    def validate (self, value, pos ) :
+        """
+        override our parent's validate method
+        """
+        
+        if (value == "") or (value is None) or (value == "None") :
+            return (QtGui.QValidator.Acceptable, pos)
+        if (value == "N") or (value == "No") or (value == "Non") :
+            return (QtGui.QValidator.Intermediate, pos)
+        
+        return super(self.__class__, self).validate(value, pos)
+    
+    def fixup (self, value) :
+        """
+        correct the input if needed
+        """
+        
+        value = QtCore.QString(value)
+        
+        if (value == "") or (value == "N") or (value == "No") or (value == "Non") :
+            value = QtCore.QString("None")
+        
+        super(self.__class__, self).fixup(value)
+    
+
 class GlanceGUIView (QtGui.QWidget) :
     """
     The main view object that will create the gui that's visible to the user.
@@ -74,11 +107,11 @@ class GlanceGUIView (QtGui.QWidget) :
         tempWidget.setLayout(self._build_data_tab())
         self.tabWidget.addTab(tempWidget, "basic")
         
-        # TODO uncomment this to work on the settings tab
         # add a tab that allows more detailed, optional settings
-        #tempWidget = QtGui.QWidget()
-        #tempWidget.setLayout(self._build_settings_tab())
-        #self.tabWidget.addTab(tempWidget, "settings")
+        tempWidget = QtGui.QWidget()
+        tempWidget.setLayout(self._build_settings_tab())
+        self.tempHangOnToTab = tempWidget # TODO, remove when line below is uncommented
+        #self.tabWidget.addTab(tempWidget, "settings") #TODO, uncomment this when this tab is ready to go
         
         tempLayout = QtGui.QGridLayout()
         tempLayout.addWidget(self.tabWidget)
@@ -115,7 +148,8 @@ class GlanceGUIView (QtGui.QWidget) :
         layoutToUse.addWidget(QtGui.QLabel("epsilon:"), currentRow, 0)
         self.epsilonWidget = QtGui.QLineEdit()
         self.epsilonWidget.setToolTip("Maximum acceptible difference between the variable data in the two files.")
-        tempValidator = QtGui.QDoubleValidator(self.epsilonWidget)
+        tempValidator = _DoubleOrNoneValidator(self.epsilonWidget)
+        #tempValidator = QtGui.QDoubleValidator(self.epsilonWidget)
         tempValidator.setBottom(0.0) # only accept positive epsilons
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         self.epsilonWidget.setValidator(tempValidator)
@@ -128,7 +162,8 @@ class GlanceGUIView (QtGui.QWidget) :
         layoutToUse.addWidget(QtGui.QLabel("epsilon percent:"), currentRow, 0)
         self.epsilonPerWidget = QtGui.QLineEdit()
         self.epsilonPerWidget.setToolTip("Maximum acceptible difference between the variable data in terms of % of each data point in the A file.")
-        tempValidator = QtGui.QDoubleValidator(self.epsilonPerWidget)
+        tempValidator = _DoubleOrNoneValidator(self.epsilonPerWidget)
+        #tempValidator = QtGui.QDoubleValidator(self.epsilonPerWidget)
         tempValidator.setBottom(0.0) # only accept positive epsilon percents
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         self.epsilonPerWidget.setValidator(tempValidator)
@@ -252,9 +287,13 @@ class GlanceGUIView (QtGui.QWidget) :
         layoutToUse = QtGui.QGridLayout()
         currentRow = 0
         
-        # add the filter entry areas
-        currentRow = self._add_filter_controls("A", layoutToUse, currentRow)
-        currentRow = self._add_filter_controls("B", layoutToUse, currentRow)
+        # add the drop down for selecting a custom color map
+        layoutToUse.addWidget(QtGui.QLabel("Color map:"), currentRow, 0)
+        self.colormapDropDown = QtGui.QComboBox()
+        self.colormapDropDown.activated.connect(self.colormapSelected)
+        layoutToUse.addWidget(self.colormapDropDown, currentRow, 1, 1, 2)
+        
+        currentRow = currentRow + 1
         
         # add the drop down for selecting the data display form
         layoutToUse.addWidget(QtGui.QLabel("Data Form:"), currentRow, 0)
@@ -269,7 +308,7 @@ class GlanceGUIView (QtGui.QWidget) :
         showOriginalsInSameRange.setToolTip("Check to constrain the colorbar range of the Original A and " +
                                             "Original B data plots to be the same.\nThe range will include all data in both A and B.")
         showOriginalsInSameRange.setDisabled(False)
-        #showOriginalsInSameRange.stateChanged.connect(TODO)
+        showOriginalsInSameRange.stateChanged.connect(self.reportOriginalsRangeToggled)
         self.useSameRangeWidget = showOriginalsInSameRange
         layoutToUse.addWidget(showOriginalsInSameRange, currentRow, 1, 1, 2)
         
@@ -281,22 +320,22 @@ class GlanceGUIView (QtGui.QWidget) :
         currentRow = self._add_lon_lat_controls("A", layoutToUse, currentRow)
         currentRow = self._add_lon_lat_controls("B", layoutToUse, currentRow)
         
+        # add the filtering related controls
+        currentRow = self._add_filter_controls("A", layoutToUse, currentRow)
+        currentRow = self._add_filter_controls("B", layoutToUse, currentRow)
+        
         # add box to enter lon/lat epsilon
         layoutToUse.addWidget(QtGui.QLabel("lon/lat epsilon:"), currentRow, 0)
         llepsilonWidget = QtGui.QLineEdit()
         self.llepsilonWidget = llepsilonWidget
         llepsilonWidget.setToolTip("Maximum acceptible difference between the longitudes or latitudes in the two files.")
-        tempValidator = QtGui.QDoubleValidator(llepsilonWidget)
+        tempValidator = _DoubleOrNoneValidator(llepsilonWidget)
+        #tempValidator = QtGui.QDoubleValidator(llepsilonWidget)
         tempValidator.setBottom(0.0) # only accept positive epsilons
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         llepsilonWidget.setValidator(tempValidator)
         llepsilonWidget.editingFinished.connect(self.reportLLEpsilonChanged)
         layoutToUse.addWidget(llepsilonWidget, currentRow, 1, 1, 2)
-        
-        # TODO, possible enhancements for the future
-        #       add filters for lon/lat?
-        #       allow lon/lat to be loaded from a different file?
-        #       add buttons to let you plot lon/lat specific errors?
         
         return layoutToUse
     
@@ -308,25 +347,60 @@ class GlanceGUIView (QtGui.QWidget) :
         return the next free current_row number when finished adding widgets
         """
         
-        # add the entry to name the specific function
-        grid_layout.addWidget(QtGui.QLabel(str(file_prefix) + " filter function:"), current_row, 0)
-        functionEntry = QtGui.QLineEdit()
-        functionEntry.setToolTip("Enter python function to use for filtering " + str(file_prefix) + " data here."
-                                 + "\nThis function should work in the form function_name(data_to_filter)"
-                                 + "\n and you should enter only the function_name here.")
-        #functionEntry.editingFinished.connect(TODO)
-        grid_layout.addWidget(functionEntry, current_row, 1, 1, 3)
-        self.widgetInfo[file_prefix]["filter_function"] = functionEntry
+        # label the specific section
+        grid_layout.addWidget(QtGui.QLabel(str(file_prefix) + " filtering:"), current_row, 0)
         
         current_row = current_row + 1
         
-        grid_layout.addWidget(QtGui.QLabel(str(file_prefix) + " filter setup: "), current_row, 0)
-        setupCodeEntry = QtGui.QTextEdit()
-        setupCodeEntry.setToolTip("Enter additional python code needed to set up the filter function for " + str(file_prefix) + ".")
-        setupCodeEntry.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Preferred) # TODO, this is not working!
-        #setupCodeEntry.editingFinished.connect(TODO)
-        self.widgetInfo[file_prefix]["filter_setup"] = setupCodeEntry
-        grid_layout.addWidget(setupCodeEntry, current_row, 1, 1, 3)
+        # add something to give range restrictions
+        restrictToRangeCheckbox = QtGui.QCheckBox("restrict data to range:")
+        restrictToRangeCheckbox.setToolTip("When checked data outside the entered range will be treated as the fill value.")
+        restrictToRangeCheckbox.setDisabled(False)
+        restrictToRangeCheckbox.stateChanged.connect(partial(self.reportRestrictRangeToggled, file_prefix=file_prefix))
+        self.widgetInfo[file_prefix]["doRestrictRangeCheckbox"] = restrictToRangeCheckbox
+        grid_layout.addWidget(restrictToRangeCheckbox, current_row, 1, 1, 2)
+        
+        current_row = current_row + 1
+        
+        # add the areas to enter the range boundaries
+        
+        # first add the min
+        minRangeValue = QtGui.QLineEdit()
+        minRangeValue.setToolTip("Minimum acceptable data value for " + str(file_prefix) + " data")
+        tempValidator = QtGui.QDoubleValidator(minRangeValue)
+        # at some point the bottom and top of the ranges will need to be set on this validator
+        # do I need to save it or can I recover it from the widget?
+        tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        minRangeValue.setValidator(tempValidator)
+        minRangeValue.editingFinished.connect(partial(self.reportMinRangeValChanged, file_prefix=file_prefix))
+        self.widgetInfo[file_prefix]["minRangeRestriction"] = minRangeValue
+        grid_layout.addWidget(minRangeValue, current_row, 1) #, 1, 2)
+        
+        # now a label to clarify the relationship between the entry areas
+        grid_layout.addWidget(QtGui.QLabel("to"), current_row, 2)
+        
+        # first add the min
+        maxRangeValue = QtGui.QLineEdit()
+        maxRangeValue.setToolTip("Maximum acceptable data value for " + str(file_prefix) + " data")
+        tempValidator = QtGui.QDoubleValidator(maxRangeValue)
+        # at some point the bottom and top of the ranges will need to be set on this validator
+        # do I need to save it or can I recover it from the widget?
+        tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
+        maxRangeValue.setValidator(tempValidator)
+        maxRangeValue.editingFinished.connect(partial(self.reportMaxRangeValChanged, file_prefix=file_prefix))
+        self.widgetInfo[file_prefix]["maxRangeRestriction"] = maxRangeValue
+        grid_layout.addWidget(maxRangeValue, current_row, 3) #1, 1, 2)
+        
+        current_row = current_row + 1
+        
+        # add a check box to filter AWIPS data
+        isAWIPSdata = QtGui.QCheckBox("correct for AWIPS data types")
+        isAWIPSdata.setToolTip("AWIPS files use signed numbers to hold unsigned data. "
+                               + "Check this box if you are plotting an AWIPS file and would like your data plotted in the original, unsigned form.")
+        isAWIPSdata.setDisabled(False)
+        isAWIPSdata.stateChanged.connect(partial(self.reportIsAWIPSToggled, file_prefix=file_prefix))
+        self.widgetInfo[file_prefix]["isAWIPScheckbox"] = isAWIPSdata
+        grid_layout.addWidget(isAWIPSdata, current_row, 1, 1, 2)
         
         current_row = current_row + 1
         
@@ -501,6 +575,17 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userSelectedImageType(newImageType)
     
+    def colormapSelected (self) :
+        """
+        the user selected a colormap, let our user update listeners know
+        """
+        
+        newColormap = self.colormapDropDown.currentText()
+        
+        # let the listeners know
+        for listener in self.userUpdateListeners :
+            listener.userSelectedColormap(newColormap)
+    
     def reportDataFormSelected (self) :
         """
         the user selected a new data form, so let our user update listeners know that
@@ -511,6 +596,51 @@ class GlanceGUIView (QtGui.QWidget) :
         # report the new data form to our user update listeners
         for listener in self.userUpdateListeners :
             listener.userSelectedDataForm(newDataForm)
+    
+    def reportOriginalsRangeToggled (self) :
+        """
+        the user toggled whether or not they want their original plots to be
+        displayed in a shared range
+        """
+        
+        # this must be recorded before we tamper with the focus, because that will
+        # trigger other events that may erase this information temporarily
+        shouldUseSharedRange = self.useSameRangeWidget.isChecked()
+        
+        # first we need to clean up focus in case it's in one of the line-edit boxes
+        self.setFocus()
+        
+        # let our listeners know the user changed an overload setting
+        for listener in self.userUpdateListeners :
+            listener.userToggledSharedRange(shouldUseSharedRange)
+    
+    def reportRestrictRangeToggled (self, file_prefix=None) :
+        """
+        the user toggled the "restrict data to range" check box
+        """
+        
+        print ("*** restrict range checkbox toggled TODO " + file_prefix)
+    
+    def reportMinRangeValChanged (self, file_prefix=None) :
+        """
+        the user changed the minimum value for the acceptable range
+        """
+        
+        print ("*** minimum range value changed TODO " + file_prefix)
+    
+    def reportMaxRangeValChanged (self, file_prefix=None) :
+        """
+        the user changed the maximum value for the acceptable range
+        """
+        
+        print ("*** maximum range value changed TODO " + file_prefix)
+    
+    def reportIsAWIPSToggled (self, file_prefix=None) :
+        """
+        the user toggled the "correct for AWIPS data types" check box
+        """
+        
+        print ("*** AWIPS check box toggled TODO " + file_prefix)
     
     def reportDisplayStatsClicked (self) :
         """
@@ -622,8 +752,6 @@ class GlanceGUIView (QtGui.QWidget) :
         if a list is given, then replace the list of options that are being displayed for that file.
         """
         
-        """ TODO, uncomment once that tab is set up
-        
         # if we got a new list, set up the appropriate drop down lists
         if lonlatList is not None :
             
@@ -640,8 +768,6 @@ class GlanceGUIView (QtGui.QWidget) :
         # set the selected longitude
         tempPosition = self.widgetInfo[filePrefix]['lonName'].findText(newLongitude)
         self.widgetInfo[filePrefix]['lonName'].setCurrentIndex(tempPosition)
-        
-        """
     
     def updateEpsilon (self, epsilon) :
         """
@@ -662,7 +788,7 @@ class GlanceGUIView (QtGui.QWidget) :
         update the epsilon for longitude and latitude displayed to the user
         """
         
-        #self.llepsilonWidget.setText(str(newLonLatEpsilon)) TODO, uncomment once that tab is set up
+        self.llepsilonWidget.setText(str(newLonLatEpsilon))
     
     def updateImageTypes (self, imageType, list=None) :
         """
@@ -679,13 +805,27 @@ class GlanceGUIView (QtGui.QWidget) :
         tempPosition = self.imageSelectionDropDown.findText(imageType)
         self.imageSelectionDropDown.setCurrentIndex(tempPosition)
     
+    def updateColormaps(self, colormap, list=None) :
+        """
+        update the colormap that's selected,
+        if the list is given, clear and reset the list of possible colormaps
+        """
+        
+        # replace the list if needed
+        if list is not None :
+            self.colormapDropDown.clear()
+            self.colormapDropDown.addItems(list)
+        
+        #change the currently selected colormap
+        tempPosition = self.colormapDropDown.findText(colormap)
+        self.colormapDropDown.setCurrentIndex(tempPosition)
+    
     def updateDataForms(self, dataForm, list=None) :
         """
         update the data form that's selected,
         if the list is given, clear and reset the list of possible data forms
         """
         
-        """ TODO, uncomment once that tab is set up
         # replace the list if needed
         if list is not None :
             self.dataDisplayFormDropDown.clear()
@@ -694,7 +834,13 @@ class GlanceGUIView (QtGui.QWidget) :
         # change the currently selected data form
         tempPosition = self.dataDisplayFormDropDown.findText(dataForm)
         self.dataDisplayFormDropDown.setCurrentIndex(tempPosition)
+    
+    def updateUseSharedRange(self, doUseSharedRange) :
         """
+        update whether or not a shared range should be used
+        """
+        
+        self.useSameRangeWidget.setChecked(doUseSharedRange)
     
     ################# end data model update related methods #################
     
