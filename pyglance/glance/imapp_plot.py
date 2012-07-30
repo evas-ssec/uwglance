@@ -51,6 +51,7 @@ defaultValues   = {
                     'optLonBase':    'Lon_',
                     'optLatBase':    'Lat_',
                     'figureName':    'frame.png',
+                    'otFigName':     'OT.png',
                     'thumbPrefix':   'thumb',
                     'figureDPI':     200,
                     'thumbDPI':      90
@@ -109,6 +110,40 @@ lightningColorMapData = { 'red':   ((0.0,  1.00, 1.00),
                                     (0.75, 0.00, 0.00),
                                     (1.00, 0.00, 0.00)) }
 lightningColorMap = colors.LinearSegmentedColormap('lightningColorMap', lightningColorMapData, 256)
+
+def _select_viewing_coords (lonData,       latData,
+                            missingLonVal, missingLatVal,
+                            minLatFromFile=None,        maxLatFromFile=None,
+                            minLonFromFile=None,        maxLonFromFile=None,
+                            minLatFromCommandLine=None, maxLatFromCommandLine=None,
+                            minLonFromCommandLine=None, maxLonFromCommandLine=None) :
+    """
+    Select the coordinates that definte the viewing window based on the input information.
+    
+    Note: If lon/lat information was specified on the command line it will trump any other source.
+    If points are given in the file those will be used in preference to examining the data. If no
+    other source is available, the range of the data will be used to define the viewing window.
+    """
+    
+    minLat = _calc_coord_priority(latData, missingLatVal, minLatFromFile, minLatFromCommandLine, function=np.min)
+    maxLat = _calc_coord_priority(latData, missingLatVal, maxLatFromFile, maxLatFromCommandLine, function=np.max)
+    minLon = _calc_coord_priority(lonData, missingLonVal, minLonFromFile, minLonFromCommandLine, function=np.min)
+    maxLon = _calc_coord_priority(lonData, missingLonVal, maxLonFromFile, maxLonFromCommandLine, function=np.max)
+    
+    return minLat, maxLat, minLon, maxLon
+
+def _calc_coord_priority(data, missingVal, fromFile, fromCommandLine, function=np.min) :
+    """
+    sort out which of the coordinate sources should be used
+    """
+    
+    # use the command line if we have it, other wise try to use the file
+    toReturn = fromCommandLine if (fromCommandLine is not None) else fromFile
+    # if both command line and file are unavailable, calculate it ourselves
+    if (fromFile is None) and (fromCommandLine is None) :
+        toReturn = function(data[data != missingVal])
+    
+    return toReturn
 
 def _check_requested_projection (projection, doWarn=True, fileDescription="") :
     """
@@ -172,9 +207,36 @@ def _clean_lon_lat (longitudeData, latitudeData, correctNegativeLongitudes=True)
         while sum(longitudeData < 0) > 0 :
             longitudeData[longitudeData < 0] += 360.0
     longitudeData[longitudeData > 360.0] %= 360.0
+
+def _organize_lightning_risk_areas (otLons, otLats, otBTs) :
+    """
+    organize the ot centers into sets based on how much risk there is of lightning near them
     
-    # TODO, do the latitudes need to be fixed?
+    the risk of lightning is determined by the brightness temperature at a center
+    for temperatures under 200 (exclusive)                    the risk is considered to be 70%
+    for temperatures from  200 (inclusive) to 205 (exclusive) the risk is considered to be 65%
+    for temperatures from  205 (inclusive) to 210 (exclusive) the risk is considered to be 50%
+    for temperatures from  210 (inclusive) to 215 (exclusive) the risk is considered to be 35%
+    """
     
+    riskAreas = { }
+    mask70    = otBTs < 200.0
+    mask65    = (otBTs >= 200.0) & (otBTs < 205.0)
+    mask50    = (otBTs >= 205.0) & (otBTs < 210.0)
+    mask35    = (otBTs >= 210.0) & (otBTs < 215.0)
+    
+    # the riskAreas should be a list with entries in the form
+    # riskAreas[plotOrder] = (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith)
+    if np.any(mask70) :
+        riskAreas[3] = (otLons[mask70], otLats[mask70], 70, 'magenta', 0.9)
+    if np.any(mask65) :
+        riskAreas[2] = (otLons[mask65], otLats[mask65], 65, 'red',     0.9)
+    if np.any(mask50) :
+        riskAreas[1] = (otLons[mask50], otLats[mask50], 50, 'yellow',  0.9)
+    if np.any(mask35) :
+        riskAreas[0] = (otLons[mask35], otLats[mask35], 35, 'green',   0.9)
+    
+    return riskAreas
 
 def _modify_view_window_longitudes(upperRightLon, lowerLeftLon) :
     """
@@ -182,7 +244,7 @@ def _modify_view_window_longitudes(upperRightLon, lowerLeftLon) :
     So in some cases the corner points (and the data longitudes) will need to be massaged to make it happy
     """
     
-    # matplotlib needs the longitudes between 0 and 360 to get mercater correct TODO, this may need to change in future
+    # matplotlib needs the longitudes to increase from left to right across the projection; it will show the wrong window if they don't
     modifiedViewWindow = False
     if upperRightLon < 0 :
         upperRightLon = upperRightLon + 360.0
@@ -487,18 +549,19 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
     axes.set_position([0.1, 0.15, 0.8, 0.8]) # why was this method so hard to find?
     
     # set up the figure title
-    # TODO compose the figure title with time/date info?
     axes.set_title(figureTitle)
     
     return figure
 
 def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, latitudeData, colormap=cm.jet,
                                     plotWarningCircles=False, warningDistance=25.0, useDarkBackground=False, title="Overshooting Tops/Thermal Couplets",
-                                    datetime=None) :
+                                    datetime=None, correctLongitudes=False) :
     """
     Plot the thermal couplet centers using a mask that identifies where they are
     TODO, this is not finished at all
     """
+    
+    _clean_lon_lat (longitudeData, latitudeData, correctNegativeLongitudes=correctLongitudes)
     
     # build the basic map plot plot
     axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=useDarkBackground,)
@@ -522,7 +585,7 @@ def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, l
             # TODO, this is not really the way this should work in the long run
             degreesToUse = (warningDistance / 111.0) / 2.0 # TODO this is a very rough approximation of 1 degree latitude = 111 km, if needed do more complex math
             for centerNum in range(len(centersLat)) :
-                p = basemapObject.tissot(centersLon[centerNum], centersLat[centerNum], degreesToUse, 100, facecolor='yellow', alpha=0.5, lw=0)
+                p = basemapObject.tissot(centersLon[centerNum], centersLat[centerNum], degreesToUse, 100, facecolor='yellow', alpha=0.75, lw=0)
     
     # and some informational stuff
     tempTitle = title
@@ -532,16 +595,16 @@ def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, l
     
     return figure
 
-def _create_lightning_risk_figure(basemapObject, riskAreasInfoList,
+def _create_lightning_risk_figure(basemapObject, riskAreasInfo,
                                   warningDistance=10.0, useDarkBackground=True, title="Lightning Risk",
                                   colorbarLabel="Lightning Risk within 10 km of overshooting top (%)",
-                                  datetime=None) :
+                                  datetime=None, correctLongitudes=False) :
     """
     Plot areas of lightning risk colored based on the % chance of cloud-to-ground lightning
     
-    the riskAreasInfoList should be a list with entries in the form (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith)
+    the riskAreasInfoList should be a dictionary with entries in the form (lower plot orders will be plotted first):
     
-    TODO, this is not finished at all
+    riskAreasInfoList[plotOrder] = (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith)
     """
     
     # build the basic map plot plot
@@ -553,14 +616,17 @@ def _create_lightning_risk_figure(basemapObject, riskAreasInfoList,
     # hang on to info about the percentages and their colors
     riskPercentsColors = { }
     # we're going to need to loop through all the sets to plot them
-    for (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith) in riskAreasInfoList :
+    for plotOrderKey in sorted(riskAreasInfo.keys()) :
+        (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith) = riskAreasInfo[plotOrderKey]
+        _clean_lon_lat (lonArray, latArray, correctNegativeLongitudes=correctLongitudes)
+        
         riskPercentsColors[percentageChance] = colorToPlotIn
         # TODO, this is not really the way this should work in the long run
         degreesToUse = (warningDistance / 111.0) # TODO this is a very rough approximation of 1 degree latitude = 111 km, if needed do more complex math
         for centerNum in range(len(lonArray)) :
             p = basemapObject.tissot(lonArray[centerNum], latArray[centerNum], degreesToUse, 100, facecolor=colorToPlotIn, alpha=alphaToPlotWith, lw=0)
     
-    # TODO, use riskPercentsColors to build a colorbar?
+    # FUTURE, use riskPercentsColors to build a colorbar instead of hard coding this?
     
     percentages = sorted(riskPercentsColors.keys())
     
@@ -574,8 +640,6 @@ def _create_lightning_risk_figure(basemapObject, riskAreasInfoList,
     #colorBarToReturn.locator   = matplotlib.ticker.FixedLocator([(1./8.), (3./8.), (5./8.), (7./8.)])
     #colorBarToReturn.formatter = matplotlib.ticker.FixedFormatter(["70", "65", "50", "35"])
     #colorBarToReturn.update_ticks()
-    #for tempText in colorBarToReturn.ax.get_xticklabels():
-    #    tempText.set_fontsize(5)
     colorBarToReturn.set_label(colorbarLabel, fontsize=8)
     
     # and some informational stuff
@@ -630,6 +694,16 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
                       default=0, help="which frame should be used for the thumbnail; the default is 0 (the first frame); " +
                                       "1 would be the second frame generated and so on; if the frame requested is too high " +
                                       "(i.e. it would fall beyond the set of frames to be generated) the first frame will be used")
+    
+    # these allow you to override the automatic viewing window
+    parser.add_option('-a', '--minViewLongitude', dest="minViewLon", type='int',
+                      default=None, help="the minimum longitude that will be visible; if unset will auto-detect from file or data")
+    parser.add_option('-z', '--maxViewLongitude', dest="maxViewLon", type='int',
+                      default=None, help="the maximum longitude that will be visible; if unset will auto-detect from file or data")
+    parser.add_option('-b', '--minViewLatitude',  dest="minViewLat", type='int',
+                      default=None, help="the minimum latitude  that will be visible; if unset will auto-detect from file or data")
+    parser.add_option('-y', '--maxViewLatitude',  dest="maxViewLat", type='int',
+                      default=None, help="the maximum latitude  that will be visible; if unset will auto-detect from file or data")
     
     # time related settings
     parser.add_option('-s', '--startTime', dest="startTime", type='int',
@@ -708,6 +782,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         LOG.info("Loading variable data from overshooting tops data file.")
         otQAFlag  = otFileObject.file_object["ot_overshooting_top_qa_flag"]
         otPQIFlag = otFileObject.file_object["ot_overshooting_top_pqi_flag"]
+        otBT14    = otFileObject.file_object["ot_overshooting_top_grid_bt14"]
         # TODO, what else do I need?
         
         # create some masks to identify things about the data
@@ -724,29 +799,19 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         latitudeData  = otFileObject.file_object["pixel_latitude"]
         missingLonVal = otFileObject.file_object.missing_value("pixel_longitude")
         missingLatVal = otFileObject.file_object.missing_value("pixel_latitude")
-        tempMaskLon   = (longitudeData != missingLonVal) & goodCenters # for now only look at good data
-        tempMaskLat   = (latitudeData  != missingLatVal) & goodCenters # for now only look at good data
-        lonTemp       = longitudeData[tempMaskLon]
-        latTemp       = latitudeData [tempMaskLat]
-        minLongitude = np.min(lonTemp)
-        maxLongitude = np.max(lonTemp)
-        minLatitude  = np.min(latTemp)
-        maxLatitude  = np.max(latTemp)
+        # sort out the viewing window
+        minLatitude, maxLatitude, minLongitude, maxLongitude = _select_viewing_coords(longitudeData, latitudeData, missingLonVal, missingLatVal,
+                                                                                      minLatFromCommandLine=options.minViewLat, maxLatFromCommandLine=options.maxViewLat,
+                                                                                      minLonFromCommandLine=options.minViewLon, maxLonFromCommandLine=options.maxViewLon)
         
         # do some more lon / lat calculations
         latRange  = maxLatitude  - minLatitude
         lonRange  = maxLongitude - minLongitude
         centerLat = minLatitude  + (latRange / 2.0)
         centerLon = minLongitude + (lonRange / 2.0)
-        # TEMP expand the range by a bit to alow space around our good data points
-        minLatitude  = minLatitude  - (latRange / 4.0)
-        maxLatitude  = maxLatitude  + (latRange / 4.0)
-        minLongitude = minLongitude - (lonRange / 4.0)
-        maxLongitude = maxLongitude + (lonRange / 4.0)
+        
         # make sure the view window longitudes are in ranges that matplotlib will accept
         minLongitude, maxLongitude, shouldModifyNegativeLons = _modify_view_window_longitudes(minLongitude, maxLongitude)
-        
-        # TODO, haven't hooked up the boolean to control modification of negative longitudes yet
         
         # get the base time information and translate it into a date time object
         dateString = otFileObject.file_object.get_global_attribute("Image_Date")
@@ -771,11 +836,12 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         
         # create a plot of the centers of the thermal couplets
         LOG.info ("Creating plot of Overshooting Top center locations.")
-        tempFigure = _create_thermal_couplets_figure(basemapObject, goodCenters, longitudeData, latitudeData, datetime=timeReferenceObject) # TODO, more will be needed here?
+        tempFigure = _create_thermal_couplets_figure(basemapObject, goodCenters, longitudeData, latitudeData,
+                                                     datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons)
         
         # save the plot and then get rid of the local copy
         LOG.info("Saving plot to disk.")
-        figureNameAndPath = os.path.join(options.outpath, "coupletCenters" + defaultValues['figureName']) # TODO, need a constant other than 'figureName'
+        figureNameAndPath = os.path.join(options.outpath, "coupletCenters" + defaultValues['otFigName'])
         tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
         plt.close(tempFigure)
         del(tempFigure)
@@ -783,33 +849,24 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # create a plot of the turbulence around the centers
         LOG.info ("Creating plot of Turbulence Risk.")
         tempFigure = _create_thermal_couplets_figure(basemapObject, goodCenters, longitudeData, latitudeData,
-                                                     plotWarningCircles=True, useDarkBackground=True, title="Turbulence Risk", datetime=timeReferenceObject) # TODO, more will be needed here?
+                                                     plotWarningCircles=True, useDarkBackground=True, title="Turbulence Risk",
+                                                     datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons) 
         
         # save the plot and then get rid of the local copy
         LOG.info("Saving plot to disk.")
-        figureNameAndPath = os.path.join(options.outpath, "turbulenceRisk" + defaultValues['figureName']) # TODO, need a constant other than 'figureName'
+        figureNameAndPath = os.path.join(options.outpath, "turbulenceRisk" + defaultValues['otFigName'])
         tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
         plt.close(tempFigure)
         del(tempFigure)
         
         # create a plot of the lightning risks near the centers
         LOG.info ("Creating plot of Lightning Risk.")
-        tempLon  = longitudeData[goodCenters]
-        tempLat  =  latitudeData[goodCenters]
-        LOG.debug ("Number of OT centers: " + str(tempLat.size))
-        # the riskAreas should be a list with entries in the form (lonArray, latArray, percentageChance, colorToPlotIn, alphaToPlotWith)
-        # TODO this is temp test code to make dummy data and is very fragile
-        riskAreas = [ ]
-        if tempLat.size > 0 :
-            riskAreas = [(tempLon[  : 5], tempLat[  : 5], 65, 'red',     0.75),
-                         (tempLon[ 5:10], tempLat[ 5:10], 50, 'yellow',  0.75),
-                         (tempLon[10:20], tempLat[10:20], 70, 'magenta', 0.75),
-                         (tempLon[20:  ], tempLat[20:  ], 35, 'green',   0.75)] # TODO, this is just some dummy data to test it
-        tempFigure = _create_lightning_risk_figure(basemapObject, riskAreas, datetime=timeReferenceObject)
+        riskAreas = _organize_lightning_risk_areas (longitudeData[goodCenters], latitudeData[goodCenters], otBT14[goodCenters])
+        tempFigure = _create_lightning_risk_figure(basemapObject, riskAreas, datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons)
         
         # save the plot and then get rid of the local copy
         LOG.info("Saving plot to disk.")
-        figureNameAndPath = os.path.join(options.outpath, "lightningRisk" + defaultValues['figureName']) # TODO, need a constant other than 'figureName'
+        figureNameAndPath = os.path.join(options.outpath, "lightningRisk" + defaultValues['otFigName'])
         tempFigure.savefig(figureNameAndPath, dpi=defaultValues['figureDPI'])
         plt.close(tempFigure)
         del(tempFigure)
@@ -859,7 +916,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # get the base time information and translate it into a date time object
         timeUnitsString     = trajectoryFileObject.file_object.get_attribute(defaultValues['timeVar'], UNITS_CONSTANT)
         try :
-            timeReferenceObject = datetime.datetime.strptime(timeUnitsString, "hours since %Y-%m-%d %H:%M:%S %Z")
+            timeReferenceObject = datetime.strptime(timeUnitsString, "hours since %Y-%m-%d %H:%M:%S %Z")
         except ValueError :
             LOG.warn ("Unable to parse datetime from file. Trying alternate datetime format.")
             try :
@@ -872,6 +929,12 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # get information on where we should display the data
         northeastLon, northeastLat = trajectoryFileObject.file_object.get_global_attribute( defaultValues['neName'] )
         southwestLon, southwestLat = trajectoryFileObject.file_object.get_global_attribute( defaultValues['swName'] )
+        # wire in _select_viewing_coords so it's possible to use the command line options
+        southwestLat, northeastLat, southwestLon, northeastLon = _select_viewing_coords(None, None, None, None,
+                                                                                        minLatFromFile=southwestLat,              maxLatFromFile=northeastLat,
+                                                                                        minLonFromFile=southwestLon,              maxLonFromFile=northeastLon,
+                                                                                        minLatFromCommandLine=options.minViewLat, maxLatFromCommandLine=options.maxViewLat,
+                                                                                        minLonFromCommandLine=options.minViewLon, maxLonFromCommandLine=options.maxViewLon)
         LOG.debug ("Viewing window, northeast corner (lat / lon): " + str(northeastLat) + " / " + str(northeastLon))
         LOG.debug ("Viewing window, southwest corner (lat / lon): " + str(southwestLat) + " / " + str(southwestLon))
         parallelWidth = options.parallelWidth
@@ -903,7 +966,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
                 LOG.debug ("Viewing window in optional file, northeast corner (lat / lon): " + str(optionalNELat) + " / " + str(optionalNELon))
                 LOG.debug ("Viewing window in optional file, southwest corner (lat / lon): " + str(optionalSWLat) + " / " + str(optionalSWLon))
                 
-                # if the two viewing windows are not the same, we don't want to display this data TODO, confirm that this is the right strategy?
+                # if the two viewing windows are not the same, warn the user that something may be wrong
                 if ((optionalNELat != northeastLat) or (optionalNELon != northeastLon) or
                     (optionalSWLat != southwestLat) or (optionalSWLon != southwestLon)) :
                     LOG.warn ("Incompatable viewing area given in optional file. Optional data will be plotted but may not appear as expected.")
@@ -1089,7 +1152,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
             
             # build the title we'll use for our figure
             timeTemp  = timeReferenceObject + timeChangeObject
-            titleTemp = "MODIS AOD & AOD Trajectories on " + timeTemp.strftime("%Y-%m-%d %HZ") # TODO, this is not quite the format they asked for, but close
+            titleTemp = "MODIS AOD & AOD Trajectories on " + timeTemp.strftime("%Y-%m-%d %HZ")
             
             # make the plot
             LOG.info("Creating trajectory plot for time " + str(float(currentTime)) + ".")
@@ -1101,7 +1164,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
                                                figureTitle=titleTemp,
                                                backgroundDataSets=backgroundData, plotInitAOD=(not options.hideInitAOD ),
                                                correctNegativeLongitudes=doLonCorrections)
-                                               # TODO, the figure title needs to have the dates in it and the day may roll over, so current time can't be put in directly
+                                               # the figure title needs to have the dates in it and the day may roll over, so current time can't be put in directly
             
             # save the plot to disk
             LOG.info("Saving plot to disk.")

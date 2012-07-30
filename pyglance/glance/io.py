@@ -376,6 +376,9 @@ class nc (object):
     # for scaling it will be (so the return type may not reflect the
     # type found in the original file)
     def __getitem__(self, name):
+        
+        #print ("*** opening variable: " + name)
+        
         # defaults
         scale_factor = 1.0
         add_offset = 0.0
