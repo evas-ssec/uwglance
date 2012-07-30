@@ -568,6 +568,7 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colo
         
         # if our colorbar has limits set those
         if colorbarLimits is not None :
+            LOG.debug("setting colorbar limits: " + str(colorbarLimits))
             clim(vmin=colorbarLimits[0], vmax=colorbarLimits[-1])
         # make a color bar
         cbar = colorbar(format='%.3g')
@@ -614,7 +615,7 @@ def create_line_plot_figure(dataList, figureTitle) :
         
         # if we don't have these, set them to defaults
         if invalidMask is None :
-            invalidMask = zeros(dataSet.shape, dtype=bool)
+            invalidMask = zeros(dataSet.size, dtype=bool)
         if labelName is None :
             labelName = 'data' + str(dataSetLabelNumber)
             dataSetLabelNumber = dataSetLabelNumber + 1
@@ -627,8 +628,8 @@ def create_line_plot_figure(dataList, figureTitle) :
             if minTagPts < 0 :
                 minTagPts = dataSet.size + 1
             
-            indexData = ma.array(range(dataSet.size), mask=invalidMask)
-            cleanData = ma.array(dataSet,             mask=invalidMask)
+            indexData = ma.array(range(dataSet.size), mask=invalidMask.ravel())
+            cleanData = ma.array(dataSet.ravel(),     mask=invalidMask.ravel())
             
             # plot the tag data and gather information about it
             if tagData is not None :
@@ -644,7 +645,7 @@ def create_line_plot_figure(dataList, figureTitle) :
                 # if we have mismatch points, we need to show them
                 if numMismatchPoints > 0:
                     
-                    cleanTagData = ma.array(dataSet, mask=~tagData | invalidMask)
+                    cleanTagData = ma.array(dataSet.ravel(), mask=~tagData.ravel() | invalidMask.ravel())
                     axes.plot(indexData, cleanTagData, 'yo', label='mismatch point')
             
             if str.lower(str(units)) !="none" :

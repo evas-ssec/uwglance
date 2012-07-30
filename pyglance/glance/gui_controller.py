@@ -166,6 +166,34 @@ class GlanceGUIController (object) :
         
         self.model.updateSettingsDataSelection(useSharedRangeForOriginals=should_use_shared_range)
     
+    def userToggledRestrictRange(self, file_prefix, should_restrict_range) :
+        """
+        the user has toggled whether or not to restrict the data to a fixed range
+        """
+        
+        self.model.updateFileSettings(file_prefix, doRestrictRange=should_restrict_range)
+    
+    def userChangedRangeMin(self, file_prefix, new_range_min) :
+        """
+        the user changed the minimum of the acceptable data range
+        """
+        
+        self.model.updateFileSettings(file_prefix, newRangeMin=new_range_min)
+    
+    def userChangedRangeMax(self, file_prefix, new_range_max) :
+        """
+        the user changed the maximum of the acceptable data range
+        """
+        
+        self.model.updateFileSettings(file_prefix, newRangeMax=new_range_max)
+    
+    def userToggledIsAWIPS(self, file_prefix, data_is_AWIPS) :
+        """
+        the user has toggled whether or not the file should be treated as AWIPS formatted data
+        """
+        
+        self.model.updateFileSettings(file_prefix, doCorrectForAWIPS=data_is_AWIPS)
+    
     def userRequestsStats (self) :
         """
         the user has asked for stats information
@@ -185,6 +213,7 @@ class GlanceGUIController (object) :
             self.figs.spawnPlot()
         except (IncompatableDataObjects, ValueError), idove :
             self.handleWarning(str(idove))
+            #raise
     
     ################# end of methods to handle user input reporting #################
     

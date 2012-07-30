@@ -95,9 +95,22 @@ class GlanceGUIModel (object) :
     self.useSharedRange - True if images for the original data should be displayed in a range
                           that includeds the data from both files, False if not
     
+    self.fileSettings - a dictionary of settings specific to a file, in the form:
+                                {
+                                    "doRange":  True or False for whether or not the range of the data should be restricted,
+                                    "minRange": The minimum acceptable value if the range is restricted,
+                                    "maxRange": The maximum acceptable value if the range is restricted,
+                                    "isAWIPS":  True or False for whether or not the data is in AWIPS format
+                                }
+    
     self.dataListeners  - objects that want to be notified when data changes
     self.errorHandlers  - objects that want to be notified when there's a serious error
     """
+    
+    DO_RANGE  = "doRange"
+    MIN_RANGE = "minRange"
+    MAX_RANGE = "maxRange"
+    IS_AWIPS  = "isAWIPS"
     
     def __init__ (self) :
         """
@@ -112,11 +125,27 @@ class GlanceGUIModel (object) :
         # general settings
         self.epsilon        = 0.0
         self.epsilonPercent = None
-        self.llEpsilon      = 0.0
+        self.llEpsilon      = None
         self.imageType      = IMAGE_TYPES[0]
         self.colormap       = COLORMAP_NAMES[0]
         self.dataForm       = SIMPLE_2D
         self.useSharedRange = False
+        
+        # This is obviously only going to work for these two prefixes, would need
+        # to add a fully formed sub-class to make this more general
+        self.fileSettings = { }
+        self.fileSettings["A"]   = {
+                                GlanceGUIModel.DO_RANGE:  False,
+                                GlanceGUIModel.MIN_RANGE: None,
+                                GlanceGUIModel.MAX_RANGE: None,
+                                GlanceGUIModel.IS_AWIPS:  False
+                               }
+        self.fileSettings["B"]   = {
+                                GlanceGUIModel.DO_RANGE:  False,
+                                GlanceGUIModel.MIN_RANGE: None,
+                                GlanceGUIModel.MAX_RANGE: None,
+                                GlanceGUIModel.IS_AWIPS:  False
+                               }
         
         # this represents all the people who want to hear about data updates
         # these people can register and will get data related messages
@@ -171,6 +200,10 @@ class GlanceGUIModel (object) :
             self.fileData[filePrefix].latitude  = DEFAULT_LATITUDE
         if DEFAULT_LONGITUDE in variableList :
             self.fileData[filePrefix].longitude = DEFAULT_LONGITUDE
+        # make sure the longitude and latitude are loaded into our local cache
+        # TODO, it would be good to background this task at some point
+        _ = self._load_variable_data(filePrefix, self.fileData[filePrefix].latitude)
+        _ = self._load_variable_data(filePrefix, self.fileData[filePrefix].longitude) 
         
         # load info on the current variable
         tempDataObj = self._load_variable_data(filePrefix, tempVariable)
@@ -259,6 +292,22 @@ class GlanceGUIModel (object) :
             dataListener.updateColormaps(self.colormap, list=COLORMAP_NAMES)
             dataListener.updateDataForms(self.dataForm, list=DATA_FORMS)
             dataListener.updateUseSharedRange(self.useSharedRange)
+        
+        self.sendFileSettings("A")
+        self.sendFileSettings("B")
+    
+    def sendFileSettings (self, file_prefix) :
+        """
+        send out settings data that's related to the individual files but not data selections
+        """
+        
+        # let our data listeners know about these values
+        for listener in self.dataListeners :
+            listener.updateDoRestrictRange (file_prefix, self.fileSettings[file_prefix][GlanceGUIModel.DO_RANGE ])
+            listener.updateRestrictRangeMin(file_prefix, self.fileSettings[file_prefix][GlanceGUIModel.MIN_RANGE])
+            listener.updateRestrictRangeMax(file_prefix, self.fileSettings[file_prefix][GlanceGUIModel.MAX_RANGE])
+            listener.updateIsAWIPS         (file_prefix, self.fileSettings[file_prefix][GlanceGUIModel.IS_AWIPS ])
+            pass
     
     def updateFileDataSelection (self, file_prefix, newVariableText=None, newOverrideValue=None, newFillValue=np.nan) :
         """
@@ -318,25 +367,26 @@ class GlanceGUIModel (object) :
         """
         someone has changed one or more of the general settings related data values
         
-        Note: if an input value is left at it's default (None or nan) then it's assumed that it was not externally changed
+        Note: if an input value is left at it's default (None or nan)
+        then it's assumed that it was not externally changed
         """
         
         didUpdate = False
         
         # update the epsilon if needed
-        if newEpsilonValue is not np.nan :
+        if (newEpsilonValue is not np.nan) and (newEpsilonValue != self.epsilon) :
             LOG.debug("Setting epsilon to: " + str(newEpsilonValue))
             self.epsilon = newEpsilonValue
             didUpdate = True
         
         # update the epsilon %
-        if newEpsilonPercent is not np.nan :
+        if (newEpsilonPercent is not np.nan) and (newEpsilonPercent != self.epsilonPercent) :
             LOG.debug("Setting epsilon percent to: " + str(newEpsilonPercent))
             self.epsilonPercent = newEpsilonPercent
             didUpdate = True
         
         # update the lon/lat epsilon if needed
-        if newllEpsilon is not np.nan :
+        if (newllEpsilon is not np.nan) and (newllEpsilon != self.llEpsilon) :
             LOG.debug("Setting lon/lat epsilon to: " + str(newllEpsilon))
             self.llEpsilon = newllEpsilon
             didUpdate = True
@@ -379,6 +429,48 @@ class GlanceGUIModel (object) :
                 listener.updateColormaps(self.colormap)
                 listener.updateDataForms(self.dataForm)
                 listener.updateUseSharedRange(self.useSharedRange)
+    
+    def updateFileSettings (self, file_prefix, doRestrictRange=None,
+                            newRangeMin=np.nan, newRangeMax=np.nan,
+                            doCorrectForAWIPS=None) :
+        """
+        someone has changed one or more of the file specific settings
+        
+        Note: if an input value is left at it's default (None or nan)
+        then it's assumed that it was not externally changed
+        """
+        
+        didUpdate = False
+        
+        if file_prefix not in self.fileSettings.keys() :
+            LOG.warn("Unknown file prefix (" + str(file_prefix) + ") in updateFileSettings.")
+            return
+        
+        # update the range restriction setting if needed
+        if (doRestrictRange is not None) and (self.fileSettings[file_prefix][GlanceGUIModel.DO_RANGE] != doRestrictRange) :
+            LOG.debug("Setting use range restriction for file " + str(file_prefix) + " to: " + str(doRestrictRange))
+            self.fileSettings[file_prefix][GlanceGUIModel.DO_RANGE] = doRestrictRange
+            didUpdate = True
+        
+        if (newRangeMin is not np.nan) and (self.fileSettings[file_prefix][GlanceGUIModel.MIN_RANGE] != newRangeMin) :
+            LOG.debug("Setting minimum value for range restriction in file " + str(file_prefix) + " to: " + str(newRangeMin))
+            self.fileSettings[file_prefix][GlanceGUIModel.MIN_RANGE] = newRangeMin
+            didUpdate = True
+        
+        if (newRangeMax is not np.nan) and (self.fileSettings[file_prefix][GlanceGUIModel.MAX_RANGE] != newRangeMax) :
+            LOG.debug("Setting maximum value for range restriction in file " + str(file_prefix) + " to: " + str(newRangeMax))
+            self.fileSettings[file_prefix][GlanceGUIModel.MAX_RANGE] = newRangeMax
+            didUpdate = True
+        
+        if (doCorrectForAWIPS is not None) and (self.fileSettings[file_prefix][GlanceGUIModel.IS_AWIPS] != doCorrectForAWIPS) :
+            if (doCorrectForAWIPS is True) or (doCorrectForAWIPS is False) :
+                LOG.debug("Setting do AWIPS data correction for file " + str(file_prefix) + " to: " + str(doCorrectForAWIPS))
+                self.fileSettings[file_prefix][GlanceGUIModel.IS_AWIPS] = doCorrectForAWIPS
+                didUpdate = True
+        
+        # let our data listeners know about any changes
+        if didUpdate :
+            self.sendFileSettings(file_prefix)
     
     def updateLonLatSelections (self, file_prefix, new_latitude_name=None, new_longitude_name=None) :
         """
@@ -448,10 +540,13 @@ class GlanceGUIModel (object) :
         
         return toReturn
     
-    def getVariableData (self, filePrefix, variableName) :
+    def getVariableData (self, filePrefix, variableName, doCorrections=False) :
         """
         get the data object for the variable of variableName associated with the file prefix
         or None if that variable is not loaded
+        
+        If doCorrections is True, data filtering for AWIPS and range corrections will be done
+        by this function based on the currently selected settings for that file.
         
         Note: this is not a copy, but the original object, so any manipulations
         done to it will be reflected in the model
@@ -460,6 +555,18 @@ class GlanceGUIModel (object) :
         
         if (filePrefix in self.fileData) and (variableName in self.fileData[filePrefix].var_data_cache) :
             toReturn = self.fileData[filePrefix].var_data_cache[variableName]
+            
+            if (self.fileSettings[filePrefix][GlanceGUIModel.IS_AWIPS] or
+                self.fileSettings[filePrefix][GlanceGUIModel.DO_RANGE]) :
+                toReturn = toReturn.copy()
+            
+            if self.fileSettings[filePrefix][GlanceGUIModel.IS_AWIPS] :
+                toReturn.data = toReturn.data.astype(np.uint8) # TODO, will setting this break anything?
+            if self.fileSettings[filePrefix][GlanceGUIModel.DO_RANGE] :
+                if self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE] is not None :
+                    toReturn.data[toReturn.data < self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE]] = toReturn.fill_value
+                if self.fileSettings[filePrefix][GlanceGUIModel.MAX_RANGE] is not None :
+                    toReturn.data[toReturn.data > self.fileSettings[filePrefix][GlanceGUIModel.MAX_RANGE]] = toReturn.fill_value
         
         return toReturn
     
@@ -511,11 +618,28 @@ class GlanceGUIModel (object) :
         """
         return self.imageType
     
+    def getColormapName (self) :
+        """
+        get the name of the colormap to use
+        
+        the return will be on of the constants from gui_constants:
+            COLORMAP_NAMES = [CM_RAINBOW, CM_GRAY]
+        """
+        
+        return str(self.colormap)
+    
+    def getIsAWIPS (self, filePrefix) :
+        """
+        get whether or not the data is in AWIPS format
+        """
+        
+        return self.fileSettings[filePrefix][GlanceGUIModel.IS_AWIPS]
+    
     def getDataForm (self) :
         """
         get the text string describing the data form currently selected
         
-        the return will correspond to one of the constants from this module:
+        the return will correspond to one of the constants from glance.gui_constants:
         
             SIMPLE_2D
             MAPPED_2D
@@ -523,6 +647,13 @@ class GlanceGUIModel (object) :
         """
         
         return self.dataForm
+    
+    def getShouldShowOriginalPlotsInSameRange (self) :
+        """
+        get whether or not the original plots should be shown in a shared range
+        """
+        
+        return self.useSharedRange
     
     def registerDataListener (self, objectToRegister) :
         """

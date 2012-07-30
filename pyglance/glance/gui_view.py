@@ -49,12 +49,19 @@ class _DoubleOrNoneValidator (QtGui.QDoubleValidator) :
         correct the input if needed
         """
         
+        ok    = False
+        
+        if (value == "N") or (value == "No") or (value == "Non") :
+            value = QtCore.QString("None")
+            ok    = True
+        if (value == "") or (value == None) :
+            value = QtCore.QString("")
+            ok    = True
+        
         value = QtCore.QString(value)
         
-        if (value == "") or (value == "N") or (value == "No") or (value == "Non") :
-            value = QtCore.QString("None")
-        
-        super(self.__class__, self).fixup(value)
+        if not ok :
+            super(self.__class__, self).fixup(value)
     
 
 class GlanceGUIView (QtGui.QWidget) :
@@ -110,8 +117,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # add a tab that allows more detailed, optional settings
         tempWidget = QtGui.QWidget()
         tempWidget.setLayout(self._build_settings_tab())
-        self.tempHangOnToTab = tempWidget # TODO, remove when line below is uncommented
-        #self.tabWidget.addTab(tempWidget, "settings") #TODO, uncomment this when this tab is ready to go
+        self.tabWidget.addTab(tempWidget, "settings")
         
         tempLayout = QtGui.QGridLayout()
         tempLayout.addWidget(self.tabWidget)
@@ -147,9 +153,8 @@ class GlanceGUIView (QtGui.QWidget) :
         # set up the epsilon input box
         layoutToUse.addWidget(QtGui.QLabel("epsilon:"), currentRow, 0)
         self.epsilonWidget = QtGui.QLineEdit()
-        self.epsilonWidget.setToolTip("Maximum acceptible difference between the variable data in the two files.")
+        self.epsilonWidget.setToolTip("Maximum acceptible difference between the variable data in the two files. Leave blank or enter None for no comparison.")
         tempValidator = _DoubleOrNoneValidator(self.epsilonWidget)
-        #tempValidator = QtGui.QDoubleValidator(self.epsilonWidget)
         tempValidator.setBottom(0.0) # only accept positive epsilons
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         self.epsilonWidget.setValidator(tempValidator)
@@ -161,9 +166,8 @@ class GlanceGUIView (QtGui.QWidget) :
         # set up the epsilon percent input box
         layoutToUse.addWidget(QtGui.QLabel("epsilon percent:"), currentRow, 0)
         self.epsilonPerWidget = QtGui.QLineEdit()
-        self.epsilonPerWidget.setToolTip("Maximum acceptible difference between the variable data in terms of % of each data point in the A file.")
+        self.epsilonPerWidget.setToolTip("Maximum acceptible difference between the variable data in terms of % of each data point in the A file. Leave blank or enter None for no comparison.")
         tempValidator = _DoubleOrNoneValidator(self.epsilonPerWidget)
-        #tempValidator = QtGui.QDoubleValidator(self.epsilonPerWidget)
         tempValidator.setBottom(0.0) # only accept positive epsilon percents
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         self.epsilonPerWidget.setValidator(tempValidator)
@@ -266,7 +270,7 @@ class GlanceGUIView (QtGui.QWidget) :
         grid_layout.addWidget(QtGui.QLabel("fill value:"), currentRow+1, 1)
         fillValue = QtGui.QLineEdit()
         fillValue.setToolTip("The fill value that will be used.")
-        tempValidator = QtGui.QDoubleValidator(fillValue)
+        tempValidator = _DoubleOrNoneValidator(fillValue)
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         fillValue.setValidator(tempValidator)
         fillValue.setDisabled(True)
@@ -316,26 +320,27 @@ class GlanceGUIView (QtGui.QWidget) :
         
         # add lon/lat controls
         
-        # add the lon/lat controls that are separated by file
-        currentRow = self._add_lon_lat_controls("A", layoutToUse, currentRow)
-        currentRow = self._add_lon_lat_controls("B", layoutToUse, currentRow)
+        # add the lon/lat controls that are separated by file TODO add these back in
+        #currentRow = self._add_lon_lat_controls("A", layoutToUse, currentRow)
+        #currentRow = self._add_lon_lat_controls("B", layoutToUse, currentRow)
         
         # add the filtering related controls
         currentRow = self._add_filter_controls("A", layoutToUse, currentRow)
         currentRow = self._add_filter_controls("B", layoutToUse, currentRow)
         
+        """ TODO, add this back when the lon/lat epsilon is being used
         # add box to enter lon/lat epsilon
         layoutToUse.addWidget(QtGui.QLabel("lon/lat epsilon:"), currentRow, 0)
         llepsilonWidget = QtGui.QLineEdit()
         self.llepsilonWidget = llepsilonWidget
-        llepsilonWidget.setToolTip("Maximum acceptible difference between the longitudes or latitudes in the two files.")
+        llepsilonWidget.setToolTip("Maximum acceptible difference between the longitudes or latitudes in the two files. Leave blank or enter None for no comparison.")
         tempValidator = _DoubleOrNoneValidator(llepsilonWidget)
-        #tempValidator = QtGui.QDoubleValidator(llepsilonWidget)
         tempValidator.setBottom(0.0) # only accept positive epsilons
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
         llepsilonWidget.setValidator(tempValidator)
         llepsilonWidget.editingFinished.connect(self.reportLLEpsilonChanged)
         layoutToUse.addWidget(llepsilonWidget, currentRow, 1, 1, 2)
+        """
         
         return layoutToUse
     
@@ -366,8 +371,8 @@ class GlanceGUIView (QtGui.QWidget) :
         
         # first add the min
         minRangeValue = QtGui.QLineEdit()
-        minRangeValue.setToolTip("Minimum acceptable data value for " + str(file_prefix) + " data")
-        tempValidator = QtGui.QDoubleValidator(minRangeValue)
+        minRangeValue.setToolTip("Minimum acceptable data value for " + str(file_prefix) + " data. (Leave blank or enter None for no limit.)")
+        tempValidator = _DoubleOrNoneValidator(minRangeValue)
         # at some point the bottom and top of the ranges will need to be set on this validator
         # do I need to save it or can I recover it from the widget?
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
@@ -381,8 +386,8 @@ class GlanceGUIView (QtGui.QWidget) :
         
         # first add the min
         maxRangeValue = QtGui.QLineEdit()
-        maxRangeValue.setToolTip("Maximum acceptable data value for " + str(file_prefix) + " data")
-        tempValidator = QtGui.QDoubleValidator(maxRangeValue)
+        maxRangeValue.setToolTip("Maximum acceptable data value for " + str(file_prefix) + " data. (Leave blank or enter None for no limit.)")
+        tempValidator = _DoubleOrNoneValidator(maxRangeValue)
         # at some point the bottom and top of the ranges will need to be set on this validator
         # do I need to save it or can I recover it from the widget?
         tempValidator.setNotation(QtGui.QDoubleValidator.StandardNotation)
@@ -518,6 +523,8 @@ class GlanceGUIView (QtGui.QWidget) :
         when the lon/lat epsilon changes, report it to user update listeners
         """
         
+        pass
+        """ TODO uncomment when this is needed
         newLLEpsilon = self.llepsilonWidget.text()
         # it's still possible for epsilon to not be a number, so fix that
         newLLEpsilon = self._extra_number_validation(newLLEpsilon)
@@ -526,6 +533,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # let our user update listeners know the llepsilon changed
         for listener in self.userUpdateListeners :
             listener.userChangedLLEpsilon(newLLEpsilon)
+        """
     
     
     def reportEpsilonPercentChanged (self) :
@@ -619,28 +627,60 @@ class GlanceGUIView (QtGui.QWidget) :
         the user toggled the "restrict data to range" check box
         """
         
-        print ("*** restrict range checkbox toggled TODO " + file_prefix)
+        # this must be recorded before we tamper with the focus, because that will
+        # trigger other events that may erase this information temporarily
+        shouldRestrictRange = self.widgetInfo[file_prefix]["doRestrictRangeCheckbox"].isChecked()
+        
+        # first we need to clean up focus in case it's in one of the line-edit boxes
+        self.setFocus()
+        
+        # let our listeners know the user changed an overload setting
+        for listener in self.userUpdateListeners :
+            listener.userToggledRestrictRange(file_prefix, shouldRestrictRange)
     
     def reportMinRangeValChanged (self, file_prefix=None) :
         """
         the user changed the minimum value for the acceptable range
         """
         
-        print ("*** minimum range value changed TODO " + file_prefix)
+        newRangeMin = self.widgetInfo[file_prefix]["minRangeRestriction"].text()
+        # it's still possible for this to not be a number, so fix that
+        newRangeMin = self._extra_number_validation(newRangeMin)
+        self.widgetInfo[file_prefix]["minRangeRestriction"].setText(str(newRangeMin))
+        
+        # let our user update listeners know the value changed
+        for listener in self.userUpdateListeners :
+            listener.userChangedRangeMin(file_prefix, newRangeMin)
     
     def reportMaxRangeValChanged (self, file_prefix=None) :
         """
         the user changed the maximum value for the acceptable range
         """
         
-        print ("*** maximum range value changed TODO " + file_prefix)
+        newRangeMax = self.widgetInfo[file_prefix]["maxRangeRestriction"].text()
+        # it's still possible for this to not be a number, so fix that
+        newRangeMax = self._extra_number_validation(newRangeMax)
+        self.widgetInfo[file_prefix]["maxRangeRestriction"].setText(str(newRangeMax))
+        
+        # let our user update listeners know the value changed
+        for listener in self.userUpdateListeners :
+            listener.userChangedRangeMax(file_prefix, newRangeMax)
     
     def reportIsAWIPSToggled (self, file_prefix=None) :
         """
         the user toggled the "correct for AWIPS data types" check box
         """
         
-        print ("*** AWIPS check box toggled TODO " + file_prefix)
+        # this must be recorded before we tamper with the focus, because that will
+        # trigger other events that may erase this information temporarily
+        dataIsAWIPS = self.widgetInfo[file_prefix]["isAWIPScheckbox"].isChecked()
+        
+        # first we need to clean up focus in case it's in one of the line-edit boxes
+        self.setFocus()
+        
+        # let our listeners know the user changed an overload setting
+        for listener in self.userUpdateListeners :
+            listener.userToggledIsAWIPS(file_prefix, dataIsAWIPS)
     
     def reportDisplayStatsClicked (self) :
         """
@@ -673,13 +713,14 @@ class GlanceGUIView (QtGui.QWidget) :
         
         toReturn = None
         
-        try :
-            toReturn = int(string_that_should_be_a_number)
-        except ValueError :
+        if toReturn != "" :
             try :
-                toReturn = float(string_that_should_be_a_number)
+                toReturn = int(string_that_should_be_a_number)
             except ValueError :
-                pass # in this case we can't convert it, so just toss it
+                try :
+                    toReturn = float(string_that_should_be_a_number)
+                except ValueError :
+                    pass # in this case we can't convert it, so just toss it
         
         return toReturn
     
@@ -751,7 +792,8 @@ class GlanceGUIView (QtGui.QWidget) :
         Update the latitude and longitude names that are selected in the drop down,
         if a list is given, then replace the list of options that are being displayed for that file.
         """
-        
+        pass
+        """ TODO uncomment this when these controls are finished
         # if we got a new list, set up the appropriate drop down lists
         if lonlatList is not None :
             
@@ -768,11 +810,14 @@ class GlanceGUIView (QtGui.QWidget) :
         # set the selected longitude
         tempPosition = self.widgetInfo[filePrefix]['lonName'].findText(newLongitude)
         self.widgetInfo[filePrefix]['lonName'].setCurrentIndex(tempPosition)
+        """
     
     def updateEpsilon (self, epsilon) :
         """
         update the comparison epsilon displayed to the user
         """
+        
+        stringToUse = str(epsilon) if epsilon is not None else ""
         
         self.epsilonWidget.setText(str(epsilon))
     
@@ -788,7 +833,8 @@ class GlanceGUIView (QtGui.QWidget) :
         update the epsilon for longitude and latitude displayed to the user
         """
         
-        self.llepsilonWidget.setText(str(newLonLatEpsilon))
+        #self.llepsilonWidget.setText(str(newLonLatEpsilon)) TODO, uncomment when we need this contro
+        pass
     
     def updateImageTypes (self, imageType, list=None) :
         """
@@ -841,6 +887,34 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         
         self.useSameRangeWidget.setChecked(doUseSharedRange)
+    
+    def updateDoRestrictRange (self, filePrefix, doRestrictRange) :
+        """
+        update our control to reflect whether or not the range is going to be restricted
+        """
+        
+        self.widgetInfo[filePrefix]["doRestrictRangeCheckbox"].setChecked(doRestrictRange)
+    
+    def updateRestrictRangeMin (self, filePrefix, newRangeMin) :
+        """
+        update the minimum for the range restriction
+        """
+        
+        self.widgetInfo[filePrefix]["minRangeRestriction"].setText(str(newRangeMin))
+    
+    def updateRestrictRangeMax (self, filePrefix, newRangeMax) :
+        """
+        update the maximum for the range restriction
+        """
+        
+        self.widgetInfo[filePrefix]["maxRangeRestriction"].setText(str(newRangeMax))
+    
+    def updateIsAWIPS (self, filePrefix, isAWIPS) :
+        """
+        update whether or not this should be treated as an AWIPS file
+        """
+        
+        self.widgetInfo[filePrefix]["isAWIPScheckbox"].setChecked(isAWIPS)
     
     ################# end data model update related methods #################
     

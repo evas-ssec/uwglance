@@ -45,6 +45,24 @@ def trim_off_of_left (data, num_elements_to_trim) :
     
     return data[:, num_elements_to_trim:]
 
+def reverse_2D_data_vertically (data) :
+    """
+    Reverse two dimensional data along it's first dimension.
+    For most satellite data this will result in it flipping vertically
+    when glance displays it.
+    """
+    
+    return data.copy()[::-1]
+
+def reverse_2D_data_horizontally (data) :
+    """
+    Reverse two dimensional data along it's second dimension.
+    For most satellite data this will result in it flipping horizontally
+    when glance displays it.
+    """
+    
+    return data.copy()[:, ::-1]
+
 def flatten_data_into_bins (data, ranges, new_values, missing_value, return_data_type) :
     """
     Sort the data into the given ranges. Each range should correspond to a value

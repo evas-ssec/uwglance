@@ -152,6 +152,14 @@ class DataObject (object) :
         
         self.have_analyzed = False
     
+    def copy (self) :
+        """
+        return a copy of this data object
+        """
+        
+        return DataObject(self.data.copy(), fillValue=self.fill_value, ignoreMask=self.masks.ignore_mask,
+                 overrideFillValue=self.override_fill_value, defaultFillValue=self.default_fill_value)
+    
     def self_analysis(self) :
         """
         Gather some basic information about a data set
