@@ -590,7 +590,7 @@ def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, l
     # and some informational stuff
     tempTitle = title
     if datetime is not None :
-        tempTitle = title + ": " + datetime.datetime.strftime("%Y-%m-%d at %H:%M UTC")
+        tempTitle = title + ": " + datetime.strftime("%Y-%m-%d at %H:%M UTC")
     axes.set_title(tempTitle)
     
     return figure
@@ -645,7 +645,7 @@ def _create_lightning_risk_figure(basemapObject, riskAreasInfo,
     # and some informational stuff
     tempTitle = title
     if datetime is not None :
-        tempTitle = title + ": " + datetime.datetime.strftime("%Y-%m-%d at %H:%M UTC")
+        tempTitle = title + ": " + datetime.strftime("%Y-%m-%d at %H:%M UTC")
     axes.set_title(tempTitle)
     
     return figure
