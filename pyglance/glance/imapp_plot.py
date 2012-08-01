@@ -590,7 +590,7 @@ def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, l
     # and some informational stuff
     tempTitle = title
     if datetime is not None :
-        tempTitle = title + ": " + datetime.strftime("%Y-%m-%d at %H:%M UTC")
+        tempTitle = title + ": " + datetime.datetime.strftime("%Y-%m-%d at %H:%M UTC")
     axes.set_title(tempTitle)
     
     return figure
@@ -645,7 +645,7 @@ def _create_lightning_risk_figure(basemapObject, riskAreasInfo,
     # and some informational stuff
     tempTitle = title
     if datetime is not None :
-        tempTitle = title + ": " + datetime.strftime("%Y-%m-%d at %H:%M UTC")
+        tempTitle = title + ": " + datetime.datetime.strftime("%Y-%m-%d at %H:%M UTC")
     axes.set_title(tempTitle)
     
     return figure
@@ -819,7 +819,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         dateTimeStringTemp = str(dateString) + "." + str(timeString)
         timeReferenceObject = None
         try :
-            timeReferenceObject = datetime.strptime(dateTimeStringTemp, "1%y%j.%H%M%S")
+            timeReferenceObject = datetime.datetime.strptime(dateTimeStringTemp, "1%y%j.%H%M%S")
         except ValueError :
             LOG.warn ("Unable to parse datetime from file. No datetime information will be displayed on images.")
             timeReferenceObject = None
@@ -916,7 +916,7 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # get the base time information and translate it into a date time object
         timeUnitsString     = trajectoryFileObject.file_object.get_attribute(defaultValues['timeVar'], UNITS_CONSTANT)
         try :
-            timeReferenceObject = datetime.strptime(timeUnitsString, "hours since %Y-%m-%d %H:%M:%S %Z")
+            timeReferenceObject = datetime.datetime.strptime(timeUnitsString, "hours since %Y-%m-%d %H:%M:%S %Z")
         except ValueError :
             LOG.warn ("Unable to parse datetime from file. Trying alternate datetime format.")
             try :
