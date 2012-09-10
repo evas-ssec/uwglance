@@ -31,7 +31,7 @@ from   glance.io   import UNITS_CONSTANT
 
 LOG = logging.getLogger(__name__)
 
-IMAPP_PLOT_VERSION = 0.4
+IMAPP_PLOT_VERSION = 0.5
 
 defaultValues   = {
                     'longitudeVar':  'xtraj',
@@ -555,7 +555,7 @@ def _create_imapp_figure (initAODdata,       initLongitudeData,       initLatitu
 
 def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, latitudeData, colormap=cm.jet,
                                     plotWarningCircles=False, warningDistance=25.0, useDarkBackground=False, title="Overshooting Tops/Thermal Couplets",
-                                    datetime=None, correctLongitudes=False) :
+                                    datetime=None, correctLongitudes=False, parallelWidth=5.0, meridianWidth=5.0) :
     """
     Plot the thermal couplet centers using a mask that identifies where they are
     TODO, this is not finished at all
@@ -564,7 +564,7 @@ def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, l
     _clean_lon_lat (longitudeData, latitudeData, correctNegativeLongitudes=correctLongitudes)
     
     # build the basic map plot plot
-    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=useDarkBackground,)
+    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=parallelWidth, meridianWidth=meridianWidth, useDarkBackground=useDarkBackground,)
     
     # build extra info to go to the map plotting function
     kwargs = { } 
@@ -598,7 +598,8 @@ def _create_thermal_couplets_figure(basemapObject, centersMask, longitudeData, l
 def _create_lightning_risk_figure(basemapObject, riskAreasInfo,
                                   warningDistance=10.0, useDarkBackground=True, title="Lightning Risk",
                                   colorbarLabel="Lightning Risk within 10 km of overshooting top (%)",
-                                  datetime=None, correctLongitudes=False) :
+                                  datetime=None, correctLongitudes=False,
+                                  parallelWidth=5.0, meridianWidth=5.0) :
     """
     Plot areas of lightning risk colored based on the % chance of cloud-to-ground lightning
     
@@ -608,7 +609,7 @@ def _create_lightning_risk_figure(basemapObject, riskAreasInfo,
     """
     
     # build the basic map plot plot
-    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=5.0, meridianWidth=5.0, useDarkBackground=useDarkBackground,)
+    axes, figure = _build_basic_figure_with_map (basemapObject, parallelWidth=parallelWidth, meridianWidth=meridianWidth, useDarkBackground=useDarkBackground,)
     
     # build extra info to go to the map plotting function
     kwargs = { } 
@@ -659,6 +660,7 @@ examples:
 
 python -m glance.imapp_plot aodTraj traj.nc
 python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
+python -m glance.imapp_plot otPlot  otData.hdf
 
 """
     # the following represent options available to the user on the command line:
@@ -837,7 +839,8 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # create a plot of the centers of the thermal couplets
         LOG.info ("Creating plot of Overshooting Top center locations.")
         tempFigure = _create_thermal_couplets_figure(basemapObject, goodCenters, longitudeData, latitudeData,
-                                                     datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons)
+                                                     datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons,
+                                                     parallelWidth=parallelWidth, meridianWidth=meridianWidth)
         
         # save the plot and then get rid of the local copy
         LOG.info("Saving plot to disk.")
@@ -850,7 +853,8 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         LOG.info ("Creating plot of Turbulence Risk.")
         tempFigure = _create_thermal_couplets_figure(basemapObject, goodCenters, longitudeData, latitudeData,
                                                      plotWarningCircles=True, useDarkBackground=True, title="Turbulence Risk",
-                                                     datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons) 
+                                                     datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons,
+                                                     parallelWidth=parallelWidth, meridianWidth=meridianWidth) 
         
         # save the plot and then get rid of the local copy
         LOG.info("Saving plot to disk.")
@@ -862,7 +866,9 @@ python -m glance.imapp_plot aodTraj traj.nc optionalGrid.nc
         # create a plot of the lightning risks near the centers
         LOG.info ("Creating plot of Lightning Risk.")
         riskAreas = _organize_lightning_risk_areas (longitudeData[goodCenters], latitudeData[goodCenters], otBT14[goodCenters])
-        tempFigure = _create_lightning_risk_figure(basemapObject, riskAreas, datetime=timeReferenceObject, correctLongitudes=shouldModifyNegativeLons)
+        tempFigure = _create_lightning_risk_figure(basemapObject, riskAreas, datetime=timeReferenceObject,
+                                                   correctLongitudes=shouldModifyNegativeLons,
+                                                   parallelWidth=parallelWidth, meridianWidth=meridianWidth)
         
         # save the plot and then get rid of the local copy
         LOG.info("Saving plot to disk.")
