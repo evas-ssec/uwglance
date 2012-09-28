@@ -178,7 +178,15 @@ def rotate_indexes_right (data) :
     
     return data_new
 
+# TODO, this method is only here for backwards compatibility
 def set_to_value_between_bounds(data, value_to_set_to, bottom_bound_exclusive, top_bound_exclusive) :
+    """
+    Wherever the data is non-finite or outside the given bounds, set it to the given value.
+    """
+    
+    return set_to_value_outside_bounds (data, value_to_set_to, bottom_bound_exclusive, top_bound_exclusive)
+
+def set_to_value_outside_bounds(data, value_to_set_to, bottom_bound_exclusive, top_bound_exclusive) :
     """
     Wherever the data is non-finite or outside the given bounds, set it to the given value.
     """

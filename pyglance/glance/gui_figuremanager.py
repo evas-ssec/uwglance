@@ -343,6 +343,7 @@ class GlanceGUIFigures (object) :
                 # Note: histograms don't care about data format requested, they are histogram formatted
                 
                 rawDiffDataClean = diffData.diff_data_object.data[diffData.diff_data_object.masks.valid_mask]
+                # TODO, should the range option be added here?
                 tempFigure = figures.create_histogram(rawDiffDataClean, DEFAULT_NUM_BINS, "Difference in\n" + aVarName,
                                                       "Value of (B - A) at each data point", "Number of points with a given difference", units=aUnitsText)
                 

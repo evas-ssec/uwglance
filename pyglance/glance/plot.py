@@ -170,7 +170,8 @@ def plot_and_save_comparison_figures (aData, bData,
                                      epsilonPercent=None,
                                      fullDPI=None, thumbDPI=None,
                                      units_a=None, units_b=None,
-                                     useBData=True) :
+                                     useBData=True,
+                                     histRange=None) :
     """
     Plot images for a set of figures based on the data sets and settings
     passed in. The images will be saved to disk according to the settings.
@@ -229,6 +230,7 @@ def plot_and_save_comparison_figures (aData, bData,
     useBData -           should the b data be expected or not? when this is false,
                          b data will not be used and no lon/lat data for b will be
                          expected either
+    histRange -          the range that should be used for the histogram, or None
     
     ** May fail due to a known bug on MacOSX systems.
     """
@@ -302,7 +304,10 @@ def plot_and_save_comparison_figures (aData, bData,
                                        epsilonPercent=epsilonPercent,
                                        
                                        # used for display in several types of plots
-                                       units_a=units_a, units_b=units_b
+                                       units_a=units_a, units_b=units_b,
+                                       
+                                       # range for a histogram
+                                       histRange=histRange
                                        )
         plottingFunctions.update(moreFunctions)
     

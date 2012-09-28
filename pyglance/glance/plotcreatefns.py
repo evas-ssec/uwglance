@@ -183,7 +183,10 @@ class PlottingFunctionFactory :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) : _abstract
 
@@ -226,7 +229,10 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         
@@ -255,7 +261,7 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
                                                                          ("Difference in\n" + variableDisplayName),
                                                                          ('Value of (Data File B - Data File A) at a Data Point'),
                                                                          ('Number of Data Points with a Given Difference'),
-                                                                         True, units=units_a)),
+                                                                         True, units=units_a, rangeList=histRange)),
                                               "histogram of the amount of difference in " + variableDisplayName,
                                               "Hist.png", compared_fig_list)
         # make the scatter plot
@@ -327,7 +333,10 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         
@@ -514,7 +523,10 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         
@@ -707,7 +719,10 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         """
@@ -821,7 +836,10 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         """
@@ -916,7 +934,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                                                               "\nfor " + binName + " # " + str(binNumber + 1)),
                                                                              ('RMS Difference across ' + tupleName + ' dimension'),
                                                                              ('Number of Cases with a Given RMS Diff.'),
-                                                                             True, units=units_a)
+                                                                             True, units=units_a, rangeList=histRange)
                 functionsToReturn[str(binNumber + 1) + 'histogram'] = (make_histogram,
                                                   "histogram of rms differences in " + variableDisplayName,
                                                   str(binNumber + 1) + "Hist.png", new_list)
@@ -1021,7 +1039,10 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         """
@@ -1163,7 +1184,10 @@ class DataHistogramPlotFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         
@@ -1186,7 +1210,7 @@ class DataHistogramPlotFunctionFactory (PlottingFunctionFactory) :
                                                                          ("Values of\n" + variableDisplayName),
                                                                          ('Value of Data Point'),
                                                                          ('Number of Data Points with a Given Value'),
-                                                                         True, units=units_a)),
+                                                                         True, units=units_a, rangeList=histRange)),
                                               "histogram of the values in " + variableDisplayName,
                                               "HistA.png", original_fig_list)
         
@@ -1229,7 +1253,10 @@ class InspectIMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         """
@@ -1300,7 +1327,10 @@ class InspectLinePlotsFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         """
@@ -1373,7 +1403,10 @@ class InspectMappedContourPlotFunctionFactory (PlottingFunctionFactory) :
                                    # the optional epsilon for comparison of a percent of A
                                    epsilonPercent=None,
                                    # the optional units for display
-                                   units_a=None, units_b=None
+                                   units_a=None, units_b=None,
+                                   
+                                   # an optional range for a histogram
+                                   histRange=None
                                    
                                    ) :
         

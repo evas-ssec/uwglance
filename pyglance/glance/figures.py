@@ -351,7 +351,7 @@ def _draw_x_equals_y_line(axes, color='k', style='--', epsilon=None, epsilonColo
     axes.set_ybound(ybounds)
 
 # build a histogram figure of the given data with the given title and number of bins
-def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, units=None) :
+def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, units=None, rangeList=None) :
     
     # make the figure
     figure = plt.figure()
@@ -360,8 +360,12 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, unit
     if (data is None) or (len(data) <= 0) :
         return figure
     
+    if rangeList is not None :
+        assert len(rangeList) == 2
+        assert rangeList[0] < rangeList[1]
+    
     # the histogram of the data
-    n, outBins, patches = plt.hist(data, bins)
+    n, outBins, patches = plt.hist(data, bins, range=rangeList) # if rangeList is None the range won't be restricted
     
     # format our axes so they display gracefully
     yFormatter = FormatStrFormatter("%3.3g")
@@ -411,6 +415,11 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, unit
         if (medianVal > centerOfDisplay) :
             xValToUse = 0.17
         figtext(xValToUse, 0.60, statText)
+    
+    # make sure we didn't mess up the range if it's being restricted
+    # (this may be unnessicary, but it's a good extra precaution)
+    if rangeList is not None:
+        plt.xlim(rangeList)
     
     return figure
 

@@ -1610,7 +1610,8 @@ def inspect_library_call (a_path, var_list=[ ],
                              fullDPI=       runInfo['detail_DPI'],
                              thumbDPI=      runInfo['thumb_DPI'],
                              units_a=       varRunInfo['units_a']               if 'units_a'             in varRunInfo else None,
-                             useBData=False)
+                             useBData=False,
+                             histRange=varRunInfo['histogram_range'] if 'histogram_range' in varRunInfo else None)
                 
                 LOG.info("\tfinished creating figures for: " + explanationName)
             
@@ -1935,7 +1936,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                              fullDPI=       runInfo['detail_DPI'],
                              thumbDPI=      runInfo['thumb_DPI'],
                              units_a=       varRunInfo['units_a']         if 'units_a'         in varRunInfo else None,
-                             units_b=       varRunInfo['units_b']         if 'units_b'         in varRunInfo else None)
+                             units_b=       varRunInfo['units_b']         if 'units_b'         in varRunInfo else None,
+                            )#histRange=     varRunInfo['histogram_range'] if 'histogram_range' in varRunInfo else None)
                 
                 LOG.info("\tfinished creating figures for: " + explanationName)
             
