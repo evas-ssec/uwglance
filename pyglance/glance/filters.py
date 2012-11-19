@@ -111,8 +111,9 @@ def extract_bit_from_packed_mask (data, index_of_bit_to_extract,
     return_data_type.
     
     Note: If you wish to examine or compare more than one packed bit, you may
-    use this filter multiple times to extract each separately and then program
-    your own function to perform any comparisons. 
+    use this filter multiple times to extract each separately or you can use
+    extract_multiple_bits_from_packed_mask to extract a set of bits as combined
+    integers.
     """
     # we are only allowing positive indexing due to data typing complexity
     assert(index_of_bit_to_extract >= 0)
@@ -127,6 +128,43 @@ def extract_bit_from_packed_mask (data, index_of_bit_to_extract,
     new_data = np.zeros(data.shape, dtype=return_data_type)
     new_data[pure_extraction >  0] = truth_value
     new_data[pure_extraction <= 0] = false_value
+    
+    return new_data
+
+def extract_multiple_bits_from_packed_mask (data, list_of_indices_to_extract) :
+    """
+    Extract multiple bits packed into a larger data set. The bits that you wish
+    to extract must be identified by their indecides from the lower end of the
+    array of bits (with 0 being the bit that would represent a value of 1
+    if the mask was an integer; so the 1 indexed bit would represent the integer
+    value of 2, the 2 indexed bit a value of 4, and so on).
+    Note: It is assumed that the endian-ness of your data was handled correctly
+    by whatever code loaded it from the file.
+    
+    The bits will be extracted and put back together from lowest index to highest.
+    They will be interpreted as integers.
+    """
+    
+    # we are only allowing positive indexing due to data typing complexity
+    assert(np.min(list_of_indices_to_extract) >= 0)
+    
+    # make some empty variables for use in our loop
+    new_data = np.zeros(data.shape, dtype=np.int)
+    bit_mask = np.zeros(data.shape, dtype=np.int)
+    
+    # pull out each bit and add that information to the return array
+    for list_idx in range(len(list_of_indices_to_extract)) :
+        
+        # make a mask to use for extracting this bit
+        mask_value = 2**list_of_indices_to_extract[list_idx]
+        bit_mask  *= 0
+        bit_mask  += mask_value
+        
+        # extract the bit
+        pure_extraction = np.bitwise_and(data, bit_mask)
+        
+        # add the bit to our return array
+        new_data[pure_extraction > 0] += 2**list_idx
     
     return new_data
 

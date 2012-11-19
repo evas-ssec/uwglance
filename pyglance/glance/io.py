@@ -1041,6 +1041,9 @@ class jpss_adl(object):
 def open(pathname, allowWrite=False):
     suffix = os.path.splitext(pathname)[1][1:].lower()
     if (not suffix) or (suffix not in globals()):
+        # this ican be used to specify a format on the command line by setting the
+        # environment variable FORMAT, for example:
+        #           export FORMAT=nc
         suffix = os.environ.get('FORMAT', None)
         LOG.info('overriding unknown load format to "%s"' % suffix)
     cls = globals()[suffix]
