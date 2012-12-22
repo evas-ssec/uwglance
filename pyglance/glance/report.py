@@ -16,6 +16,8 @@ import types as types
 import numpy as np
 import shutil as shutil
 
+from glance.constants import *
+
 LOG = logging.getLogger(__name__)
 
 # TODO, this should be overridable in the config file when there is one
@@ -77,70 +79,81 @@ def generate_and_save_summary_report(files,
     more keys can be added in the future if more detailed data reporting is desired on the main report page
     
     runInfo should be information about the run in the form
-        runInfo = {'machine': currentMachine,
-                   'user': currentUser,
-                   'time': currentTime,
-                   'version': a version string describing glance,
-                   'latitude': latitudeName,
-                   'longitude': longitudeName,
-                   'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
-                   'longitude_alt_name_in_b': longitudeNameInB,     # optional, if not defined, B's using the normal longitude
-                   'shouldIncludeImages': shouldIncludeImages,      # this key/value is optional, defaults to True
-                   'short_circuit_diffs': if the diff related information should be shown
+        runInfo = {
+                   MACHINE_INFO_KEY:        currentMachine,
+                   USER_INFO_KEY:           currentUser,
+                   TIME_INFO_KEY:           currentTime,
+                   GLANCE_VERSION_INFO_KEY: a version string describing glance,
+                   LATITUDE_NAME_KEY:       latitudeName,
+                   LONGITUDE_NAME_KEY:      longitudeName,
+                   LAT_ALT_NAME_IN_B_KEY:   latitudeNameInB,       # optional, if not defined, B's using the normal latitude
+                   LON_ALT_NAME_IN_B_KEY:   longitudeNameInB,     # optional, if not defined, B's using the normal longitude
+                   DO_MAKE_IMAGES_KEY:      shouldIncludeImages,      # this key/value is optional, defaults to True
+                   SHORT_CIRCUIT_DIFFS_KEY: if the diff related information should be shown
                    }
                    
     files is a dictionary in the form
-        files = {'file A': {'path': fileAName,
-                            #'displayName': fileADisplayName, # TODO
-                            'lastModifiedTime': lastModifiedTimeA,
-                            'md5sum': aMD5SUM
-                            },
-                 'file B': {'path': fileBName,
-                            #'displayName': fileADisplayName, # TODO
-                            'lastModifiedTime': lastModifiedTimeB,
-                            'md5sum': bMD5SUM
-                            }
+        files = {A_FILE_TITLE_KEY:
+                           {
+                            PATH_KEY:          fileAName,
+                            #DISPLAY_NAME_KEY:  fileADisplayName, # TODO
+                            LAST_MODIFIED_KEY: lastModifiedTimeA,
+                            MD5SUM_KEY:        aMD5SUM
+                           },
+                 B_FILE_TITLE_KEY:
+                           {
+                            PATH_KEY:          fileBName,
+                            #DISPLAY_NAME_KEY:  fileADisplayName, # TODO
+                            LAST_MODIFIED_KEY: lastModifiedTimeB,
+                            MD5SUM_KEY:        bMD5SUM
+                           }
                     }
     
     spatial is a dictionary in the form
         spatial = {
-                     'file A': {'numInvPts': number of spatially invalid points only in A (and not corrspondingly in B),
-                                'perInvPts': percent of spatially invalid points in A (out of all pts in A)
+                     A_FILE_TITLE_KEY:
+                                {
+                                NUMBER_INVALID_PTS_KEY:  number of spatially invalid points only in A (and not corrspondingly in B),
+                                PERCENT_INVALID_PTS_KEY: percent of spatially invalid points in A (out of all pts in A)
                                 },
-                     'file B': {'numInvPts': number of spatially invalid points only in B (and not corrspondingly in A),
-                                'perInvPts': percent of spatially invalid points in B (out of all pts in B)
+                     B_FILE_TITLE_KEY:
+                                {
+                                NUMBER_INVALID_PTS_KEY:  number of spatially invalid points only in B (and not corrspondingly in A),
+                                PERCENT_INVALID_PTS_KEY: percent of spatially invalid points in B (out of all pts in B)
                                 },
-                     'perInvPtsInBoth': the percent of points that are spatially invalid in at least one of the two files,
-                     'num_lon_lat_not_equal_points': number of points that do not match in the sets of lon/lat
-                                # if the 'num_lon_lat_not_equal_points' key is defined it means there are mismatching
-                                # longitude/latitude pairs in the data that was compared!
+                     PERCENT_INV_PTS_SHARED_KEY: the percent of points that are spatially invalid in at least one of the two files,
         }
     any of the first level of keys in spatial are optional,
-    although it is assumed that if you include an entry for 'file A' or 'file B' it
-    will have both of the expected keys in its dictionary (ie. both numInvPts and perInvPts)
+    although it is assumed that if you include an entry for A_FILE_TITLE_KEY or B_FILE_TITLE_KEY it
+    will have both of the expected keys in its dictionary
+    (ie. both NUMBER_INVALID_PTS_KEY and PERCENT_INVALID_PTS_KEY)
     
     varNames should be information about the variables present in the files, in the form
-        varNames = {'uniqueToAVars': uniqueToAVars,
-                    'uniqueToBVars': uniqueToBVars,
-                    'sharedVars': sharedVars
-                    }
+        varNames = {
+                    VAR_NAMES_UNIQUE_TO_A_KEY: uniqueToAVars,
+                    VAR_NAMES_UNIQUE_TO_B_KEY: uniqueToBVars,
+                    SHARED_VARIABLE_NAMES_KEY: sharedVars
+                   }
+    all entries in the varNames dictionary are optional.
     """
     
     # pack up all the data needed to build the summary report
     
-    # TODO, more automated defaults
-    varNameDefaults = { 'uniqueToAVars': [],
-                        'uniqueToBVars': [],
-                        'sharedVars': []}
-    varNamesToUse = varNameDefaults
+    
+    varNamesToUse = {
+                        VAR_NAMES_UNIQUE_TO_A_KEY: [ ],
+                        VAR_NAMES_UNIQUE_TO_B_KEY: [ ],
+                        SHARED_VARIABLE_NAMES_KEY: [ ]
+                    }
     varNamesToUse.update(varNames)
     
     # build the full kwargs with all the info
-    kwargs = { 'runInfo': runInfo,
-               'files': files,
-               'spatial': spatial,
-               'varNames': varNamesToUse,
-               'variables': variables 
+    kwargs = { 
+               RUN_INFO_DICT_KEY:          runInfo,
+               FILES_INFO_DICT_KEY:        files,
+               SPATIAL_INFO_DICT_KEY:      spatial,
+               VARIABLE_NAMES_DICT_KEY:    varNamesToUse,
+               VARIABLE_RUN_INFO_DICT_KEY: variables 
                }
               
     _make_and_save_page((outputPath + "/" + reportFileName), 'mainreport.txt', **kwargs)
@@ -152,8 +165,8 @@ def generate_and_save_summary_report(files,
     shutil.copy(failFile, outputPath)
     
     # copy the original configuration file, TODO should I move this to a list input in the parameters?
-    if ('config_file_path' in runInfo) :
-        originalConfigFile = runInfo['config_file_path']
+    if (CONFIG_FILE_PATH_KEY in runInfo) :
+        originalConfigFile = runInfo[CONFIG_FILE_PATH_KEY]
         shutil.copy(originalConfigFile, outputPath)
     
     return
@@ -162,8 +175,9 @@ def generate_and_save_doc_page(definitions, outputPath) :
     """
     generate a page with all the statistics definitions for reference from the reports
     """
-    kwargs = {'definitions': definitions
-              }
+    kwargs = {
+                DEFINITIONS_INFO_KEY: definitions
+             }
     _make_and_save_page(outputPath + "/doc.html", 'doc.txt', **kwargs)
     
     return
@@ -186,65 +200,73 @@ def generate_and_save_variable_report(files,
     ie. there may be many different groups of stats that should each be displayed
     
     generalRunInfo is a dictionary in the form
-        generalRunInfo = {  'machine': currentMachine,
-                            'user': currentUser,
-                            'version': a version string describing glance,
-                            'latitude': latitudeName,
-                            'longitude': longitudeName,
-                            'latitude_alt_name_in_b': latitudeNameInB,       # optional, if not defined, B's using the normal latitude
-                            'longitude_alt_name_in_b': longitudeNameInB,     # optional, if not defined, B's using the normal longitude
-                            'shouldIncludeImages': shouldIncludeImages,
-                            'short_circuit_diffs': if the diff related information should be shown
-                            }
+        generalRunInfo = {
+                            MACHINE_INFO_KEY:        currentMachine,
+                            USER_INFO_KEY:           currentUser,
+                            GLANCE_VERSION_INFO_KEY: a version string describing glance,
+                            LATITUDE_NAME_KEY:       latitudeName,
+                            LONGITUDE_NAME_KEY:      longitudeName,
+                            LAT_ALT_NAME_IN_B_KEY:   latitudeNameInB,       # optional, if not defined, B's using the normal latitude
+                            LON_ALT_NAME_IN_B_KEY:   longitudeNameInB,     # optional, if not defined, B's using the normal longitude
+                            DO_MAKE_IMAGES_KEY:      shouldIncludeImages,
+                            SHORT_CIRCUIT_DIFFS_KEY: if the diff related information should be shown
+                         }
     
     variableRunInfo is a dictionary in the form
-        variableRunInfo = { 'variable_name': variableName,
-                            'epsilon': epsilon,
-                            'missing_value': missingDataValue,
-                            'display_name': displayName
-                            'did_pass': boolean value or None, # optional, boolean means it did or did not pass, None means it was
-                                                               # not qualitatively tested against a set of tolerances
+        variableRunInfo = {
+                            VARIABLE_TECH_NAME_KEY: variableName,
+                            EPSILON_KEY:            epsilon,
+                            FILL_VALUE_KEY:         missingDataValue,
+                            DISPLAY_NAME_KEY:       displayName
+                            DID_VARIABLE_PASS_KEY:      boolean value or None, # optional, boolean means it did or did not pass, None means it was
+                                                                           # not qualitatively tested against a set of tolerances
                             'time': currentTime
-                            }
+                          }
                             
     files is a dictionary in the form
-        files = {'file A': {'path': fileAName,
-                            #'displayName': fileADisplayName, # TODO
-                            'lastModifiedTime': lastModifiedTimeA,
-                            'md5sum': aMD5SUM
-                            },
-                 'file B': {'path': fileBName,
-                            #'displayName': fileADisplayName, # TODO
-                            'lastModifiedTime': lastModifiedTimeB,
-                            'md5sum': bMD5SUM
+        files = {A_FILE_TITLE_KEY:
+                        {
+                            PATH_KEY:          fileAName,
+                            #DISPLAY_NAME_KEY:  fileADisplayName, # TODO
+                            LAST_MODIFIED_KEY: lastModifiedTimeA,
+                            MD5SUM_KEY:        aMD5SUM
+                        },
+                 B_FILE_TITLE_KEY:
+                        {
+                            PATH_KEY:          fileBName,
+                            #DISPLAY_NAME_KEY:  fileADisplayName, # TODO
+                            LAST_MODIFIED_KEY: lastModifiedTimeB,
+                            MD5SUM_KEY:        bMD5SUM
                             }
                     }
                     
     spatial is a dictionary in the form
         spatial = {
-                     'file A': {'numInvPts': number of spatially invalid points only in A (and not corrspondingly in B),
-                                'perInvPts': percent of spatially invalid points in A (out of all pts in A)
-                                },
-                     'file B': {'numInvPts': number of spatially invalid points only in B (and not corrspondingly in A),
-                                'perInvPts': percent of spatially invalid points in B (out of all pts in B)
-                                },
-                     'perInvPtsInBoth': the percent of points that are spatially invalid in at least one of the two files,
-                     'num_lon_lat_not_equal_points': number of points that do not match in the sets of lon/lat
-                                # if the 'num_lon_lat_not_equal_points' key is defined it means there are mismatching
-                                # longitude/latitude pairs in the data that was compared!
+                     A_FILE_TITLE_KEY:
+                            {
+                                NUMBER_INVALID_PTS_KEY:  number of spatially invalid points only in A (and not corrspondingly in B),
+                                PERCENT_INVALID_PTS_KEY: percent of spatially invalid points in A (out of all pts in A)
+                            },
+                     B_FILE_TITLE_KEY:
+                            {
+                                NUMBER_INVALID_PTS_KEY:  number of spatially invalid points only in B (and not corrspondingly in A),
+                                PERCENT_INVALID_PTS_KEY: percent of spatially invalid points in B (out of all pts in B)
+                            },
+                     PERCENT_INV_PTS_SHARED_KEY: the percent of points that are spatially invalid in at least one of the two files,
         }
     
     imageNames is a dictionary in the form
         imageNames = {
-                      'original' : [list, of, file-names, of, original, images],
-                      'compared' : [list, of, file-names, of, compared, images]
-        }
+                      ORIGINAL_IMAGES_KEY : [list, of, file-names, of, original, images],
+                      COMPARED_IMAGES_KEY : [list, of, file-names, of, compared, images]
+                     }
     note: the assumption will be made that smaller versions of these images exist
     in the form small.filename 
     
     any of the first level of keys in spatial are optional,
-    although it is assumed that if you include an entry for 'file A' or 'file B' it
-    will have both of the expected keys in its dictionary (ie. both numInvPts and perInvPts)
+    although it is assumed that if you include an entry for A_FILE_TITLE_KEY or
+    B_FILE_TITLE_KEY it will have both of the expected keys in its dictionary
+    (ie. both NUMBER_INVALID_PTS_KEY and PERCENT_INVALID_PTS_KEY)
     
     """
     
@@ -255,11 +277,12 @@ def generate_and_save_variable_report(files,
     runInfo.update(variableRunInfo)
     
     # put all the info together in the kwargs
-    kwargs = { 'runInfo': runInfo,
-               'files' : files,
-               'statGroups': statGroups,
-               'spatial': spatial,
-               'imageNames': imageNames
+    kwargs = {
+               RUN_INFO_DICT_KEY:        runInfo,
+               FILES_INFO_DICT_KEY :     files,
+               STATS_INFO_DICT_KEY:      statGroups,
+               SPATIAL_INFO_DICT_KEY:    spatial,
+               IMAGE_NAME_INFO_DICT_KEY: imageNames
                }
     
     _make_and_save_page((outputPath + "/" + reportFileName), 'variablereport.txt', **kwargs)
@@ -283,41 +306,44 @@ def generate_and_save_inspect_variable_report(files,
     ie. there may be many different groups of stats that should each be displayed
     
     generalRunInfo is a dictionary in the form
-        generalRunInfo = {  'machine': currentMachine,
-                            'user': currentUser,
-                            'version': a version string describing glance,
-                            'latitude': latitudeName,
-                            'longitude': longitudeName,
-                            'shouldIncludeImages': shouldIncludeImages,
-                            }
+        generalRunInfo = {
+                            MACHINE_INFO_KEY:        currentMachine,
+                            USER_INFO_KEY:           currentUser,
+                            GLANCE_VERSION_INFO_KEY: a version string describing glance,
+                            LATITUDE_NAME_KEY:       latitudeName,
+                            LONGITUDE_NAME_KEY:      longitudeName,
+                            DO_MAKE_IMAGES_KEY:      shouldIncludeImages,
+                         }
     
     variableRunInfo is a dictionary in the form
-        variableRunInfo = { 'variable_name': variableName,
-                            'missing_value': missingDataValue,
-                            'display_name': displayName,
-                            'time': currentTime
+        variableRunInfo = { VARIABLE_TECH_NAME_KEY: variableName,
+                            FILL_VALUE_KEY:         missingDataValue,
+                            DISPLAY_NAME_KEY:       displayName,
+                            TIME_INFO_KEY:          currentTime
                             }
                             
     files is a dictionary in the form
-        files = {'file A': {'path': fileAName,
-                            #'displayName': fileADisplayName, # TODO
-                            'lastModifiedTime': lastModifiedTimeA,
-                            'md5sum': aMD5SUM
-                            },
-                    }
+        files = {
+                    A_FILE_TITLE_KEY:
+                        {
+                            PATH_KEY:          fileAName,
+                            #DISPLAY_NAME_KEY:  fileADisplayName, # TODO
+                            LAST_MODIFIED_KEY: lastModifiedTimeA,
+                            MD5SUM_KEY:        aMD5SUM
+                        },
+                }
                     
     spatial is a dictionary in the form
         spatial = {
-                    'numInvPts': number of spatially invalid points only in A (and not corrspondingly in B),
-                    'perInvPts': percent of spatially invalid points in A (out of all pts in A)
-                                
+                    NUMBER_INVALID_PTS_KEY:  number of spatially invalid points only in A (and not corrspondingly in B),
+                    PERCENT_INVALID_PTS_KEY: percent of spatially invalid points in A (out of all pts in A)
                   }
     
     imageNames is a dictionary in the form
         imageNames = {
-                      'original' : [list, of, file-names, of, original, images],
-                      'compared' : [list, of, file-names, of, analyzed, images]
-        }
+                        ORIGINAL_IMAGES_KEY : [list, of, file-names, of, original, images],
+                        COMPARED_IMAGES_KEY : [list, of, file-names, of, analyzed, images]
+                     }
     note: the assumption will be made that smaller versions of these images exist
     in the form small.filename 
     
@@ -330,11 +356,12 @@ def generate_and_save_inspect_variable_report(files,
     runInfo.update(variableRunInfo)
     
     # put all the info together in the kwargs
-    kwargs = { 'runInfo': runInfo,
-               'files' : files,
-               'statGroups': statGroups,
-               'spatial': spatial,
-               'imageNames': imageNames
+    kwargs = { 
+               RUN_INFO_DICT_KEY:        runInfo,
+               FILES_INFO_DICT_KEY :     files,
+               STATS_INFO_DICT_KEY:      statGroups,
+               SPATIAL_INFO_DICT_KEY:    spatial,
+               IMAGE_NAME_INFO_DICT_KEY: imageNames
                }
     
     _make_and_save_page((outputPath + "/" + reportFileName), 'inspectvariablereport.txt', **kwargs)
@@ -360,55 +387,61 @@ def generate_and_save_inspection_summary_report(files,
     more keys can be added in the future if more detailed data reporting is desired on the main report page
     
     runInfo should be information about the run in the form
-        runInfo = {'machine': currentMachine,
-                   'user': currentUser,
-                   'time': currentTime,
-                   'version': a version string describing glance,
-                   'latitude': latitudeName,
-                   'longitude': longitudeName,
-                   'shouldIncludeImages': shouldIncludeImages,      # this key/value is optional, defaults to True
-                   }
+        runInfo =   {
+                        MACHINE_INFO_KEY:        currentMachine,
+                        USER_INFO_KEY:           currentUser,
+                        TIME_INFO_KEY:           currentTime,
+                        GLANCE_VERSION_INFO_KEY: a version string describing glance,
+                        LATITUDE_NAME_KEY:       latitudeName,
+                        LONGITUDE_NAME_KEY:      longitudeName,
+                        DO_MAKE_IMAGES_KEY:      shouldIncludeImages,      # this key/value is optional, defaults to True
+                    }
                    
     files is a dictionary in the form
-        files = {'file A': {'path': fileAName,
-                            #'displayName': fileADisplayName, # TODO
-                            'lastModifiedTime': lastModifiedTimeA,
-                            'md5sum': aMD5SUM
+        files =     {
+                        A_FILE_TITLE_KEY:
+                            {
+                                PATH_KEY:          fileAName,
+                                #DISPLAY_NAME_KEY:  fileADisplayName, # TODO
+                                LAST_MODIFIED_KEY: lastModifiedTimeA,
+                                MD5SUM_KEY:        aMD5SUM
                             },
                     }
     
     spatial is a dictionary in the form
         spatial = {
-                   'numInvPts': number of spatially invalid points only in A (and not corrspondingly in B),
-                   'perInvPts': percent of spatially invalid points in A (out of all pts in A)
-                   }
+                    NUMBER_INVALID_PTS_KEY:  number of spatially invalid points only in A (and not corrspondingly in B),
+                    PERCENT_INVALID_PTS_KEY: percent of spatially invalid points in A (out of all pts in A)
+                  }
     
     varNames should be information about the variables present in the file, in the form
     more information may be added to this dictionary in the future
-        varNames = {'possibleNames': listOfAllVarsInFile,
+        varNames = {
+                        POSSIBLE_NAMES_KEY: listOfAllVarsInFile,
                     }
     """
     
     # pack up all the data needed to build the summary report
     
     # TODO, more automated defaults
-    varNameDefaults = { 'possibleNames': [ ],}
+    varNameDefaults = { POSSIBLE_NAMES_KEY: [ ],}
     varNamesToUse = varNameDefaults
     varNamesToUse.update(varNames)
     
     # build the full kwargs with all the info
-    kwargs = { 'runInfo': runInfo,
-               'files': files,
-               'spatial': spatial,
-               'varNames': varNamesToUse,
-               'variables': variables 
+    kwargs = {
+                RUN_INFO_DICT_KEY: runInfo,
+                FILES_INFO_DICT_KEY: files,
+                SPATIAL_INFO_DICT_KEY: spatial,
+                VARIABLE_NAMES_DICT_KEY: varNamesToUse,
+                VARIABLE_RUN_INFO_DICT_KEY: variables 
                }
               
     _make_and_save_page((outputPath + "/" + reportFileName), 'inspectmainreport.txt', **kwargs)
     
     # copy the original configuration file, TODO should I move this to a list input in the parameters?
-    if ('config_file_path' in runInfo) :
-        originalConfigFile = runInfo['config_file_path']
+    if (CONFIG_FILE_PATH_KEY in runInfo) :
+        originalConfigFile = runInfo[CONFIG_FILE_PATH_KEY]
         shutil.copy(originalConfigFile, outputPath)
     
     return

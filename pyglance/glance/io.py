@@ -412,6 +412,11 @@ class nc (object):
         
         return scaled_data_copy 
     
+    # TODO, this hasn't been supported in other file types
+    def close (self) :
+        self._nc.close()
+        self._nc = None
+    
     def get_variable_object(self, name):
         return self._nc.var(name)
     

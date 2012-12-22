@@ -27,6 +27,7 @@ import glance.delta    as delta
 import glance.figures  as figures
 import glance.data     as dataobj
 import glance.plotcreatefns as plotfns
+from glance.constants import *
 
 LOG = logging.getLogger(__name__)
 
@@ -184,21 +185,24 @@ def plot_and_save_comparison_figures (aData, bData,
                          set)
     
         lonLatDataDict = {
-                          'a' = {
-                                 'lon': longitudeDataForFileA,
-                                 'lat': latitudeDataForFileA,
-                                 'inv_mask': invalidMaskForFileA
-                                 },
-                          'b' = {
-                                 'lon': longitudeDataForFileB,
-                                 'lat': latitudeDataForFileB,
-                                 'inv_mask': invalidMaskForFileB
-                                 },
-                          'common' = {
-                                      'lon': longitudeDataCommonToBothFiles,
-                                      'lat': latitudeDataCommonToBothFiles,
-                                      'inv_mask': invalidMaskCommonToBothFiles
-                                      }
+                          A_FILE_KEY =
+                                {
+                                 LON_KEY:          longitudeDataForFileA,
+                                 LAT_KEY:          latitudeDataForFileA,
+                                 INVALID_MASK_KEY: invalidMaskForFileA
+                                },
+                          B_FILE_KEY =
+                                {
+                                 LON_KEY:          longitudeDataForFileB,
+                                 LAT_KEY:          latitudeDataForFileB,
+                                 INVALID_MASK_KEY: invalidMaskForFileB
+                                },
+                          COMMON_KEY =
+                                {
+                                 LON_KEY:          longitudeDataCommonToBothFiles,
+                                 LAT_KEY:          latitudeDataCommonToBothFiles,
+                                 INVALID_MASK_KEY: invalidMaskCommonToBothFiles
+                                }
                           }
     
     required parameters:
@@ -248,13 +252,13 @@ def plot_and_save_comparison_figures (aData, bData,
     spaciallyInvalidMaskB = None
     if (lonLatDataDict is not None) and (len(lonLatDataDict.keys()) > 0):
         if useBData :
-            spaciallyInvalidMaskA = lonLatDataDict['a']['inv_mask']
-            spaciallyInvalidMaskB = lonLatDataDict['b']['inv_mask']
+            spaciallyInvalidMaskA = lonLatDataDict[A_FILE_KEY][INVALID_MASK_KEY]
+            spaciallyInvalidMaskB = lonLatDataDict[B_FILE_KEY][INVALID_MASK_KEY]
         else :
-            spaciallyInvalidMaskA = lonLatDataDict['inv_mask']
+            spaciallyInvalidMaskA = lonLatDataDict[INVALID_MASK_KEY]
     
     # compare the two data sets to get our difference data and mismatch info
-    aDataObject = dataobj.DataObject(aData, fillValue=missingValue,       ignoreMask=spaciallyInvalidMaskA)
+    aDataObject = dataobj.DataObject(aData, fillValue=missingValue, ignoreMask=spaciallyInvalidMaskA)
     bDataObject = None
     diffInfo    = None
     if useBData :

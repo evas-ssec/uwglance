@@ -914,6 +914,83 @@ class StatisticalAnalysis (StatisticalData) :
         self.missingValue = MissingValueStatistics(diffInfoObject)
         self.finiteData   = FiniteDataStatistics(diffInfoObject)
     
+    def check_pass_or_fail(self,
+                           epsilon_failure_tolerance   =np.nan, epsilon_failure_tolerance_default   =None,
+                           non_finite_data_tolerance   =np.nan, non_finite_data_tolerance_default   =None,
+                           total_data_failure_tolerance=np.nan, total_data_failure_tolerance_default=None,
+                           min_acceptable_r_squared    =np.nan, min_acceptable_r_squared_default    =None
+                           ) :
+        """
+        Check whether the variable passed analysis, failed analysis, or
+        did not need to be quantitatively tested
+        
+        also returns information about the fractions of failure
+        """
+        
+        passValues = [ ]
+        
+        # test the epsilon value tolerance
+        
+        # get the tolerance for failures compared to epsilon
+        epsilonTolerance = epsilon_failure_tolerance if epsilon_failure_tolerance is not np.nan else epsilon_failure_tolerance_default
+        
+        # did we fail based on the epsilon?
+        failed_fraction = self.comparison.diff_outside_epsilon_fraction
+        #failed_fraction = variableStats['Numerical Comparison Statistics']['diff_outside_epsilon_fraction']
+        passed_epsilon  = None
+        if epsilonTolerance is not None :
+            passed_epsilon = failed_fraction <= epsilonTolerance
+        passValues.append(passed_epsilon)
+        
+        # test the nonfinite tolerance
+        
+        # get the tolerance for failures in amount of nonfinite data (in spatially valid areas)
+        nonfiniteTolerance = non_finite_data_tolerance if non_finite_data_tolerance is not np.nan else non_finite_data_tolerance_default
+        
+        # did we fail based on nonfinite data
+        non_finite_diff_fraction = self.finiteData.finite_in_only_one_fraction
+        #non_finite_diff_fraction = variableStats['Finite Data Statistics']['finite_in_only_one_fraction']
+        passed_nonfinite         = None
+        if nonfiniteTolerance is not None :
+            passed_nonfinite = non_finite_diff_fraction <= nonfiniteTolerance
+        passValues.append(passed_nonfinite)
+        
+        # test if the total failed percentage is acceptable
+        
+        # get the total percentage of failed data that is acceptable
+        totalFailTolerance = total_data_failure_tolerance if total_data_failure_tolerance is not np.nan else total_data_failure_tolerance_default
+        
+        # did we fail based on all data failures?
+        passed_all_percentage = None
+        if totalFailTolerance is not None :
+            passed_all_percentage = (non_finite_diff_fraction + failed_fraction) <= totalFailTolerance
+        passValues.append(passed_all_percentage)
+        
+        # test the r-squared correlation coefficent
+        
+        # get the minimum acceptable r-squared correlation coefficient
+        min_r_squared = min_acceptable_r_squared if min_acceptable_r_squared is not np.nan else min_acceptable_r_squared_default
+        
+        # did we fail based on the r-squared correlation coefficient?
+        r_squared_value  = None
+        passed_r_squared = None
+        if min_r_squared is not None :
+            r_squared_value  = self.comparison.r_squared_correlation
+            #r_squared_value  = variableStats['Numerical Comparison Statistics']['r-squared correlation']
+            passed_r_squared = r_squared_value >= min_r_squared
+        passValues.append(passed_r_squared)
+        
+        # figure out the overall pass/fail result
+        didPass = None
+        for passValue in passValues :
+            # if passValue isn't none, we need to update didPass
+            if passValue is not None :
+                if didPass is not None :
+                    didPass = passValue and didPass
+                else :
+                    didPass = passValue
+        
+        return didPass, failed_fraction, non_finite_diff_fraction, r_squared_value
     
     def dictionary_form(self) :
         """
@@ -1016,7 +1093,6 @@ class StatisticalInspectionAnalysis (StatisticalData) :
         self.notANumber   = NotANumberInspectionStatistics(dataObject)
         self.missingValue = MissingValueInspectionStatistics(dataObject)
         self.finiteData   = FiniteDataInspectionStatistics(dataObject)
-    
     
     def dictionary_form(self) :
         """

@@ -18,6 +18,7 @@ from numpy import ma
 import glance.graphics as maps
 import glance.delta    as delta
 import glance.figures  as figures
+from glance.constants import *
 
 LOG = logging.getLogger(__name__)
 
@@ -107,11 +108,11 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask=None, variab
         nameMessage = " (" + variableDisplayName + ")"
     
     # figure out the bounding axis
-    aAxis        = get_visible_axes(lonLatDataDict['a']['lon'], lonLatDataDict['a']['lat'], goodInAMask)
+    aAxis        = get_visible_axes(lonLatDataDict[A_FILE_KEY][LON_KEY], lonLatDataDict[A_FILE_KEY][LAT_KEY], goodInAMask)
     fullAxis     = aAxis
     bAxis        = None
     if goodInBMask is not None :
-        bAxis    = get_visible_axes(lonLatDataDict['b']['lon'], lonLatDataDict['b']['lat'], goodInBMask)
+        bAxis    = get_visible_axes(lonLatDataDict[B_FILE_KEY][LON_KEY], lonLatDataDict[B_FILE_KEY][LAT_KEY], goodInBMask)
         fullAxis = [min(aAxis[0], bAxis[0]), max(aAxis[1], bAxis[1]),
                     min(aAxis[2], bAxis[2]), max(aAxis[3], bAxis[3])]
     else :
@@ -129,11 +130,11 @@ def _make_axis_and_basemap(lonLatDataDict, goodInAMask, goodInBMask=None, variab
     
     # create our basemap
     LOG.info('\t\tloading base map data')
-    lonToUse = lonLatDataDict['a']['lon']
-    latToUse = lonLatDataDict['a']['lat']
+    lonToUse = lonLatDataDict[A_FILE_KEY][LON_KEY]
+    latToUse = lonLatDataDict[A_FILE_KEY][LAT_KEY]
     if goodInBMask is not None :
-        lonToUse = lonLatDataDict['common']['lon']
-        latToUse = lonLatDataDict['common']['lat']
+        lonToUse = lonLatDataDict[COMMON_KEY][LON_KEY]
+        latToUse = lonLatDataDict[COMMON_KEY][LAT_KEY]
     baseMapInstance, fullAxis = maps.create_basemap(lonToUse, latToUse,
                                                     fullAxis, select_projection(fullAxis))
     
@@ -250,48 +251,48 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
         functionsToReturn = { }
         
         # make the histogram plot
-        if ('do_plot_histogram' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_histogram']) :
+        if (DO_PLOT_HISTOGRAM_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_HISTOGRAM_KEY]) :
             
             assert(goodInBothMask.shape == rawDiffData.shape)
             
             # setup the data bins for the histogram
             numBinsToUse = 50
             valuesForHist = rawDiffData[goodInBothMask]
-            functionsToReturn['histogram'] = ((lambda : figures.create_histogram(valuesForHist, numBinsToUse,
-                                                                         ("Difference in\n" + variableDisplayName),
-                                                                         ('Value of (Data File B - Data File A) at a Data Point'),
-                                                                         ('Number of Data Points with a Given Difference'),
-                                                                         True, units=units_a, rangeList=histRange)),
-                                              "histogram of the amount of difference in " + variableDisplayName,
-                                              "Hist.png", compared_fig_list)
+            functionsToReturn[HIST_FUNCTION_KEY] = ((lambda : figures.create_histogram(valuesForHist, numBinsToUse,
+                                                                                       ("Difference in\n" + variableDisplayName),
+                                                                                       ('Value of (Data File B - Data File A) at a Data Point'),
+                                                                                       ('Number of Data Points with a Given Difference'),
+                                                                                       True, units=units_a, rangeList=histRange)),
+                                                    "histogram of the amount of difference in " + variableDisplayName,
+                                                    "Hist.png", compared_fig_list)
         # make the scatter plot
-        if ('do_plot_scatter' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_scatter']) :
+        if (DO_PLOT_SCATTER_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_SCATTER_KEY]) :
             
             assert(aData.shape    == bData.shape)
             assert(bData.shape    == goodInBothMask.shape)
             assert(goodInBothMask.shape == outsideEpsilonMask.shape)
             
             # TODO, if there's an epsilon percent, how should the epsilon lines be drawn?
-            functionsToReturn['scatter']   = ((lambda : figures.create_scatter_plot(aData[goodInBothMask], bData[goodInBothMask],
-                                                                            "Value in File A vs Value in File B",
-                                                                            "File A Value", "File B Value",
-                                                                            outsideEpsilonMask[goodInBothMask],
-                                                                            epsilon, units_x=units_a, units_y=units_b)),
-                                              "scatter plot of file a values vs file b values for " + variableDisplayName,
-                                              "Scatter.png", compared_fig_list)
+            functionsToReturn[SCATTER_FUNCTION_KEY]   = ((lambda : figures.create_scatter_plot(aData[goodInBothMask], bData[goodInBothMask],
+                                                                                               "Value in File A vs Value in File B",
+                                                                                               "File A Value", "File B Value",
+                                                                                               outsideEpsilonMask[goodInBothMask],
+                                                                                               epsilon, units_x=units_a, units_y=units_b)),
+                                                         "scatter plot of file a values vs file b values for " + variableDisplayName,
+                                                         "Scatter.png", compared_fig_list)
         
         # make a hexplot, which is like a scatter plot with density
-        if ('do_plot_hex' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_hex']) :
+        if (DO_PLOT_HEX_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_HEX_KEY]) :
             
             assert(aData.shape == bData.shape)
             assert(bData.shape == goodInBothMask.shape)
             
-            functionsToReturn['scatterD']  = ((lambda : figures.create_hexbin_plot(aData[goodInBothMask], bData[goodInBothMask],
-                                                                                   "Value in File A vs Value in File B",
-                                                                                   "File A Value", "File B Value", epsilon,
-                                                                                   units_x=units_a, units_y=units_b)),
-                                              "density of file a values vs file b values for " + variableDisplayName,
-                                              "Hex.png", compared_fig_list)
+            functionsToReturn[HEX_PLOT_FUNCTION_KEY]  = ((lambda : figures.create_hexbin_plot(aData[goodInBothMask], bData[goodInBothMask],
+                                                                                              "Value in File A vs Value in File B",
+                                                                                              "File A Value", "File B Value", epsilon,
+                                                                                              units_x=units_a, units_y=units_b)),
+                                                         "density of file a values vs file b values for " + variableDisplayName,
+                                                         "Hex.png", compared_fig_list)
         
         return functionsToReturn
 
@@ -371,112 +372,112 @@ class MappedContourPlotFunctionFactory (PlottingFunctionFactory) :
         # make the plotting functions
         
         # make the original data plots
-        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+        if (DO_PLOT_ORIGINALS_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ORIGINALS_KEY]) :
             
-            assert('a'   in lonLatDataDict)
-            assert('lat' in lonLatDataDict['a'])
-            assert('lon' in lonLatDataDict['a'])
-            assert(lonLatDataDict['a']['lat'].shape == lonLatDataDict['a']['lon'].shape)
+            assert(A_FILE_KEY in lonLatDataDict)
+            assert(LAT_KEY    in lonLatDataDict[A_FILE_KEY])
+            assert(LON_KEY    in lonLatDataDict[A_FILE_KEY])
+            assert(lonLatDataDict[A_FILE_KEY][LAT_KEY].shape == lonLatDataDict[A_FILE_KEY][LON_KEY].shape)
             
-            functionsToReturn['originalA'] = ((lambda : mappedPlottingFunction(aData,
-                                                                               lonLatDataDict['a']['lat'], 
-                                                                               lonLatDataDict['a']['lon'],
-                                                                               baseMapInstance, fullAxis,
-                                                                               (variableDisplayName + "\nin File A"),
-                                                                               invalidMask=(~goodInAMask),
-                                                                               dataRanges=dataRanges or sharedRange,
-                                                                               dataRangeNames=dataRangeNames,
-                                                                               dataRangeColors=dataColors,
-                                                                               units=units_a)),
-                                              variableDisplayName + " in file a",
-                                              "A.png",  original_fig_list)
+            functionsToReturn[ORIG_A_FUNCTION_KEY] = ((lambda : mappedPlottingFunction(aData,
+                                                                                       lonLatDataDict[A_FILE_KEY][LAT_KEY], 
+                                                                                       lonLatDataDict[A_FILE_KEY][LON_KEY],
+                                                                                       baseMapInstance, fullAxis,
+                                                                                       (variableDisplayName + "\nin File A"),
+                                                                                       invalidMask=(~goodInAMask),
+                                                                                       dataRanges=dataRanges or sharedRange,
+                                                                                       dataRangeNames=dataRangeNames,
+                                                                                       dataRangeColors=dataColors,
+                                                                                       units=units_a)),
+                                                      variableDisplayName + " in file a",
+                                                      "A.png",  original_fig_list)
             
-            assert('b'   in lonLatDataDict)
-            assert('lat' in lonLatDataDict['b'])
-            assert('lon' in lonLatDataDict['b'])
-            assert(lonLatDataDict['b']['lat'].shape == lonLatDataDict['b']['lon'].shape)
+            assert(B_FILE_KEY in lonLatDataDict)
+            assert(LAT_KEY    in lonLatDataDict[B_FILE_KEY])
+            assert(LON_KEY    in lonLatDataDict[B_FILE_KEY])
+            assert(lonLatDataDict[B_FILE_KEY][LAT_KEY].shape == lonLatDataDict[B_FILE_KEY][LON_KEY].shape)
             
-            functionsToReturn['originalB'] = ((lambda : mappedPlottingFunction(bData, 
-                                                                               lonLatDataDict['b']['lat'], 
-                                                                               lonLatDataDict['b']['lon'],
-                                                                               baseMapInstance, fullAxis,
-                                                                               (variableDisplayName + "\nin File B"),
-                                                                               invalidMask=(~goodInBMask),
-                                                                               dataRanges=dataRanges or sharedRange,
-                                                                               dataRangeNames=dataRangeNames,
-                                                                               dataRangeColors=dataColors,
-                                                                               units=units_b)),
-                                              variableDisplayName + " in file b",
-                                              "B.png",  original_fig_list)
+            functionsToReturn[ORIG_B_FUNCTION_KEY] = ((lambda : mappedPlottingFunction(bData, 
+                                                                                       lonLatDataDict[B_FILE_KEY][LAT_KEY], 
+                                                                                       lonLatDataDict[B_FILE_KEY][LON_KEY],
+                                                                                       baseMapInstance, fullAxis,
+                                                                                       (variableDisplayName + "\nin File B"),
+                                                                                       invalidMask=(~goodInBMask),
+                                                                                       dataRanges=dataRanges or sharedRange,
+                                                                                       dataRangeNames=dataRangeNames,
+                                                                                       dataRangeColors=dataColors,
+                                                                                       units=units_b)),
+                                                      variableDisplayName + " in file b",
+                                                      "B.png",  original_fig_list)
         
         # make the absolute value difference plot
-        if ('do_plot_abs_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_abs_diff']) :
+        if (DO_PLOT_ABS_DIFF_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ABS_DIFF_KEY]) :
             
             assert(absDiffData.shape == goodInBothMask.shape)
-            assert('common' in lonLatDataDict)
-            assert('lat'    in lonLatDataDict['common'])
-            assert('lon'    in lonLatDataDict['common'])
-            assert(lonLatDataDict['common']['lat'].shape == lonLatDataDict['common']['lon'].shape)
-            assert(lonLatDataDict['common']['lon'].shape == absDiffData.shape)
+            assert(COMMON_KEY in lonLatDataDict)
+            assert(LAT_KEY    in lonLatDataDict[COMMON_KEY])
+            assert(LON_KEY    in lonLatDataDict[COMMON_KEY])
+            assert(lonLatDataDict[COMMON_KEY][LAT_KEY].shape == lonLatDataDict[COMMON_KEY][LON_KEY].shape)
+            assert(lonLatDataDict[COMMON_KEY][LON_KEY].shape == absDiffData.shape)
             
-            functionsToReturn['diffAbs']   = ((lambda : mappedPlottingFunction(absDiffData,
-                                                                               lonLatDataDict['common']['lat'], 
-                                                                               lonLatDataDict['common']['lon'],
-                                                                               baseMapInstance, fullAxis,
-                                                                               ("Absolute value of difference in\n"
-                                                                                + variableDisplayName),
-                                                                               invalidMask=(~goodInBothMask),
-                                                                               units=units_a)),
-                                              "absolute value of difference in " + variableDisplayName,
-                                              "AbsDiff.png", compared_fig_list)
+            functionsToReturn[ABS_DIFF_FUNCTION_KEY]   = ((lambda : mappedPlottingFunction(absDiffData,
+                                                                                           lonLatDataDict[COMMON_KEY][LAT_KEY], 
+                                                                                           lonLatDataDict[COMMON_KEY][LON_KEY],
+                                                                                           baseMapInstance, fullAxis,
+                                                                                           ("Absolute value of difference in\n"
+                                                                                            + variableDisplayName),
+                                                                                           invalidMask=(~goodInBothMask),
+                                                                                           units=units_a)),
+                                                          "absolute value of difference in " + variableDisplayName,
+                                                          "AbsDiff.png", compared_fig_list)
         # make the subtractive difference plot
-        if ('do_plot_sub_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_sub_diff']) :
+        if (DO_PLOT_SUB_DIFF_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_SUB_DIFF_KEY]) :
             
             assert(rawDiffData.shape == goodInBothMask.shape)
-            assert('common' in lonLatDataDict)
-            assert('lat'    in lonLatDataDict['common'])
-            assert('lon'    in lonLatDataDict['common'])
-            assert(lonLatDataDict['common']['lat'].shape == lonLatDataDict['common']['lon'].shape)
-            assert(lonLatDataDict['common']['lon'].shape == rawDiffData.shape)
+            assert(COMMON_KEY in lonLatDataDict)
+            assert(LAT_KEY    in lonLatDataDict[COMMON_KEY])
+            assert(LON_KEY    in lonLatDataDict[COMMON_KEY])
+            assert(lonLatDataDict[COMMON_KEY][LAT_KEY].shape == lonLatDataDict[COMMON_KEY][LON_KEY].shape)
+            assert(lonLatDataDict[COMMON_KEY][LON_KEY].shape == rawDiffData.shape)
             
-            functionsToReturn['diffSub']   = ((lambda : mappedPlottingFunction(rawDiffData, 
-                                                                               lonLatDataDict['common']['lat'], 
-                                                                               lonLatDataDict['common']['lon'],
-                                                                               baseMapInstance, fullAxis,
-                                                                               ("Value of (Data File B - Data File A) for\n"
-                                                                                + variableDisplayName),
-                                                                               invalidMask=(~goodInBothMask),
-                                                                               units=units_a)),
-                                              "the difference in " + variableDisplayName,
-                                              "Diff.png",    compared_fig_list)
+            functionsToReturn[SUB_DIFF_FUNCTION_KEY]   = ((lambda : mappedPlottingFunction(rawDiffData, 
+                                                                                           lonLatDataDict[COMMON_KEY][LAT_KEY], 
+                                                                                           lonLatDataDict[COMMON_KEY][LON_KEY],
+                                                                                           baseMapInstance, fullAxis,
+                                                                                           ("Value of (Data File B - Data File A) for\n"
+                                                                                            + variableDisplayName),
+                                                                                           invalidMask=(~goodInBothMask),
+                                                                                           units=units_a)),
+                                                          "the difference in " + variableDisplayName,
+                                                          "Diff.png",    compared_fig_list)
         # make the mismatch data plot
-        if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
+        if (DO_PLOT_MISMATCH_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_MISMATCH_KEY]) :
             
             assert(aData.shape == bData.shape)
             assert(goodInAMask.shape == goodInBMask.shape)
-            assert('common' in lonLatDataDict)
-            assert('lat'    in lonLatDataDict['common'])
-            assert('lon'    in lonLatDataDict['common'])
-            assert(lonLatDataDict['common']['lat'].shape == lonLatDataDict['common']['lon'].shape)
-            assert(lonLatDataDict['common']['lon'].shape == aData.shape)
+            assert(COMMON_KEY in lonLatDataDict)
+            assert(LAT_KEY    in lonLatDataDict[COMMON_KEY])
+            assert(LON_KEY    in lonLatDataDict[COMMON_KEY])
+            assert(lonLatDataDict[COMMON_KEY][LAT_KEY].shape == lonLatDataDict[COMMON_KEY][LON_KEY].shape)
+            assert(lonLatDataDict[COMMON_KEY][LON_KEY].shape == aData.shape)
             
             # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
             # that our plot won't be totally destroyed by missing or non-finite data from B
             bDataCopy = np.array(bData)
             tempMask = goodInAMask & (~goodInBMask) 
             bDataCopy[tempMask] = aData[tempMask]
-            functionsToReturn['mismatch']   = ((lambda : mappedPlottingFunction(bDataCopy, 
-                                                                               lonLatDataDict['common']['lat'], 
-                                                                               lonLatDataDict['common']['lon'],
-                                                                               baseMapInstance, fullAxis,
-                                                                               ("Areas of mismatch data in\n" + variableDisplayName),
-                                                                               invalidMask=(~(goodInAMask | goodInBMask)),
-                                                                               colorMap=figures.MEDIUM_GRAY_COLOR_MAP, tagData=mismatchMask,
-                                                                               dataRanges=dataRanges,
-                                                                               dataRangeNames=dataRangeNames,
-                                                                               units=units_a)), # TODO, does this need modification?
-                                              "mismatch data in " + variableDisplayName,
-                                              "Mismatch.png", compared_fig_list)
+            functionsToReturn[MISMATCH_FUNCTION_KEY]   = ((lambda : mappedPlottingFunction(bDataCopy, 
+                                                                                           lonLatDataDict[COMMON_KEY][LAT_KEY], 
+                                                                                           lonLatDataDict[COMMON_KEY][LON_KEY],
+                                                                                           baseMapInstance, fullAxis,
+                                                                                           ("Areas of mismatch data in\n" + variableDisplayName),
+                                                                                           invalidMask=(~(goodInAMask | goodInBMask)),
+                                                                                           colorMap=figures.MEDIUM_GRAY_COLOR_MAP, tagData=mismatchMask,
+                                                                                           dataRanges=dataRanges,
+                                                                                           dataRangeNames=dataRangeNames,
+                                                                                           units=units_a)), # TODO, does this need modification?
+                                                          "mismatch data in " + variableDisplayName,
+                                                          "Mismatch.png", compared_fig_list)
         
         return functionsToReturn
 
@@ -562,16 +563,17 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
         # make the plotting functions
         
         # make the original data plots
-        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+        if (DO_PLOT_ORIGINALS_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ORIGINALS_KEY]) :
             
-            assert('a'   in lonLatDataDict)
-            assert('lat' in lonLatDataDict['a'])
-            assert('lon' in lonLatDataDict['a'])
-            assert(lonLatDataDict['a']['lat'].shape == lonLatDataDict['a']['lon'].shape)
+            assert(A_FILE_KEY in lonLatDataDict)
+            assert(LAT_KEY    in lonLatDataDict[A_FILE_KEY])
+            assert(LON_KEY    in lonLatDataDict[A_FILE_KEY])
+            assert(lonLatDataDict[A_FILE_KEY][LAT_KEY].shape == lonLatDataDict[A_FILE_KEY][LON_KEY].shape)
             
-            functionsToReturn['originalA'] = ((lambda : mappedPlottingFunction(aData,
-                                                                               lonLatDataDict['a']['lat'], 
-                                                                               lonLatDataDict['a']['lon'],
+            functionsToReturn[ORIG_A_FUNCTION_KEY] = \
+                                             ((lambda : mappedPlottingFunction(aData,
+                                                                               lonLatDataDict[A_FILE_KEY][LAT_KEY], 
+                                                                               lonLatDataDict[A_FILE_KEY][LON_KEY],
                                                                                baseMapInstance, fullAxis,
                                                                                (variableDisplayName + "\nin File A"),
                                                                                invalidMask=(~goodInAMask),
@@ -580,14 +582,15 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                               variableDisplayName + " in file a",
                                               "A.png",  original_fig_list)
             
-            assert('b'   in lonLatDataDict)
-            assert('lat' in lonLatDataDict['b'])
-            assert('lon' in lonLatDataDict['b'])
-            assert(lonLatDataDict['b']['lat'].shape == lonLatDataDict['b']['lon'].shape)
+            assert(B_FILE_KEY in lonLatDataDict)
+            assert(LAT_KEY    in lonLatDataDict[B_FILE_KEY])
+            assert(LON_KEY    in lonLatDataDict[B_FILE_KEY])
+            assert(lonLatDataDict[B_FILE_KEY][LAT_KEY].shape == lonLatDataDict[B_FILE_KEY][LON_KEY].shape)
             
-            functionsToReturn['originalB'] = ((lambda : mappedPlottingFunction(bData, 
-                                                                               lonLatDataDict['b']['lat'], 
-                                                                               lonLatDataDict['b']['lon'],
+            functionsToReturn[ORIG_B_FUNCTION_KEY] = \
+                                             ((lambda : mappedPlottingFunction(bData, 
+                                                                               lonLatDataDict[B_FILE_KEY][LAT_KEY], 
+                                                                               lonLatDataDict[B_FILE_KEY][LON_KEY],
                                                                                baseMapInstance, fullAxis,
                                                                                (variableDisplayName + "\nin File B"),
                                                                                invalidMask=(~ goodInBMask),
@@ -606,18 +609,19 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
             diffVData = aVData - bVData
             
             # make the absolute value difference plot
-            if ('do_plot_abs_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_abs_diff']) :
+            if (DO_PLOT_ABS_DIFF_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ABS_DIFF_KEY]) :
                 
                 assert(absDiffData.shape == goodInBothMask.shape)
-                assert('common' in lonLatDataDict)
-                assert('lat'    in lonLatDataDict['common'])
-                assert('lon'    in lonLatDataDict['common'])
-                assert(lonLatDataDict['common']['lat'].shape == lonLatDataDict['common']['lon'].shape)
-                assert(lonLatDataDict['common']['lon'].shape == absDiffData.shape)
+                assert(COMMON_KEY in lonLatDataDict)
+                assert(LAT_KEY    in lonLatDataDict[COMMON_KEY])
+                assert(LON_KEY    in lonLatDataDict[COMMON_KEY])
+                assert(lonLatDataDict[COMMON_KEY][LAT_KEY].shape == lonLatDataDict[COMMON_KEY][LON_KEY].shape)
+                assert(lonLatDataDict[COMMON_KEY][LON_KEY].shape == absDiffData.shape)
                 
-                functionsToReturn['diffAbs']   = ((lambda : mappedPlottingFunction(absDiffData,
-                                                                                   lonLatDataDict['common']['lat'], 
-                                                                                   lonLatDataDict['common']['lon'],
+                functionsToReturn[ABS_DIFF_FUNCTION_KEY] = \
+                                                 ((lambda : mappedPlottingFunction(absDiffData,
+                                                                                   lonLatDataDict[COMMON_KEY][LAT_KEY], 
+                                                                                   lonLatDataDict[COMMON_KEY][LON_KEY],
                                                                                    baseMapInstance, fullAxis,
                                                                                    ("Absolute value of difference in\n"
                                                                                     + variableDisplayName),
@@ -627,18 +631,19 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                                   "absolute value of difference in " + variableDisplayName,
                                                   "AbsDiff.png", compared_fig_list)
             # make the subtractive difference plot
-            if ('do_plot_sub_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_sub_diff']) :
+            if (SUB_DIFF_FUNCTION_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[SUB_DIFF_FUNCTION_KEY]) :
                 
                 assert(rawDiffData.shape == goodInBothMask.shape)
-                assert('common' in lonLatDataDict)
-                assert('lat'    in lonLatDataDict['common'])
-                assert('lon'    in lonLatDataDict['common'])
-                assert(lonLatDataDict['common']['lat'].shape == lonLatDataDict['common']['lon'].shape)
-                assert(lonLatDataDict['common']['lon'].shape == rawDiffData.shape)
+                assert(COMMON_KEY in lonLatDataDict)
+                assert(LAT_KEY    in lonLatDataDict[COMMON_KEY])
+                assert(LON_KEY    in lonLatDataDict[COMMON_KEY])
+                assert(lonLatDataDict[COMMON_KEY][LAT_KEY].shape == lonLatDataDict[COMMON_KEY][LON_KEY].shape)
+                assert(lonLatDataDict[COMMON_KEY][LON_KEY].shape == rawDiffData.shape)
                 
-                functionsToReturn['diffSub']   = ((lambda : mappedPlottingFunction(rawDiffData, 
-                                                                                   lonLatDataDict['common']['lat'], 
-                                                                                   lonLatDataDict['common']['lon'],
+                functionsToReturn[SUB_DIFF_FUNCTION_KEY]   = \
+                                                 ((lambda : mappedPlottingFunction(rawDiffData, 
+                                                                                   lonLatDataDict[COMMON_KEY][LAT_KEY], 
+                                                                                   lonLatDataDict[COMMON_KEY][LON_KEY],
                                                                                    baseMapInstance, fullAxis,
                                                                                    ("Value of (Data File B - Data File A) for\n"
                                                                                     + variableDisplayName),
@@ -648,24 +653,25 @@ class MappedQuiverPlotFunctionFactory (PlottingFunctionFactory) :
                                                   "the difference in " + variableDisplayName,
                                                   "Diff.png",    compared_fig_list)
             # make the mismatch data plot
-            if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
+            if (DO_PLOT_MISMATCH_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_MISMATCH_KEY]) :
                 
                 assert(aData.shape == bData.shape)
                 assert(goodInAMask.shape == goodInBMask.shape)
-                assert('common' in lonLatDataDict)
-                assert('lat'    in lonLatDataDict['common'])
-                assert('lon'    in lonLatDataDict['common'])
-                assert(lonLatDataDict['common']['lat'].shape == lonLatDataDict['common']['lon'].shape)
-                assert(lonLatDataDict['common']['lon'].shape == aData.shape)
+                assert(COMMON_KEY in lonLatDataDict)
+                assert(LAT_KEY    in lonLatDataDict[COMMON_KEY])
+                assert(LON_KEY    in lonLatDataDict[COMMON_KEY])
+                assert(lonLatDataDict[COMMON_KEY][LAT_KEY].shape == lonLatDataDict[COMMON_KEY][LON_KEY].shape)
+                assert(lonLatDataDict[COMMON_KEY][LON_KEY].shape == aData.shape)
                 
                 # this is not an optimal solution, but we need to have at least somewhat valid data at any mismatched points so
                 # that our plot won't be totally destroyed by missing or non-finite data from B
                 bDataCopy = np.array(bData)
                 tempMask = goodInAMask & (~goodInBMask) 
                 bDataCopy[tempMask] = aData[tempMask]
-                functionsToReturn['mismatch']   = ((lambda : mappedPlottingFunction(bDataCopy, 
-                                                                                   lonLatDataDict['common']['lat'], 
-                                                                                   lonLatDataDict['common']['lon'],
+                functionsToReturn[MISMATCH_FUNCTION_KEY]   = \
+                                                 ((lambda : mappedPlottingFunction(bDataCopy, 
+                                                                                   lonLatDataDict[COMMON_KEY][LAT_KEY], 
+                                                                                   lonLatDataDict[COMMON_KEY][LON_KEY],
                                                                                    baseMapInstance, fullAxis,
                                                                                    ("Areas of mismatch data in\n" + variableDisplayName),
                                                                                    invalidMask=(~(goodInAMask | goodInBMask)),
@@ -762,42 +768,41 @@ class LinePlotsFunctionFactory (PlottingFunctionFactory) :
         functionsToReturn = { }
         
         # make the original data plots
-        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+        if (DO_PLOT_ORIGINALS_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ORIGINALS_KEY]) :
             
-            
-            functionsToReturn['original'] = ((lambda: figures.create_line_plot_figure((aList + bList),
-                                                                               variableDisplayName + "\nin Both Files")),
+            functionsToReturn[ORIG_FUNCTION_KEY] = ((lambda: figures.create_line_plot_figure((aList + bList),
+                                                                                             variableDisplayName + "\nin Both Files")),
                                              variableDisplayName + " in both files",
                                              "AB.png", original_fig_list)
-            functionsToReturn['originalA'] = ((lambda: figures.create_line_plot_figure(aList,
-                                                                                variableDisplayName + "\nin File A")),
+            functionsToReturn[ORIG_A_FUNCTION_KEY] = ((lambda: figures.create_line_plot_figure(aList,
+                                                                                               variableDisplayName + "\nin File A")),
                                               variableDisplayName + " in file a",
                                               "A.png",  original_fig_list)
-            functionsToReturn['originalB'] = ((lambda: figures.create_line_plot_figure(bList,
-                                                                                variableDisplayName + "\nin File B")),
+            functionsToReturn[ORIG_B_FUNCTION_KEY] = ((lambda: figures.create_line_plot_figure(bList,
+                                                                                               variableDisplayName + "\nin File B")),
                                               variableDisplayName + " in file b",
                                               "B.png",  original_fig_list)
         
         # make the absolute value difference plot
-        if ('do_plot_abs_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_abs_diff']) :
-            functionsToReturn['diffAbs']   = ((lambda: figures.create_line_plot_figure(absDiffList,
-                                                                               "Absolute value of difference in\n" + variableDisplayName)),
-                                              "absolute value of difference in " + variableDisplayName,
-                                              "AbsDiff.png", compared_fig_list)
+        if (DO_PLOT_ABS_DIFF_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ABS_DIFF_KEY]) :
+            functionsToReturn[ABS_DIFF_FUNCTION_KEY]   = ((lambda: figures.create_line_plot_figure(absDiffList,
+                                                                                                   "Absolute value of difference in\n" + variableDisplayName)),
+                                                          "absolute value of difference in " + variableDisplayName,
+                                                          "AbsDiff.png", compared_fig_list)
         # make the subtractive difference plot
-        if ('do_plot_sub_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_sub_diff']) :
-            functionsToReturn['diffSub']   = ((lambda: figures.create_line_plot_figure(subDiffList,
-                                                                               "Value of (Data File B - Data File A) for\n"
-                                                                               + variableDisplayName)),
-                                              "the difference in " + variableDisplayName,
-                                              "Diff.png",    compared_fig_list)
+        if (DO_PLOT_SUB_DIFF_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_SUB_DIFF_KEY]) :
+            functionsToReturn[SUB_DIFF_FUNCTION_KEY]   = ((lambda: figures.create_line_plot_figure(subDiffList,
+                                                                                                   "Value of (Data File B - Data File A) for\n"
+                                                                                                   + variableDisplayName)),
+                                                          "the difference in " + variableDisplayName,
+                                                          "Diff.png",    compared_fig_list)
         
         # make the mismatch data plot
-        if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
-            functionsToReturn['mismatch']   = ((lambda: figures.create_line_plot_figure(mismatchList,
-                                                                               "Areas of mismatch data in\n" + variableDisplayName)),
-                                              "mismatch data in " + variableDisplayName,
-                                              "Mismatch.png", compared_fig_list)
+        if (DO_PLOT_MISMATCH_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_MISMATCH_KEY]) :
+            functionsToReturn[MISMATCH_FUNCTION_KEY]   = ((lambda: figures.create_line_plot_figure(mismatchList,
+                                                                                                   "Areas of mismatch data in\n" + variableDisplayName)),
+                                                          "mismatch data in " + variableDisplayName,
+                                                          "Mismatch.png", compared_fig_list)
         
         return functionsToReturn
 
@@ -905,12 +910,13 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
             scatterPlotList.append(((aData[binNumber][goodInBothMask[binNumber]]).ravel(),
                                     (bData[binNumber][goodInBothMask[binNumber]]).ravel(), None,
                                     colors.rgb2hex(tempColor), None, 'bin ' + str(binNumber + 1), None))
-        functionsToReturn['multi-scatter'] = ((lambda : figures.create_complex_scatter_plot(scatterPlotList,
-                                                                        "Value in File A vs Value in File B, Colored by Bin",
-                                                                        "File A Value", "File B Value",
-                                                                        epsilon, units_x=units_a, units_y=units_b)),
-                                          "scatter plot of file a values vs file b values for " + variableDisplayName + " by bin",
-                                          "MultiScatter.png", compared_fig_list)
+        functionsToReturn[MULTI_SCATTER_FUNCTION_KEY] = \
+                                             ((lambda : figures.create_complex_scatter_plot(scatterPlotList,
+                                                                                            "Value in File A vs Value in File B, Colored by Bin",
+                                                                                            "File A Value", "File B Value",
+                                                                                            epsilon, units_x=units_a, units_y=units_b)),
+                                              "scatter plot of file a values vs file b values for " + variableDisplayName + " by bin",
+                                              "MultiScatter.png", compared_fig_list)
         
         # for each of the bins, make the rms histogram data
         numHistogramSections = 7 # TODO at some point make this a user controlled setting
@@ -927,7 +933,7 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
             
             # make the basic histogram for this binNumber
             dataForHistogram = rmsDiffValues[np.isfinite(rmsDiffValues)] # remove any invalid data "nan" values
-            if ('do_plot_histogram' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_histogram']) :
+            if (DO_PLOT_HISTOGRAM_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_HISTOGRAM_KEY]) :
                 def make_histogram(binNumber=binNumber, dataForHistogram=dataForHistogram):
                     return figures.create_histogram(dataForHistogram, numHistogramSections,
                                                                              ("RMS Diff. in " + variableDisplayName +
@@ -935,9 +941,9 @@ class BinTupleAnalysisFunctionFactory (PlottingFunctionFactory) :
                                                                              ('RMS Difference across ' + tupleName + ' dimension'),
                                                                              ('Number of Cases with a Given RMS Diff.'),
                                                                              True, units=units_a, rangeList=histRange)
-                functionsToReturn[str(binNumber + 1) + 'histogram'] = (make_histogram,
-                                                  "histogram of rms differences in " + variableDisplayName,
-                                                  str(binNumber + 1) + "Hist.png", new_list)
+                functionsToReturn[str(binNumber + 1) + HIST_FUNCTION_KEY] = (make_histogram,
+                                                                             "histogram of rms differences in " + variableDisplayName,
+                                                                             str(binNumber + 1) + "Hist.png", new_list)
             
             # we will need to be able to mask out the non-finite data
             tempFiniteMap = np.isfinite(rmsDiffValues)
@@ -1075,12 +1081,13 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
                                          shouldUseSharedRangeForOriginal)
         
         # make the original data plots
-        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+        if (DO_PLOT_ORIGINALS_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ORIGINALS_KEY]) :
             
             assert(goodInAMask is not None)
             assert(aData.shape == goodInAMask.shape)
             
-            functionsToReturn['originalA'] = ((lambda: figures.create_simple_figure(aData, variableDisplayName + "\nin File A",
+            functionsToReturn[ORIG_A_FUNCTION_KEY] = \
+                                     ((lambda: figures.create_simple_figure(aData, variableDisplayName + "\nin File A",
                                                                             invalidMask=~goodInAMask, colorbarLimits=sharedRange, 
                                                                             units=units_a)),
                                               variableDisplayName + " in file a",
@@ -1089,38 +1096,41 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             assert(goodInBMask is not None)
             assert(bData.shape == goodInBMask.shape)
             
-            functionsToReturn['originalB'] = ((lambda: figures.create_simple_figure(bData, variableDisplayName + "\nin File B",
+            functionsToReturn[ORIG_B_FUNCTION_KEY] = \
+                                     ((lambda: figures.create_simple_figure(bData, variableDisplayName + "\nin File B",
                                                                             invalidMask=~goodInBMask, colorbarLimits=sharedRange, 
                                                                             units=units_b)),
                                               variableDisplayName + " in file b",
                                               "B.png",  original_fig_list)
         
         # make the absolute value difference plot
-        if ('do_plot_abs_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_abs_diff']) :
+        if (DO_PLOT_ABS_DIFF_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ABS_DIFF_KEY]) :
             
             assert(absDiffData    is not None)
             assert(goodInBothMask is not None)
             assert(goodInBothMask.shape == absDiffData.shape)
             
-            functionsToReturn['diffAbs']   = ((lambda: figures.create_simple_figure(absDiffData,
+            functionsToReturn[ABS_DIFF_FUNCTION_KEY] = \
+                                     ((lambda: figures.create_simple_figure(absDiffData,
                                                                             "Absolute value of difference in\n" + variableDisplayName,
                                                                             invalidMask=~goodInBothMask, units=units_a)),
                                               "absolute value of difference in " + variableDisplayName,
                                               "AbsDiff.png", compared_fig_list)
         # make the subtractive difference plot
-        if ('do_plot_sub_diff' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_sub_diff']) :
+        if (DO_PLOT_SUB_DIFF_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_SUB_DIFF_KEY]) :
             
             assert(rawDiffData    is not None)
             assert(goodInBothMask is not None)
             assert(goodInBothMask.shape == rawDiffData.shape)
             
-            functionsToReturn['diffSub']   = ((lambda: figures.create_simple_figure(rawDiffData,
+            functionsToReturn[SUB_DIFF_FUNCTION_KEY] = \
+                                     ((lambda: figures.create_simple_figure(rawDiffData,
                                                                             "Value of (Data File B - Data File A) for\n" + variableDisplayName,
                                                                             invalidMask=~goodInBothMask, units=units_a)),
                                               "the difference in " + variableDisplayName,
                                               "Diff.png",    compared_fig_list)
         # make the mismatch data plot
-        if ('do_plot_mismatch' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_mismatch']) :
+        if (DO_PLOT_MISMATCH_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_MISMATCH_KEY]) :
             
             assert(goodInAMask is not None)
             assert(goodInBMask is not None)
@@ -1136,11 +1146,11 @@ class IMShowPlotFunctionFactory (PlottingFunctionFactory) :
             bDataCopy = np.array(bData)
             tempMask = goodInAMask & (~goodInBMask) 
             bDataCopy[tempMask] = aData[tempMask]
-            functionsToReturn['mismatch']   = ((lambda: figures.create_simple_figure(bDataCopy, "Areas of mismatch data in\n" + variableDisplayName,
-                                                                            invalidMask=~(goodInAMask | goodInBMask), tagData=mismatchMask,
-                                                                            colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=units_a)),
-                                              "mismatch data in " + variableDisplayName,
-                                              "Mismatch.png", compared_fig_list)
+            functionsToReturn[MISMATCH_FUNCTION_KEY]   = ((lambda: figures.create_simple_figure(bDataCopy, "Areas of mismatch data in\n" + variableDisplayName,
+                                                                                                invalidMask=~(goodInAMask | goodInBMask), tagData=mismatchMask,
+                                                                                                colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=units_a)),
+                                                          "mismatch data in " + variableDisplayName,
+                                                          "Mismatch.png", compared_fig_list)
         
         return functionsToReturn
 
@@ -1198,7 +1208,7 @@ class DataHistogramPlotFunctionFactory (PlottingFunctionFactory) :
         assert (bData is     None)
         
         # make the histogram plot; TODO, for now reuse this setting in FUTURE, should a new one be made to control this?
-        if ('do_plot_histogram' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_histogram']) :
+        if (DO_PLOT_HISTOGRAM_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_HISTOGRAM_KEY]) :
             
             goodInAMask = aData.masks.valid_mask
             assert(goodInAMask.shape == aData.data.shape)
@@ -1206,7 +1216,8 @@ class DataHistogramPlotFunctionFactory (PlottingFunctionFactory) :
             # setup the data bins for the histogram
             numBinsToUse = 50
             valuesForHist = aData.data[goodInAMask]
-            functionsToReturn['histogram'] = ((lambda : figures.create_histogram(valuesForHist, numBinsToUse,
+            functionsToReturn[HIST_FUNCTION_KEY] = \
+                                     ((lambda : figures.create_histogram(valuesForHist, numBinsToUse,
                                                                          ("Values of\n" + variableDisplayName),
                                                                          ('Value of Data Point'),
                                                                          ('Number of Data Points with a Given Value'),
@@ -1275,14 +1286,14 @@ class InspectIMShowPlotFunctionFactory (PlottingFunctionFactory) :
         functionsToReturn = { }
         
         # make the original data plots
-        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+        if (DO_PLOT_ORIGINALS_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ORIGINALS_KEY]) :
             
             goodInAMask = aData.masks.valid_mask
             
             assert(goodInAMask is not None)
             assert(aData.data.shape == goodInAMask.shape)
             
-            functionsToReturn['originalA'] = ((lambda: figures.create_simple_figure(aData.data, variableDisplayName + "\nin File",
+            functionsToReturn[ORIG_A_FUNCTION_KEY] = ((lambda: figures.create_simple_figure(aData.data, variableDisplayName + "\nin File",
                                                                             invalidMask=~goodInAMask,
                                                                             units=units_a)),
                                               variableDisplayName + " in file",
@@ -1350,7 +1361,7 @@ class InspectLinePlotsFunctionFactory (PlottingFunctionFactory) :
         functionsToReturn = { }
         
         # make the original data plots
-        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+        if (DO_PLOT_ORIGINALS_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ORIGINALS_KEY]) :
             
             aDataTemp =  aData.data
             aMaskTemp = ~aData.masks.valid_mask
@@ -1359,7 +1370,7 @@ class InspectLinePlotsFunctionFactory (PlottingFunctionFactory) :
                 aMaskTemp = aMaskTemp.ravel()
             aList = [(aDataTemp, aMaskTemp, 'b', 'A data', None, units_a)]
             
-            functionsToReturn['originalA'] = ((lambda: figures.create_line_plot_figure(aList,
+            functionsToReturn[ORIG_A_FUNCTION_KEY] = ((lambda: figures.create_line_plot_figure(aList,
                                                                                 variableDisplayName + "\nin File")),
                                               variableDisplayName + " in file",
                                               "lineA.png",  original_fig_list)
@@ -1424,20 +1435,20 @@ class InspectMappedContourPlotFunctionFactory (PlottingFunctionFactory) :
         #print ("lon lat dictionary form: " + str(lonLatDataDict))
         
         # figure out which part of the earth is visible and construct a basemap using that
-        fullAxis, baseMapInstance = _make_axis_and_basemap({'a':lonLatDataDict},
+        fullAxis, baseMapInstance = _make_axis_and_basemap({A_FILE_KEY:lonLatDataDict},
                                                            goodInAMask, None, # there is no b mask
                                                            variableDisplayName)
         
         # make the original data plot
-        if ('do_plot_originals' not in doPlotSettingsDict) or (doPlotSettingsDict['do_plot_originals']) :
+        if (DO_PLOT_ORIGINALS_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_ORIGINALS_KEY]) :
             
-            assert('lat' in lonLatDataDict)
-            assert('lon' in lonLatDataDict)
-            assert(lonLatDataDict['lat'].shape == lonLatDataDict['lon'].shape)
+            assert(LAT_KEY in lonLatDataDict)
+            assert(LON_KEY in lonLatDataDict)
+            assert(lonLatDataDict[LAT_KEY].shape == lonLatDataDict[LON_KEY].shape)
             
-            functionsToReturn['originalA'] = ((lambda : mappedPlottingFunction(aData.data,
-                                                                               lonLatDataDict['lat'], 
-                                                                               lonLatDataDict['lon'],
+            functionsToReturn[ORIG_A_FUNCTION_KEY] = ((lambda : mappedPlottingFunction(aData.data,
+                                                                               lonLatDataDict[LAT_KEY], 
+                                                                               lonLatDataDict[LON_KEY],
                                                                                baseMapInstance, fullAxis,
                                                                                (variableDisplayName + "\nin File"),
                                                                                invalidMask=(~goodInAMask),

@@ -63,10 +63,10 @@ def create_colocation_mapping_within_epsilon((alongitude, alatitude),
     flatBLongitude = blongitude.ravel()
     
     # find the ranges of the longitude and latitude
-    minLatitude  = np.min(np.min(flatALatitude),  np.min(flatBLatitude))
-    maxLatitude  = np.max(np.max(flatALatitude),  np.max(flatBLatitude))
-    minLongitude = np.min(np.min(flatALongitude), np.min(flatBLongitude))
-    maxLongitude = np.max(np.max(flatALongitude), np.max(flatBLongitude))
+    minLatitude  = min(np.min(flatALatitude),  np.min(flatBLatitude))
+    maxLatitude  = max(np.max(flatALatitude),  np.max(flatBLatitude))
+    minLongitude = min(np.min(flatALongitude), np.min(flatBLongitude))
+    maxLongitude = max(np.max(flatALongitude), np.max(flatBLongitude))
     
     # make the bins for the data in longitude/latitude space
     aBins = { }

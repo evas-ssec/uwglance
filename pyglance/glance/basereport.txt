@@ -6,7 +6,8 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 </%doc>
 
 <%!
-    import glance.report as report
+    import glance.report    as report
+    import glance.constants as constants
 %>
 
 <%block name="htmlContent">
@@ -39,8 +40,8 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
             <% tempFileInfo = files[fileKey] %>
             <p>
                 ${fileKey}:
-                % if 'displayName' in tempFileInfo :
-                    ${tempFileInfo['displayName']}
+                % if constants.DISPLAY_NAME_KEY in tempFileInfo :
+                    ${tempFileInfo[constants.DISPLAY_NAME_KEY]}
                 % endif
                 <blockquote>
                     path: ${tempFileInfo['path']} <br>

@@ -45,7 +45,7 @@ class IncompatableDataObjects (ValueError) :
             elif dataObjectA.data.shape != dataObjectB.data.shape :
                 self.message = (aName + ' / ' + bName + ' ' +
                                 'could not be compared because the data for these variables does not match in shape ' +
-                                '(A data shape: ' + str(dataObjectA.data.shape) + '; B data shape: '
+                                '(' + aName + ' data shape: ' + str(dataObjectA.data.shape) + '; ' + bName + ' data shape: '
                                 + str(dataObjectB.data.shape) + ').')
     
     def __str__(self):
@@ -143,7 +143,7 @@ class DataObject (object) :
         If the fill value is provided it is expected to be of the same
         data type as the data array.
         """
-        self.data       = dataArray
+        self.data       = dataArray if type(dataArray) == np.ndarray else np.array([dataArray])
         self.fill_value = fillValue
         self.masks      = BasicMaskSetObject(ignoreMask)
         
