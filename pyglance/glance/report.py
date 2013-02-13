@@ -73,8 +73,9 @@ def generate_and_save_summary_report(files,
     Variables should be a dictionary keyed on the name of each compared variable and containing the
     % of data values that were judged to be "similar enough" between file A and B (according
     to the epsilon originally inputed for the comparison) and the epsilon used for the comparison
-        variables[var_name] = {"pass_epsilon_percent": percent "similar enough" according to epsilon,
-                               "variable_run_info": variable Run Info <- as defined for a variable report
+        variables[var_name] = {
+                               PASSED_EPSILON_PERCENT_KEY: percent "similar enough" according to epsilon,
+                               VARIABLE_RUN_INFO_KEY:      variable Run Info <- as defined for a variable report
                                }
     more keys can be added in the future if more detailed data reporting is desired on the main report page
     
@@ -220,7 +221,7 @@ def generate_and_save_variable_report(files,
                             DISPLAY_NAME_KEY:       displayName
                             DID_VARIABLE_PASS_KEY:      boolean value or None, # optional, boolean means it did or did not pass, None means it was
                                                                            # not qualitatively tested against a set of tolerances
-                            'time': currentTime
+                            TIME_INFO_KEY: currentTime
                           }
                             
     files is a dictionary in the form
@@ -381,8 +382,9 @@ def generate_and_save_inspection_summary_report(files,
     Variables should be a dictionary keyed on the name of each compared variable and containing the
     % of data values that were judged to be "similar enough" between file A and B (according
     to the epsilon originally inputed for the comparison) and the epsilon used for the comparison
-        variables[var_name] = {"pass_epsilon_percent": percent "similar enough" according to epsilon,
-                               "variable_run_info": variable Run Info <- as defined for a variable report
+        variables[var_name] = {
+                               PASSED_EPSILON_PERCENT_KEY: percent "similar enough" according to epsilon,
+                               VARIABLE_RUN_INFO_KEY:      variable Run Info <- as defined for a variable report
                                }
     more keys can be added in the future if more detailed data reporting is desired on the main report page
     

@@ -6,7 +6,8 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 </%doc>
 
 <%!
-    import glance.report as report
+    import glance.report    as report
+    import glance.constants as constants
 %>
 
 <%inherit file="basereport.txt"/>
@@ -18,34 +19,34 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     
     ## if we have some unique spatially invalid points, report them
     ## are there any in file A?
-    %if spatial.has_key('file A') and spatial['file A'].has_key('numInvPts') and (spatial['file A']['numInvPts'] > 0) :
+    %if spatial.has_key(constants.A_FILE_TITLE_KEY) and spatial[constants.A_FILE_TITLE_KEY].has_key(constants.NUMBER_INVALID_PTS_KEY) and (spatial[constants.A_FILE_TITLE_KEY][constants.NUMBER_INVALID_PTS_KEY] > 0) :
         <%
-            fileAInfo = spatial['file A']
+            fileAInfo = spatial[constants.A_FILE_TITLE_KEY]
         %>
         <p>
-            % if runInfo['shouldIncludeImages'] :
+            % if runInfo[constants.DO_MAKE_IMAGES_KEY] :
                 <a href="./SpatialMismatch.A.png"><img src="./SpatialMismatch.A.small.png"></a><br>
             % endif
-            File A has ${fileAInfo['numInvPts']} valid data points not present in File B.<br>
-            File A has a total of ${report.make_formatted_display_string(fileAInfo['perInvPts'])}% invalid longitude/latitude data. <br>
+            File A has ${fileAInfo[constants.NUMBER_INVALID_PTS_KEY]} valid data points not present in File B.<br>
+            File A has a total of ${report.make_formatted_display_string(fileAInfo[constants.PERCENT_INVALID_PTS_KEY])}% invalid longitude/latitude data. <br>
         </p>
     % endif
     ## are there any in file B?
-    %if spatial.has_key('file B') and spatial['file B'].has_key('numInvPts') and (spatial['file B']['numInvPts'] > 0) :
+    %if spatial.has_key(constants.B_FILE_TITLE_KEY) and spatial[constants.B_FILE_TITLE_KEY].has_key(constants.NUMBER_INVALID_PTS_KEY) and (spatial[constants.B_FILE_TITLE_KEY][constants.NUMBER_INVALID_PTS_KEY] > 0) :
         <%
-            fileBInfo = spatial['file B']
+            fileBInfo = spatial[constants.B_FILE_TITLE_KEY]
         %>
         <p>
-            % if runInfo['shouldIncludeImages'] :
+            % if runInfo[constants.DO_MAKE_IMAGES_KEY] :
                 <a href="./SpatialMismatch.B.png"><img src="./SpatialMismatch.B.small.png"></a><br>
             % endif
-            File B has ${fileBInfo['numInvPts']} valid data points not present in File A.<br>
-            File B has a total of ${report.make_formatted_display_string(fileBInfo['perInvPts'])}% longitude/latitude invalid data. <br>
+            File B has ${fileBInfo[constants.NUMBER_INVALID_PTS_KEY]} valid data points not present in File A.<br>
+            File B has a total of ${report.make_formatted_display_string(fileBInfo[constants.PERCENT_INVALID_PTS_KEY])}% longitude/latitude invalid data. <br>
         </p>
     % endif
     ## report on shared spatial invalidity if there is any
-    % if spatial.has_key('perInvPtsInBoth') :
-        <% perInBoth = spatial['perInvPtsInBoth'] %>
+    % if spatial.has_key(constants.PERCENT_INV_PTS_SHARED_KEY) :
+        <% perInBoth = spatial[constants.PERCENT_INV_PTS_SHARED_KEY] %>
         % if perInBoth > 0 :
             <p>
                 lon/lat data that is invalid in either file A or file B: ${report.make_formatted_display_string(perInBoth)}%
@@ -74,17 +75,17 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
                         <%
                             # get some information about the variable, for convenience
                             tempVariableInfo = variables[variableKey]
-                            tempVarRunInfo   = tempVariableInfo['variable_run_info']
+                            tempVarRunInfo   = tempVariableInfo[constants.VARIABLE_RUN_INFO_KEY]
                             
-                            technicalName  = tempVarRunInfo['variable_name']
+                            technicalName  = tempVarRunInfo[constants.VARIABLE_TECH_NAME_KEY]
                             varDisplayName = technicalName
-                            if 'display_name' in tempVarRunInfo :
-                                varDisplayName = tempVarRunInfo['display_name']
+                            if constants.DISPLAY_NAME_KEY in tempVarRunInfo :
+                                varDisplayName = tempVarRunInfo[constants.DISPLAY_NAME_KEY]
                             
-                            rSquaredCorr         = tempVariableInfo['r_squared_correlation']
-                            passPercent          = tempVariableInfo['pass_epsilon_percent']
-                            finiteSimilarPercent = tempVariableInfo['finite_similar_percent']
-                            didPass              = tempVarRunInfo['did_pass']
+                            rSquaredCorr         = tempVariableInfo[constants.R_SQUARED_COEFF_VALUE_KEY]
+                            passPercent          = tempVariableInfo[constants.PASSED_EPSILON_PERCENT_KEY]
+                            finiteSimilarPercent = tempVariableInfo[constants.FINITE_SIMILAR_PERCENT_KEY]
+                            didPass              = tempVarRunInfo  [constants.DID_VARIABLE_PASS_KEY]
                         %>
                         <tr>
                             <td>
@@ -97,11 +98,11 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
                                 % endif
                             </td>
                             <td>
-                                Variable: <a href="${tempVarRunInfo['variable_report_path_escaped']}">${varDisplayName}</a> <br>
-                                Epsilon used: ${tempVarRunInfo['epsilon']} <br>
+                                Variable: <a href="${tempVarRunInfo[constants.VAR_REPORT_PATH_KEY]}">${varDisplayName}</a> <br>
+                                Epsilon used: ${tempVarRunInfo[constants.EPSILON_KEY]} <br>
                                 ## if there is an epsilon percent, also show that
-                                % if ('epsilon_percent' in tempVarRunInfo) and (tempVarRunInfo['epsilon_percent'] is not None) :
-                                    Epsilon percent (of file A) used: ${tempVarRunInfo['epsilon_percent']}% <br>
+                                % if (constants.EPSILON_PERCENT_KEY in tempVarRunInfo) and (tempVarRunInfo[constants.EPSILON_PERCENT_KEY] is not None) :
+                                    Epsilon percent (of file A) used: ${tempVarRunInfo[constants.EPSILON_PERCENT_KEY]}% <br>
                                 % endif
                                 ## if there's an r squared correlation value, also show that
                                 % if rSquaredCorr is not None :
@@ -127,7 +128,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     ## report the names of variables shared between the two files, if any
     <%block name="sharedVarNames">
     
-    <% sharedVars = varNames['sharedVars'] %>
+    <% sharedVars = varNames[constants.SHARED_VARIABLE_NAMES_KEY] %>
     % if len(sharedVars) > 0 :
         <h3>Shared Variables</h3>
         <p>
@@ -146,8 +147,8 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     <%block name="uniqueVarNames">
     
     <%
-        uniqueToAVars = varNames['uniqueToAVars']
-        uniqueToBVars = varNames['uniqueToBVars']
+        uniqueToAVars = varNames[constants.VAR_NAMES_UNIQUE_TO_A_KEY]
+        uniqueToBVars = varNames[constants.VAR_NAMES_UNIQUE_TO_B_KEY]
     %>
     ## check to see if there are any unique variables we need to report
     % if (len(uniqueToAVars) > 0) or (len(uniqueToBVars) > 0) :

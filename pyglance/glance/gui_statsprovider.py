@@ -81,6 +81,7 @@ class GlanceGUIStats (object) :
         tempAnalysis = stats.StatisticalAnalysis.withDataObjects(aDataObject, bDataObject,
                                                                  epsilon=self.dataModel.getEpsilon(),
                                                                  epsilon_percent=self.dataModel.getEpsilonPercent())
+        # TODO, these constants should be moved into the gui_constants
         tempInfo = { 'variable_name':       aVarName,
                      'alternate_name_in_B': bVarName }
         kwargs   = { 'runInfo':    tempInfo,

@@ -7,6 +7,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 
 <%!
     import glance.report as report
+    import glance.constants as constants
 %>
 
 <%inherit file="basereport.txt"/>
@@ -35,19 +36,19 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
                         <%
                             # get some information about the variable, for convenience
                             tempVariableInfo = variables[variableKey]
-                            tempVarRunInfo   = tempVariableInfo['variable_run_info']
+                            tempVarRunInfo   = tempVariableInfo[constants.VARIABLE_RUN_INFO_KEY]
                             
-                            technicalName  = tempVarRunInfo['variable_name']
+                            technicalName  = tempVarRunInfo[constants.VARIABLE_TECH_NAME_KEY]
                             varDisplayName = technicalName
-                            if 'display_name' in tempVarRunInfo :
-                                varDisplayName = tempVarRunInfo['display_name']
+                            if constants.DISPLAY_NAME_KEY in tempVarRunInfo :
+                                varDisplayName = tempVarRunInfo[constants.DISPLAY_NAME_KEY]
                         %>
                         <tr>
                             <td>
                                 ## for spacing
                             </td>
                             <td>
-                                Variable: <a href="${tempVarRunInfo['variable_report_path_escaped']}">${varDisplayName}</a> <br>
+                                Variable: <a href="${tempVarRunInfo[constants.VAR_REPORT_PATH_KEY]}">${varDisplayName}</a> <br>
                             </td>
                         </tr>
                     % endfor
@@ -62,7 +63,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     ## report the names of variables shared between the two files, if any
     <%block name="allVariablesList">
     
-    <% possVars = varNames['possibleNames'] %>
+    <% possVars = varNames[constants.POSSIBLE_NAMES_KEY] %>
     % if len(possVars) > 0 :
         <h3>Possible Variables</h3>
         <p>

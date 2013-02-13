@@ -90,6 +90,8 @@ class GlanceGUIView (QtGui.QWidget) :
             'attrs' - the table to display attributes for that file
             'override' - the override check box for that file
             'fillValue' - the fill value for that file
+            TODO - at some point all of these should move to these constants should
+                   move to the constants module
     """
     
     def __init__ (self, versionString, parent=None) :

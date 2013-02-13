@@ -6,34 +6,35 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 </%doc>
 
 <%!
-    import glance.report as report
+    import glance.report    as report
+    import glance.constants as constants
 %>
 
 <%inherit file="basereport.txt"/>
 
 <%block name="title">
     <%
-        variableName = runInfo['variable_name']
+        variableName = runInfo[constants.VARIABLE_TECH_NAME_KEY]
         variableDisplayName = variableName
-        if (runInfo.has_key('display_name')):
-            variableDisplayName = runInfo['display_name']
+        if (runInfo.has_key(constants.DISPLAY_NAME_KEY)):
+            variableDisplayName = runInfo[constants.DISPLAY_NAME_KEY]
     %>
     ${variableDisplayName} Variable Comparison
 </%block>
 
 ## this version of the config file path is escaped to be down in the variable report directory
 <%block name="configFileLink">
-    Please see <a href="${runInfo['config_file_path']}">this copy of the configuration file</a>
+    Please see <a href="${runInfo[constants.CONFIG_FILE_PATH_KEY]}">this copy of the configuration file</a>
 </%block>
 
 ## additional filtering information specific to the variable being analyzed
 <%block name="additionalFilterInfo">
     ## display info about the basic data filters if the data was filtered
-    % if ('data_filter_function_a' in runInfo) and (not (runInfo['data_filter_function_a'] is None)) :
+    % if (constants.FILTER_FUNCTION_A_KEY in runInfo) and (not (runInfo[constants.FILTER_FUNCTION_A_KEY] is None)) :
         Note: The data for this variable from file A was filtered.<br>
         <% wasFiltered = True %>
     % endif
-    % if ('data_filter_function_b' in runInfo) and (not (runInfo['data_filter_function_b'] is None)) :
+    % if (constants.FILTER_FUNCTION_B_KEY in runInfo) and (not (runInfo[constants.FILTER_FUNCTION_B_KEY] is None)) :
         Note: The data for this variable from file B was filtered.<br>
         <% wasFiltered = True %>
     % endif
@@ -55,10 +56,10 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     ## show the original data images if we have any
     <%block name="originalImages">
     
-    % if (len(imageNames['original']) > 0) :
+    % if (len(imageNames[constants.ORIGINAL_IMAGES_KEY]) > 0) :
         <h3>Original Data</h3>
         <p>
-            % for image in imageNames['original']:
+            % for image in imageNames[constants.ORIGINAL_IMAGES_KEY]:
                 <a href="./${image}"><img src="small.${image}"></a>
             % endfor
         </p>
@@ -74,35 +75,35 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     ## comparison parameters
     <p>
         ## display the variable names
-        % if 'alternate_name_in_B' in runInfo :
-            variable name in A: ${runInfo['variable_name']} <br>
-            variable name in B: ${runInfo['alternate_name_in_B']} <br>
+        % if constants.VARIABLE_B_TECH_NAME_KEY in runInfo :
+            variable name in A: ${runInfo[constants.VARIABLE_TECH_NAME_KEY]} <br>
+            variable name in B: ${runInfo[constants.VARIABLE_B_TECH_NAME_KEY]} <br>
         % else :
-            variable name: ${runInfo['variable_name']} <br>
+            variable name: ${runInfo[constants.VARIABLE_TECH_NAME_KEY]} <br>
         % endif
         
         ## display the epsilon
-        epsilon value: ${runInfo['epsilon']} <br>
+        epsilon value: ${runInfo[constants.EPSILON_KEY]} <br>
         
         ## if there is an epsilon percent, also show that
-        % if ('epsilon_percent' in runInfo) and (runInfo['epsilon_percent'] is not None) :
-            epsilon percent: ${runInfo['epsilon_percent']}% <br>
+        % if (constants.EPSILON_PERCENT_KEY in runInfo) and (runInfo[constants.EPSILON_PERCENT_KEY] is not None) :
+            epsilon percent: ${runInfo[constants.EPSILON_PERCENT_KEY]}% <br>
         % endif
         
         ## display the missing value
-        % if ('missing_value_alt_in_b' in runInfo) and (not (runInfo['missing_value_alt_in_b'] is runInfo['missing_value'])) :
-            "missing" data value in A: ${str(runInfo['missing_value'])}<br>
-            "missing" data value in B: ${str(runInfo['missing_value_alt_in_b'])}<br>
+        % if (constants.FILL_VALUE_ALT_IN_B_KEY in runInfo) and (not (runInfo[constants.FILL_VALUE_ALT_IN_B_KEY] is runInfo[constants.FILL_VALUE_KEY])) :
+            "missing" data value in A: ${str(runInfo[constants.FILL_VALUE_KEY])}<br>
+            "missing" data value in B: ${str(runInfo[constants.FILL_VALUE_ALT_IN_B_KEY])}<br>
         % else :
-            "missing" data value: ${str(runInfo['missing_value'])}<br>
+            "missing" data value: ${str(runInfo[constants.FILL_VALUE_KEY])}<br>
         % endif
         
         ## if there are units available, display those
-        % if ('units_a' in runInfo) and (runInfo['units_a'] is not None) :
-            units in A: ${str(runInfo['units_a'])}<br>
+        % if (constants.VAR_UNITS_A_KEY in runInfo) and (runInfo[constants.VAR_UNITS_A_KEY] is not None) :
+            units in A: ${str(runInfo[constants.VAR_UNITS_A_KEY])}<br>
         % endif
-        % if ('units_b' in runInfo) and (runInfo['units_b'] is not None) :
-            units in B: ${str(runInfo['units_b'])}<br>
+        % if (constants.VAR_UNITS_B_KEY in runInfo) and (runInfo[constants.VAR_UNITS_B_KEY] is not None) :
+            units in B: ${str(runInfo[constants.VAR_UNITS_B_KEY])}<br>
         % endif
     </p>
     
@@ -122,7 +123,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
             </dt>
             <dd>
                 % for statName, statValue in sorted(list(dataSet.items())) :
-                    ${statName}<%block name="statDocLink"><a href="${runInfo['doc_path']}">*</a></%block>: ${report.make_formatted_display_string(statValue)} <br>
+                    ${statName}<%block name="statDocLink"><a href="${runInfo[constants.DOCUMENTATION_PATH_KEY]}">*</a></%block>: ${report.make_formatted_display_string(statValue)} <br>
                 % endfor
                 <br>
             <dd>
@@ -135,12 +136,12 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     <%block name="comparisonImages">
     
     <%
-    hideComparisonImages = ('short_circuit_diffs' in runInfo) and runInfo['short_circuit_diffs']
+    hideComparisonImages = (constants.SHORT_CIRCUIT_DIFFS_KEY in runInfo) and runInfo[constants.SHORT_CIRCUIT_DIFFS_KEY]
     %>
-    % if (len(imageNames['compared']) > 0) and (not hideComparisonImages) :
+    % if (len(imageNames[constants.COMPARED_IMAGES_KEY]) > 0) and (not hideComparisonImages) :
         <p>
             <% inSubSet = False %>
-            % for image in imageNames['compared'] :
+            % for image in imageNames[constants.COMPARED_IMAGES_KEY] :
                 ## if we have a plain image, display it
                 % if (type(image) is str) :
                     % if inSubSet :

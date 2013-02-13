@@ -11,8 +11,9 @@ import logging
 import os, subprocess, datetime
 import numpy as np
 
-import glance.delta as delta
-import glance.io    as io
+import glance.delta     as delta
+import glance.io        as io
+import glance.constants as constants
 
 LOG = logging.getLogger(__name__)
 
@@ -464,12 +465,12 @@ class FileInfo (object) :
         eventually be removed FUTURE
         """
         
-        fileInfo = {'path': self.path}
+        fileInfo = {constants.PATH_KEY: self.path}
         
         if self.md5_sum is not None :
-            fileInfo['md5sum'] = self.md5_sum
+            fileInfo[constants.MD5SUM_KEY] = self.md5_sum
         if self.last_modified is not None:
-            fileInfo['lastModifiedTime'] = self.last_modified
+            fileInfo[constants.LAST_MODIFIED_KEY] = self.last_modified
         
         return fileInfo
 

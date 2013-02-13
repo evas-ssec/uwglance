@@ -436,7 +436,7 @@ def inspect_library_call (a_path, var_list=[ ],
     LOG.debug("output dir: " + str(pathsTemp[OUT_FILE_KEY]))
     
     # return for lon_lat_data variables will be in the form 
-    #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
+    #{LON_KEY: longitude_data,      LAT_KEY: latitude_data,      INVALID_MASK_KEY: spaciallyInvalidMaskData}
     # or { } if there is no lon/lat info
     lon_lat_data = { }
     spatialInfo  = { }
@@ -606,7 +606,7 @@ def inspect_library_call (a_path, var_list=[ ],
     # the end of the loop to examine all the variables
     
     # generate our general report pages once we've analyzed all the variables
-    if (runInfo['shouldIncludeReport']) :
+    if (runInfo[DO_MAKE_REPORT_KEY]) :
         
         # get the current time
         runInfo[TIME_INFO_KEY] = datetime.datetime.ctime(datetime.datetime.now())
@@ -698,7 +698,7 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     LOG.debug("output dir: " + str(pathsTemp[OUT_FILE_KEY]))
     
     # return for lon_lat_data variables will be in the form 
-    #{"lon": longitude_data,      "lat": latitude_data,      "inv_mask": spaciallyInvalidMaskData}
+    #{LON_KEY: longitude_data,      LAT_KEY: latitude_data,      INVALID_MASK_KEY: spaciallyInvalidMaskData}
     # or { } if there is no lon/lat info
     lon_lat_data = { }
     spatialInfo  = { }
@@ -722,9 +722,12 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     
     # this will hold information for the summary report
     # it will be in the form
-    # [displayName] = {"passEpsilonPercent":     percent ok with epsilon,
-    #                  "finite_similar_percent": percent with the same finiteness, 
-    #                  "epsilon":                epsilon value used}
+    # [displayName] =  {
+    #                    PASSED_EPSILON_PERCENT_KEY: percent ok with this epsilon,
+    #                    FINITE_SIMILAR_PERCENT_KEY: percent with the same finiteness,
+    #                    R_SQUARED_COEFF_VALUE_KEY:  the r squared correlation coefficient,
+    #                    VARIABLE_RUN_INFO_KEY:      the detailed variable run information
+    #                    }
     variableComparisons = {}
     
     # go through each of the possible variables in our files

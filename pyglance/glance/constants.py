@@ -195,7 +195,7 @@ R_SQUARED_COEFF_VALUE_KEY  = 'r_squared_correlation'
 # image types
 
 ORIGINAL_IMAGES_KEY        = 'original'
-COMPARED_IMAGES_KEY        = 'compared'
+COMPARED_IMAGES_KEY        = 'compared' # TODO, got to here in searching to make sure I replaced all uses
 
 # keys used for spatial information
 

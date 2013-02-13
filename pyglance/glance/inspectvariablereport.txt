@@ -6,17 +6,18 @@ Copyright (c) 2012 University of Wisconsin SSEC. All rights reserved.
 </%doc>
 
 <%!
-    import glance.report as report
+    import glance.report    as report
+    import glance.constants as constants
 %>
 
 <%inherit file="variablereport.txt"/>
 
 <%block name="title">
     <%
-        variableName = runInfo['variable_name']
+        variableName = runInfo[constants.VARIABLE_TECH_NAME_KEY]
         variableDisplayName = variableName
-        if (runInfo.has_key('display_name')):
-            variableDisplayName = runInfo['display_name']
+        if (runInfo.has_key(constants.DISPLAY_NAME_KEY)):
+            variableDisplayName = runInfo[constants.DISPLAY_NAME_KEY]
     %>
     ${variableDisplayName} Variable Analysis
 </%block>
@@ -24,7 +25,7 @@ Copyright (c) 2012 University of Wisconsin SSEC. All rights reserved.
 ## additional filtering information specific to the variable being analyzed
 <%block name="additionalFilterInfo">
     ## display info about the basic data filters if the data was filtered
-    % if ('data_filter_function_a' in runInfo) and (not (runInfo['data_filter_function_a'] is None)) :
+    % if (constants.FILTER_FUNCTION_A_KEY in runInfo) and (not (runInfo[constants.FILTER_FUNCTION_A_KEY] is None)) :
         Note: The data for this variable was filtered.<br>
         <% wasFiltered = True %>
     % endif
@@ -39,14 +40,14 @@ Copyright (c) 2012 University of Wisconsin SSEC. All rights reserved.
 ## comparison parameters
 <p>
     ## display the variable names
-    variable name: ${runInfo['variable_name']} <br>
+    variable name: ${runInfo[constants.VARIABLE_TECH_NAME_KEY]} <br>
     
     ## display the missing value
-    "missing" data value: ${str(runInfo['missing_value'])}<br>
+    "missing" data value: ${str(runInfo[constants.FILL_VALUE_KEY])}<br>
     
     ## if there are units available, display those
-    % if ('units_a' in runInfo) and (runInfo['units_a'] is not None) :
-        units in A: ${str(runInfo['units_a'])}<br>
+    % if (constants.VAR_UNITS_A_KEY in runInfo) and (runInfo[constants.VAR_UNITS_A_KEY] is not None) :
+        units in A: ${str(runInfo[constants.VAR_UNITS_A_KEY])}<br>
     % endif
 </p>
 
