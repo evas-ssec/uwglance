@@ -237,14 +237,36 @@ class DiffInfoObject (object) :
     (if both a value and percent are present, two epsilon tests will be done)
     """
     
-    # Upcasts to be used in difference computation to avoid overflow. Currently only unsigned
-    # ints are upcast.
-    # FUTURE: handle uint64s as well (there is no int128, so might have to detect overflow)
+    POSITIVE_UPCASTS = {
+                        np.uint8:   np.int16,
+                        np.uint16:  np.int32,
+                        np.uint32:  np.int64,
+                        np.uint64:  np.float32,
+                       }
+    
+    # Upcasts to be used in difference computation to avoid overflow.
+    # right now this is agressively upcasting the comparison data
     DATATYPE_UPCASTS = {
-        np.uint8:  np.int16,
-        np.uint16: np.int32,
-        np.uint32: np.int64
-        }
+                        np.int8:    np.int16,
+                        np.int16:   np.int32,
+                        np.int32:   np.int64,
+                        np.int64:   np.float32,
+                        
+                        #np.float32: np.float64,
+                        #np.float64: np.float128,
+                       }
+    # FUTURE: right now the actual range of the data isn't being considered when upcasting
+    # (Note: numpy.finfo and numpy.iinfo can be used to get more data on types)
+    TYPE_MAXIMUM = {
+                    np.int16:    32767,
+                    np.int32:    2147483647,
+                    np.int64:    9223372036854775807,
+                    
+                    np.float32:  3.4028235e+38,
+                    
+                    np.float64:  1.7976931348623157e+308,
+                    #np.float128: 1.189731495357231765e+4932,
+                   }
     
     def __init__(self, aDataObject, bDataObject,
                  epsilonValue=0.0, epsilonPercent=None) :
@@ -278,9 +300,17 @@ class DiffInfoObject (object) :
             type_to_return = np.common_type(data1, data2)
             changed_type   = True
         
-        # upcast the type if we need to
+        # make sure we're using a type that has negative values in it
+        if type_to_return in DiffInfoObject.POSITIVE_UPCASTS :
+            type_to_return = DiffInfoObject.POSITIVE_UPCASTS[type_to_return]
+            changed_type = True
+        
+        # upcast the type if we think we'll need more space for subtracting
         if type_to_return in DiffInfoObject.DATATYPE_UPCASTS :
             type_to_return = DiffInfoObject.DATATYPE_UPCASTS[type_to_return]
+            changed_type = True
+        
+        if changed_type :
             LOG.debug('To prevent overflow, difference data will be upcast from ('
                       + str(data1.dtype) + '/' + str(data2.dtype) + ') to: ' + str(type_to_return))
         

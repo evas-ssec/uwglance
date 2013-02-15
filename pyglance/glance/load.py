@@ -9,7 +9,7 @@ Copyright (c) 2012 University of Wisconsin SSEC. All rights reserved.
 """
 
 import logging
-from pycdf import CDFError
+#from pycdf import CDFError
 import numpy
 
 import glance.delta  as delta
@@ -249,10 +249,11 @@ def load_variable_data(fileObject, variableNameInFile,
     else :
         try :
             variableData = numpy.array(fileObject[variableNameInFile]) if forceDType is None else numpy.array(fileObject[variableNameInFile], dtype=forceDType)
-        except CDFError :
+        except Exception, ex :
+            import traceback
             exceptionToRaise = ValueError('Unable to retrieve ' + variableNameInFile + ' data. The variable name ' + 
                       ' may not exist in this file or an error may have occured while attempting to' +
-                      ' access the data. Details of file access error observed: ' + str(CDFError))
+                      ' access the data. Details of file access error observed: ' + str(ex))
     
     # if we ended up with an exception, raise that now
     if exceptionToRaise is not None :
