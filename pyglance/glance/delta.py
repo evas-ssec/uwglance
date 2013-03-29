@@ -65,9 +65,7 @@ def min_with_mask(data, goodMask=None) :
     goodData = data[goodMask]
     
     # if we have any good data, get the minimum
-    toReturn = None
-    if goodData.size > 0 :
-        toReturn = np.min(goodData)
+    toReturn = np.min(goodData) if goodData.size > 0 else None
     
     return toReturn
 
@@ -92,9 +90,7 @@ def max_with_mask(data, goodMask=None) :
     goodData = data[goodMask]
     
     # if we have any good data, get the maximum
-    toReturn = None
-    if goodData.size > 0 :
-        toReturn = np.max(goodData)
+    toReturn = np.max(goodData) if goodData.size > 0 else None
     
     return toReturn
 

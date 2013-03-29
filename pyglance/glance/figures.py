@@ -291,6 +291,9 @@ def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None, units_
     # the hexbin plot of the good data 
     plt.hexbin(dataX, dataY, bins='log', cmap=cm.jet)
     plt.axis([dataX.min(), dataX.max(), dataY.min(), dataY.max()])
+    #heatmap, xedges, yedges = np.histogram2d(dataX, dataY, bins=100) #todo, testing
+    #heatmap = log(heatmap + 1)
+    #plt.imshow(heatmap, extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]], cmap=cm.jet)
     
     # create a color bar
     cb = plt.colorbar()

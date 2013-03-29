@@ -161,38 +161,53 @@ class DataObject (object) :
         return DataObject(self.data.copy(), fillValue=self.fill_value, ignoreMask=self.masks.ignore_mask,
                  overrideFillValue=self.override_fill_value, defaultFillValue=self.default_fill_value)
     
-    def self_analysis(self) :
+    def self_analysis(self, re_do_analysis=False) :
         """
         Gather some basic information about a data set
+        
+        Note: If the data has already been analyzed it will not do anything
+        unless you send in re_do_analysis=True
         """
         
-        # hang onto the shape for convenience
-        shape = self.data.shape
+        # data objects are intended to be immutable, build a new one or override to re-analyze
+        if (not self.have_analyzed) or re_do_analysis :
         
-        # if there isn't an ignore mask, make an empty one
-        if self.masks.ignore_mask is None :
-            self.masks.ignore_mask = np.zeros(shape, dtype=np.bool)
-        
-        # find the non-finite values
-        non_finite_mask = ~np.isfinite(self.data) & ~self.masks.ignore_mask
-        
-        # find and mark the missing values
-        missing_mask    = np.zeros(shape, dtype=np.bool)
-        # if the data has a fill value, mark where the missing data is
-        tempFillValue = self.select_fill_value()
-        if tempFillValue is not None :
-            missing_mask[self.data == tempFillValue] = True
-            missing_mask[self.masks.ignore_mask]     = False
-        
-        # define the valid mask as places where the data is not missing,
-        # nonfinite, or ignored
-        valid_mask = ~ (missing_mask | non_finite_mask | self.masks.ignore_mask)
-        
-        # set our masks
-        self.masks = BasicMaskSetObject(self.masks.ignore_mask, valid_mask,
-                                        non_finite_mask, missing_mask)
-        
-        self.have_analyzed = True
+            # hang onto the shape for convenience
+            shape = self.data.shape
+            
+            # if there isn't an ignore mask, make an empty one
+            if self.masks.ignore_mask is None :
+                self.masks.ignore_mask = np.zeros(shape, dtype=np.bool)
+            
+            # find the non-finite values
+            #non_finite_mask = ~np.isfinite(self.data) & ~self.masks.ignore_mask
+            #non_finite_mask = ~ (np.isfinite(self.data) | self.masks.ignore_mask)
+            non_finite_mask = np.zeros(shape, dtype=np.bool)
+            np.isfinite(self.data, non_finite_mask)
+            np.logical_or(non_finite_mask, self.masks.ignore_mask, non_finite_mask)
+            np.logical_not(non_finite_mask, non_finite_mask)
+            
+            # find and mark the missing values
+            missing_mask = np.zeros(shape, dtype=np.bool)
+            # if the data has a fill value, mark where the missing data is
+            tempFillValue = self.select_fill_value()
+            if tempFillValue is not None :
+                missing_mask[self.data == tempFillValue] = True
+                missing_mask[self.masks.ignore_mask]     = False
+            
+            # define the valid mask as places where the data is not missing,
+            # nonfinite, or ignored
+            #valid_mask = ~ (missing_mask | non_finite_mask | self.masks.ignore_mask)
+            valid_mask = np.zeros(shape, dtype=np.bool)
+            np.logical_or(missing_mask, non_finite_mask, valid_mask)
+            np.logical_or(self.masks.ignore_mask, valid_mask, valid_mask)
+            np.logical_not(valid_mask, valid_mask)
+            
+            # set our masks
+            self.masks = BasicMaskSetObject(self.masks.ignore_mask, valid_mask,
+                                            non_finite_mask, missing_mask)
+            
+            self.have_analyzed = True
     
     def select_fill_value (self) :
         """
@@ -207,10 +222,7 @@ class DataObject (object) :
         get the minimum value in this data set
         """
         
-        # TODO it would be better to put this test in the analysis function
-        # TODO but first I'd need to be sure that wouldn't break anything
-        if not self.have_analyzed :
-            self.self_analysis()
+        self.self_analysis()
         return delta.min_with_mask(self.data, self.masks.valid_mask)
     
     def get_max (self) :
@@ -218,10 +230,7 @@ class DataObject (object) :
         get the maximum value in this data set
         """
         
-        # TODO it would be better to put this test in the analysis function
-        # TODO but first I'd need to be sure that wouldn't break anything
-        if not self.have_analyzed :
-            self.self_analysis()
+        self.self_analysis()
         return delta.max_with_mask(self.data, self.masks.valid_mask)
 
 class DiffInfoObject (object) :
