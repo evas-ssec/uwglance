@@ -463,6 +463,12 @@ def inspect_library_call (a_path, var_list=[ ],
         # get the various names
         technical_name, _, explanationName = _get_name_info_for_variable(displayName, varRunInfo)
         
+        # make sure that it's possible to load this variable
+        if not(aFile.file_object.is_loadable_type(technical_name)) :
+            LOG.warn(displayName + " is of a type that cannot be loaded using current file handling libraries included with Glance." +
+                    " Skipping " + displayName + ".")
+            continue
+        
         LOG.info('analyzing: ' + explanationName)
         
         # load the variable data
@@ -741,6 +747,12 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
         technical_name, b_variable_technical_name, \
                 explanationName = _get_name_info_for_variable(displayName, varRunInfo)
         
+        # make sure that it's possible to load this variable
+        if not(aFile.file_object.is_loadable_type(technical_name)) or not(bFile.file_object.is_loadable_type(b_variable_technical_name)) :
+            LOG.warn(displayName + " is of a type that cannot be loaded using current file handling libraries included with Glance." +
+                    " Skipping " + displayName + ".")
+            continue
+        
         LOG.info('analyzing: ' + explanationName)
         
         # load the variable data
@@ -1013,6 +1025,13 @@ def stats_library_call(afn, bfn, var_list=[ ],
     doc_atend = do_document and len(names)!=1
     
     for name, epsilon, missing in names:
+        
+        # make sure that it's possible to load this variable
+        if not(aFile.is_loadable_type(name)) or not(bFile.is_loadable_type(name)) :
+            LOG.warn(name + " is of a type that cannot be loaded using current file handling libraries included with Glance." +
+                    " Skipping " + name + ".")
+            continue
+        
         aData = aFile[name]
         bData = bFile[name]
         if missing is None:
@@ -1085,6 +1104,13 @@ def inspect_stats_library_call (afn, var_list=[ ], options_set={ }, do_document=
     doc_atend = do_document and len(names)!=1
     
     for name, epsilon, missing in names:
+        
+        # make sure that it's possible to load this variable
+        if not(aFile.is_loadable_type(name)) :
+            LOG.warn(name + " is of a type that cannot be loaded using current file handling libraries included with Glance." +
+                    " Skipping " + name + ".")
+            continue
+        
         aData = aFile[name]
         
         amiss = missing

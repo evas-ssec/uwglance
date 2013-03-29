@@ -79,7 +79,7 @@ class GlanceGUIController (object) :
         
         try :
             self.model.loadNewFile(file_prefix, new_file_path)
-        except gui_model.UnableToReadFile, utrf :
+        except (gui_model.UnableToReadFile, ValueError) as utrf :
             self.handleWarning(str(utrf))
     
     def userSelectedVariable (self, file_prefix, newSelection) :
@@ -87,7 +87,10 @@ class GlanceGUIController (object) :
         the user selected a new variable
         """
         
-        self.model.updateFileDataSelection(file_prefix, newVariableText=newSelection)
+        try :
+            self.model.updateFileDataSelection(file_prefix, newVariableText=newSelection)
+        except ValueError as ve :
+            self.handleWarning(str(ve))
     
     def userChangedOverload (self, file_prefix, new_override_value) :
         """
@@ -129,14 +132,20 @@ class GlanceGUIController (object) :
         the user selected a new longitude variable
         """
         
-        self.model.updateLonLatSelections(file_prefix, new_longitude_name=newSelection)
+        try:
+            self.model.updateLonLatSelections(file_prefix, new_longitude_name=newSelection)
+        except ValueError as ve :
+            self.handleWarning(str(ve))
     
     def userSelectedLatitude (self, file_prefix, newSelection) :
         """
         the user selected a new latitude variable
         """
         
-        self.model.updateLonLatSelections(file_prefix, new_latitude_name=newSelection)
+        try :
+            self.model.updateLonLatSelections(file_prefix, new_latitude_name=newSelection)
+        except ValueError as ve :
+            self.handleWarning(str(ve))
     
     def userSelectedImageType (self, new_image_type) :
         """
@@ -201,7 +210,7 @@ class GlanceGUIController (object) :
         
         try :
             self.stats.sendStatsInfo()
-        except IncompatableDataObjects, ido :
+        except IncompatableDataObjects as ido :
             self.handleWarning(str(ido))
     
     def userRequestsPlot (self) :
@@ -211,7 +220,7 @@ class GlanceGUIController (object) :
         
         try :
             self.figs.spawnPlot()
-        except (IncompatableDataObjects, ValueError), idove :
+        except (IncompatableDataObjects, ValueError) as idove :
             self.handleWarning(str(idove))
             #raise
     

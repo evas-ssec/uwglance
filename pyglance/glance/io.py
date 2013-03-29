@@ -177,6 +177,14 @@ class CaseInsensitiveAttributeCache (object) :
         toReturn = self.globalAttributesLower
         
         return toReturn
+    
+    def is_loadable_type (self, name) :
+        """
+        check to see if the indicated variable is a type that can be loaded
+        """
+        
+        # TODO, are there any bad types for these files?
+        return True
 
 class hdf (object):
     """wrapper for HDF4 dataset for comparison
@@ -352,6 +360,14 @@ class hdf (object):
                 toReturn = self._hdf.attributes()[attributeName]
         
         return toReturn
+    
+    def is_loadable_type (self, name) :
+        """
+        check to see if the indicated variable is a type that can be loaded
+        """
+        
+        # TODO, are there any bad types for these files?
+        return True
 
 class nc (object):
     """wrapper for NetCDF3/4/opendap dataset for comparison
@@ -394,6 +410,23 @@ class nc (object):
         # get the variable object and use it to
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
+        
+        # do a check to see if this is a multi-dimensional character array
+        # (right now pycdf can't handle those correctly)
+        if (variable_object.inq_type() is NC.CHAR) and (len(variable_object.shape()) > 1) :
+            raise ValueError(name + " is a multidimensional character array, which is not currently supported.")
+        
+        #print str("** inq: " + str(variable_object.inq_type()))
+        #print str("types reference: ")
+        #print str("NC.BYTE:   " + str(NC.BYTE))
+        #print str("NC.CHAR:   " + str(NC.CHAR))
+        #print str("NC.SHORT:  " + str(NC.SHORT))
+        #print str("NC.INT:    " + str(NC.INT))
+        #print str("NC.FLOAT:  " + str(NC.FLOAT))
+        #print str("NC.DOUBLE: " + str(NC.DOUBLE))
+        
+        #print str("shape: " + str(variable_object.shape()))
+        
         raw_data_copy = variable_object[:]
         # load the scale factor and add offset
         
@@ -595,6 +628,14 @@ class nc (object):
                 toReturn = self._nc.attributes()[attributeName]
         
         return toReturn
+    
+    def is_loadable_type (self, name) :
+        """
+        check to see if the indicated variable is a type that can be loaded
+        """
+        
+        variable_object = self.get_variable_object(name)
+        return (variable_object.inq_type() is not NC.CHAR)
 
 nc4 = nc
 cdf = nc
@@ -787,6 +828,14 @@ class h5(object):
                 toReturn = self._h5.attrs[attributeName]
         
         return toReturn
+    
+    def is_loadable_type (self, name) :
+        """
+        check to see if the indicated variable is a type that can be loaded
+        """
+        
+        # TODO, are there any bad types for these files?
+        return True
 
 
 class aeri(object):
@@ -919,6 +968,14 @@ class aeri(object):
         LOG.warn('Glance does not yet support attribute retrieval in AERI files. None will be used.')
         
         return toReturn
+    
+    def is_loadable_type (self, name) :
+        """
+        check to see if the indicated variable is a type that can be loaded
+        """
+        
+        # TODO, are there any bad types for these files?
+        return True
 
 # handle the variety of file suffixes by building aliases to aeri class
 cxs = rnc = cxv = csv = spc = sum = uvs = aeri
@@ -1088,6 +1145,14 @@ class tiff (object):
         # FUTURE, GeoTIFF files do have attributes, but this isn't hooked up yet
         
         return None
+    
+    def is_loadable_type (self, name) :
+        """
+        check to see if the indicated variable is a type that can be loaded
+        """
+        
+        # TODO, are there any bad types for these files?
+        return True
 
 # people also name tiff files with one f...
 tif = tiff
@@ -1214,6 +1279,14 @@ class jpss_adl(object):
         LOG.warn('Glance does not yet support attribute retrieval in JPSS ADL files. None will be used.')
         
         return toReturn
+    
+    def is_loadable_type (self, name) :
+        """
+        check to see if the indicated variable is a type that can be loaded
+        """
+        
+        # TODO, are there any bad types for these files?
+        return True
 
 
 

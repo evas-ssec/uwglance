@@ -186,6 +186,7 @@ class GlanceGUIModel (object) :
             tempIndex    = tempIndex + 1
             tempVariable = variableList[tempIndex]
         
+        
         LOG.debug ("selected variable: " + str(tempVariable))
         
         # save all of the data related to this file for later use
