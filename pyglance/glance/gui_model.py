@@ -562,7 +562,11 @@ class GlanceGUIModel (object) :
                 toReturn = toReturn.copy()
             
             if self.fileSettings[filePrefix][GlanceGUIModel.IS_AWIPS] :
+                fill_mask = toReturn.data == toReturn.fill_value if toReturn.fill_value is not None else np.zeros(toReturn.data.shape, dtype=np.bool)
                 toReturn.data = toReturn.data.astype(np.uint8) # TODO, will setting this break anything?
+                toReturn.data = toReturn.data.astype(np.int32) # make the range larger so we can do comparisons without overflow
+                toReturn.data[fill_mask] = toReturn.fill_value
+            
             if self.fileSettings[filePrefix][GlanceGUIModel.DO_RANGE] :
                 if self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE] is not None :
                     toReturn.data[toReturn.data < self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE]] = toReturn.fill_value

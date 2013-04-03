@@ -213,6 +213,16 @@ class GlanceGUIController (object) :
         except IncompatableDataObjects as ido :
             self.handleWarning(str(ido))
     
+    def userRequestsRawData (self) :
+        """
+        the user asked for a raw data display
+        """
+        
+        # show the data for whatever's loaded
+        self.stats.sendRawData("A")
+        self.stats.sendRawData("B")
+        
+    
     def userRequestsPlot (self) :
         """
         the user has asked for a plot

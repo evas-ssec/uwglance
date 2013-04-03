@@ -137,6 +137,10 @@ class GlanceGUIView (QtGui.QWidget) :
         # hang on to stats windows so they don't vanish
         self.statsWindows = { }
         self.statsCounter = 1
+        
+        # hang on to data display windows
+        self.dataShowWindows = { }
+        self.dataShowCounter = 1
     
     def _build_data_tab (self) :
         """
@@ -186,10 +190,15 @@ class GlanceGUIView (QtGui.QWidget) :
         
         currentRow = currentRow + 1
         
+        # set up a button that shows the numerical data
+        self.rawDataButton = QtGui.QPushButton("Display Data")
+        self.rawDataButton.clicked.connect(self.reportDisplayRawDataClicked)
+        layoutToUse.addWidget(self.rawDataButton, currentRow, 1, 1, 1)
+        
         # set up a button that shows stats
         self.statsButton = QtGui.QPushButton("Display Statistics")
         self.statsButton.clicked.connect(self.reportDisplayStatsClicked)
-        layoutToUse.addWidget(self.statsButton, currentRow, 1, 1, 2)
+        layoutToUse.addWidget(self.statsButton, currentRow, 2, 1, 1)
         
         # set up the button at the bottom that creates plots
         self.displayButton = QtGui.QPushButton("Display Plot")
@@ -696,6 +705,17 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userRequestsStats()
     
+    def reportDisplayRawDataClicked (self) :
+        """
+        the user clicked the display raw data button
+        """
+        
+        # make sure the focus isn't in a line-edit box
+        self.rawDataButton.setFocus()
+        
+        for listener in self.userUpdateListeners :
+            listener.userRequestsRawData()
+    
     def reportDisplayPlotClicked (self) :
         """
         the user clicked the display plot button
@@ -736,13 +756,27 @@ class GlanceGUIView (QtGui.QWidget) :
         display this to the user
         """
         
-        tempID            = self.statsCounter
-        self.statsCounter = self.statsCounter + 1
+        tempID             = self.statsCounter
+        self.statsCounter += self.statsCounter + 1
         
         # I don't like this solution, but it would allow me to show multiple sets of stats at a time
         self.statsWindows[tempID] = StatisticsDisplayWindow(tempID,
                                                             aVariableName, variable_name_b=bVariableName,
                                                             statsTextToDisplay=statsAnalysis, stored_in=self.statsWindows)
+    
+    def displayVarData (self, variableName, fileDescriptor, variableDataObject) :
+        """
+        given variable data, pop a window to show it to the user
+        """
+        
+        tempID                = self.dataShowCounter
+        self.dataShowCounter += 1
+        
+        # not the best solution ever, but it works for now
+        self.dataShowWindows[tempID] = RawDataDisplayWindow(tempID,
+                                                            variableDataObject, variableName,
+                                                            file_descriptor=fileDescriptor,
+                                                            stored_in=self.dataShowWindows)
     
     def fileDataUpdate (self, file_prefix, file_path, selected_variable, use_fill_override, new_fill_value, variable_dimensions,
                         variable_list=None, attribute_list=None) :
@@ -964,7 +998,7 @@ class StatisticsDisplayWindow (QtGui.QWidget) :
         # create the layout and set up some of the overall record keeping
         layoutToUse = QtGui.QGridLayout()
         
-        # set up the button at the bottom that creates plots
+        # set up the box that shows the stats
         self.statsText = QtGui.QTextEdit()
         self.statsText.setHtml(statsTextToDisplay)
         self.statsText.setReadOnly(True)
@@ -985,6 +1019,74 @@ class StatisticsDisplayWindow (QtGui.QWidget) :
             del self.stored[self.id]
         
         event.accept()
+
+class NumpyArrayTableModel (QtCore.QAbstractTableModel) :
+    """
+    this is a model designed to show numpy arrays in
+    QTableView widgets
+    """
+    
+    def __init__(self, array_to_show, parent=None):
+        """
+        given the data to show, build our model
+        """
+        
+        QtCore.QAbstractTableModel.__init__(self, parent)
+        self.np_array = array_to_show
+
+    def rowCount(self, parent=None):
+        return self.np_array.shape[0]
+
+    def columnCount(self, parent=None):
+        return self.np_array.shape[1]
+
+    def data(self, index, role=QtCore.Qt.DisplayRole):
+        if index.isValid():
+            if role == QtCore.Qt.DisplayRole:
+                row = index.row()
+                col = index.column()
+                return QtCore.QVariant("%.5f"%self.np_array[row, col])
+        return QtCore.QVariant()
+
+class RawDataDisplayWindow (QtGui.QWidget) :
+    def __init__ (self, id_number, data_object_to_display, variable_name,
+                  file_descriptor=None, stored_in=None, parent=None) :
+        """
+        set up a window to display raw data
+        """
+        
+        QtGui.QWidget.__init__(self, parent)
+        
+        self.id     = id_number
+        self.stored = stored_in
+        
+        # set the window title
+        temp_title = "Data display for " + str(variable_name)
+        temp_title = temp_title + " in file " + file_descriptor if file_descriptor is not None else temp_title
+        self.setWindowTitle(temp_title)
+        
+        # create the layout and set up some of the overall record keeping
+        layoutToUse = QtGui.QGridLayout()
+        
+        # create a table view to display our data
+        self.dataView = QtGui.QTableView()
+        self.dataView.setModel(NumpyArrayTableModel(data_object_to_display.data))
+        layoutToUse.addWidget(self.dataView, 1, 1)
+        
+        # set up the overall window geometry
+        self.setLayout(layoutToUse)
+        self.setGeometry(400, 400, 500, 500)
+        
+        self.show()
+    
+    def closeEvent (self, event) :
+        """
+        we need to clean some stuff up when the window wants to close
+        """
+        
+        if self.stored is not None :
+            del self.stored[self.id]
+
 
 if __name__=='__main__':
     import doctest

@@ -95,4 +95,20 @@ class GlanceGUIStats (object) :
         # tell my listeners to show the stats data we've collected
         for listener in self.statsListeners :
                 listener.displayStatsData(aVarName, bVarName, renderedText)
+    
+    def sendRawData (self, fileID) :
+        """
+        Send raw data information to our listeners
+        """
+        
+        # get Variable name
+        varName    = self.dataModel.getVariableName(fileID)
+        
+        # get Data object
+        dataObject = self.dataModel.getVariableData(fileID, varName)
+        
+        if dataObject is not None :
+            # tell my listeners to show the stats data we've collected
+            for listener in self.statsListeners :
+                    listener.displayVarData (varName, fileID, dataObject)
 
