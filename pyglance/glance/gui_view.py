@@ -104,6 +104,10 @@ class GlanceGUIView (QtGui.QWidget) :
         # set our title with the version string
         self.setWindowTitle(versionString)
         
+        # to make Dave happy, give it an icon
+        from pkg_resources import resource_filename
+        self.setWindowIcon(QtGui.QIcon(resource_filename(__name__, "pass.gif")))
+        
         # a place to hang onto our file specific widgets
         self.widgetInfo = { }
         
