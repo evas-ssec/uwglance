@@ -230,7 +230,8 @@ def load_variable_data(fileObject, variableNameInFile,
                        variableToFilterOn=None,
                        variableBasedFilter=None,
                        altVariableFileObject=None,
-                       fileDescriptionForDisplay="file") :
+                       fileDescriptionForDisplay="file",
+                       correctForAWIPS=False) :
     """
     load data for a variable from a file
     optionally filter the variable data based on a data filter or another variable
@@ -249,6 +250,7 @@ def load_variable_data(fileObject, variableNameInFile,
     else :
         try :
             variableData = numpy.array(fileObject[variableNameInFile]) if forceDType is None else numpy.array(fileObject[variableNameInFile], dtype=forceDType)
+            variableData = variableData.astype(numpy.uint8) if correctForAWIPS else variableData
         except Exception, ex :
             import traceback
             exceptionToRaise = ValueError('Unable to retrieve ' + variableNameInFile + ' data. The variable name ' + 
