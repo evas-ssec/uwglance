@@ -628,7 +628,7 @@ class GlanceGUIModel (object) :
         get the name of the colormap to use
         
         the return will be on of the constants from gui_constants:
-            COLORMAP_NAMES = [CM_RAINBOW, CM_GRAY]
+            COLORMAP_NAMES = [CM_RAINBOW, CM_RAINBOW_REV, CM_RAINBOW_DESAT, CM_GRAY, CM_GRAY_REV, CM_SPECTRAL]
         """
         
         return str(self.colormap)
