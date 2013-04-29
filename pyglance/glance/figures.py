@@ -79,7 +79,7 @@ def _make_range(data_a, valid_a_mask, num_intervals, offset_to_range=0.0, data_b
     
     return np.linspace(minVal, maxVal, num_intervals)
 
-def _plot_tag_data_simple(tagData) :
+def _plot_tag_data_simple(tagData, axes) :
     """
     This method will plot tag data listed as true in the
     tagData mask on the current figure. It is assumed that
@@ -106,11 +106,32 @@ def _plot_tag_data_simple(tagData) :
             LOG.debug('\t\tnumber  of mismatch points: ' + str(numMismatchPoints))
             LOG.debug('\t\tpercent of mismatch points: ' + str(percentBad))
             
-            new_kwargs = {}
-            new_kwargs['cmap'] = greenColorMap
-            cleanTagData = ma.array(tagData, mask=~tagData)
-            p = contourf(cleanTagData, **new_kwargs)
-            # TODO, need to incorporate plot for small numbers of pts
+            # get the current limits of the plot
+            tempXLim = axes.get_xlim()
+            tempYLim = axes.get_ylim()
+            
+            # if there aren't a lot of points, plot them individually
+            if (numMismatchPoints < 50000) | ((numMismatchPoints < 200000) & (percentBad < 2.0)) :
+                (height, width) = tagData.shape
+                tempX = [ ]
+                tempY = [ ]
+                for h in range(height) :
+                    for w in range(width) :
+                        if tagData[h, w] :
+                            tempX.append(w)
+                            tempY.append(h)
+                pTemp = plot(tempX, tempY, '.', markersize=0.1, color='#00ff00')
+            
+            # if there are a lot of points, plot them as an overall mask
+            else :
+                new_kwargs = {}
+                new_kwargs['cmap'] = greenColorMap
+                cleanTagData = ma.array(tagData, mask=~tagData)
+                pTemp = contourf(cleanTagData, **new_kwargs)
+            
+            # make sure we haven't changed the limits of the plot
+            axes.set_xlim(tempXLim)
+            axes.set_ylim(tempYLim)
         
         # display the number of mismatch points on the report if we were passed a set of tag data
         mismatchPtString = '\n\nShowing ' + str(numMismatchPoints) + ' Mismatch Points'
@@ -591,7 +612,7 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colo
     # and some informational stuff
     axes.set_title(figureTitle)
     
-    numMismatchPoints = _plot_tag_data_simple(tagData)
+    numMismatchPoints = _plot_tag_data_simple(tagData, axes)
     
     return figure
 
