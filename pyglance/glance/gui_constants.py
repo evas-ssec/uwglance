@@ -18,20 +18,24 @@ It not only stores values that are intended to be unchangable and globally avail
 """
 
 # constants for the possible image types
-ORIGINAL_A = "Original A Data"
-ORIGINAL_B = "Original B Data"
-ABS_DIFF   = "Abs. Difference"
-RAW_DIFF   = "Raw Difference"
-HISTOGRAM  = "Histogram"
-MISMATCH   = "Mismatch Areas"
-SCATTER    = "Scatter Plot"
-HEX_PLOT   = "Hex Plot"
+ORIGINAL_A  = "Original A Data"
+ORIGINAL_B  = "Original B Data"
+ABS_DIFF    = "Abs. Difference"
+RAW_DIFF    = "Raw Difference"
+HISTOGRAM   = "Comparison Histogram"
+HISTOGRAM_A = "Historgram of A Data"
+HISTOGRAM_B = "Historgram of B Data"
+MISMATCH    = "Mismatch Areas"
+SCATTER     = "Scatter Plot"
+HEX_PLOT    = "Hex Plot"
 
 # a list of all the image types, for convenience
 IMAGE_TYPES = [ORIGINAL_A,
                ORIGINAL_B,
                ABS_DIFF,
                RAW_DIFF,
+               HISTOGRAM_A,
+               HISTOGRAM_B,
                HISTOGRAM,
                MISMATCH,
                SCATTER,
@@ -66,9 +70,13 @@ DEFAULT_NUM_BINS = 50
 
 # colormaps that are available in the GUI
 # TODO, this needs to be upkept when the list of colormaps in the figure manager changes
-CM_RAINBOW     = "Rainbow"
-CM_GRAY        = "Grayscale"
-COLORMAP_NAMES = [CM_RAINBOW, CM_GRAY]
+CM_RAINBOW       = "Rainbow"
+CM_RAINBOW_REV   = "Rainbow, Reverse"
+CM_RAINBOW_DESAT = "Rainbow, Desaturated"
+CM_GRAY          = "Grayscale"
+CM_GRAY_REV      = "Grayscale, Reverse"
+CM_SPECTRAL      = "Rainbow2"
+COLORMAP_NAMES   = [CM_RAINBOW, CM_RAINBOW_REV, CM_RAINBOW_DESAT, CM_GRAY, CM_GRAY_REV, CM_SPECTRAL]
 
 NO_DATA_MESSAGE = "Requested data was not available or did not exist."
 UNKNOWN_DATA_FORM = "An ununsupported plot format was requested. Aborting attempt to plot data."
