@@ -28,10 +28,18 @@ from   glance.gui_constants import *
 
 LOG = logging.getLogger(__name__)
 
+#temp_dict = {'blue': [(0.0, 0.75, 0.75), (0.11, 0.99955436720142599, 0.99955436720142599), (0.34000000000000002, 0.99810246679316883, 0.99810246679316883), (0.34999999999999998, 0.98545224541429477, 0.98545224541429477), (0.375, 0.94117647058823528, 0.94117647058823528), (0.64000000000000001, 0.51739405439595187, 0.51739405439595187), (0.65000000000000002, 0.5, 0.5), (0.66000000000000003, 0.5, 0.5), (0.89000000000000001, 0.5, 0.5), (0.91000000000000003, 0.5, 0.5), (1.0, 0.5, 0.5)], 'green': [(0.0, 0.5, 0.5), (0.11, 0.5, 0.5), (0.125, 0.50098039215686274, 0.50098039215686274), (0.34000000000000002, 0.93235294117647061, 0.93235294117647061), (0.34999999999999998, 0.94803921568627447, 0.94803921568627447), (0.375, 1.0, 1.0), (0.64000000000000001, 1.0, 1.0), (0.65000000000000002, 0.97966594045025435, 0.97966594045025435), (0.66000000000000003, 0.96514161220043593, 0.96514161220043593), (0.89000000000000001, 0.53667392883079168, 0.53667392883079168), (0.91000000000000003, 0.50036310820624552, 0.50036310820624552), (1.0, 0.5, 0.5)], 'red': [(0.0, 0.5, 0.5), (0.11, 0.5, 0.5), (0.125, 0.5, 0.5), (0.34000000000000002, 0.5, 0.5), (0.34999999999999998, 0.5, 0.5), (0.375, 0.54269449715370022, 0.54269449715370022), (0.64000000000000001, 0.96647691334598351, 0.96647691334598351), (0.65000000000000002, 0.98545224541429466, 0.98545224541429466), (0.66000000000000003, 0.99810246679316883, 0.99810246679316883), (0.89000000000000001, 0.99955436720142621, 0.99955436720142621), (0.91000000000000003, 0.9549910873440286, 0.9549910873440286), (1.0, 0.75, 0.75)]}
+temp_dict = {'blue': [(0.0, 0.58333333333333326, 0.58333333333333326), (0.11, 0.91607248960190135, 0.91607248960190135), (0.125, 0.91666666666666663, 0.91666666666666663), (0.34000000000000002, 0.91413662239089188, 0.91413662239089188), (0.34999999999999998, 0.89726966055239299, 0.89726966055239299), (0.375, 0.83823529411764708, 0.83823529411764708), (0.64000000000000001, 0.27319207252793593, 0.27319207252793593), (0.65000000000000002, 0.25, 0.25), (0.66000000000000003, 0.25, 0.25), (0.89000000000000001, 0.25, 0.25), (0.91000000000000003, 0.25, 0.25), (1.0, 0.25, 0.25)], 'green': [(0.0, 0.25, 0.25), (0.11, 0.25, 0.25), (0.125, 0.25130718954248366, 0.25130718954248366), (0.34000000000000002, 0.82647058823529418, 0.82647058823529418), (0.34999999999999998, 0.84738562091503267, 0.84738562091503267), (0.375, 0.91666666666666663, 0.91666666666666663), (0.64000000000000001, 0.91666666666666663, 0.91666666666666663), (0.65000000000000002, 0.88955458726700576, 0.88955458726700576), (0.66000000000000003, 0.87018881626724787, 0.87018881626724787), (0.89000000000000001, 0.29889857177438889, 0.29889857177438889), (0.91000000000000003, 0.25048414427499405, 0.25048414427499405), (1.0, 0.25, 0.25)], 'red': [(0.0, 0.25, 0.25), (0.11, 0.25, 0.25), (0.125, 0.25, 0.25), (0.34000000000000002, 0.25, 0.25), (0.34999999999999998, 0.25, 0.25), (0.375, 0.30692599620493355, 0.30692599620493355), (0.64000000000000001, 0.87196921779464465, 0.87196921779464465), (0.65000000000000002, 0.89726966055239288, 0.89726966055239288), (0.66000000000000003, 0.91413662239089177, 0.91413662239089177), (0.89000000000000001, 0.91607248960190157, 0.91607248960190157), (0.91000000000000003, 0.85665478312537158, 0.85665478312537158), (1.0, 0.58333333333333326, 0.58333333333333326)]}
+DESAT_MAP = matplotlib.colors.LinearSegmentedColormap('colormap', temp_dict, 1024)
+
 # colormaps that are available in the GUI
 # TODO, if this changes the list of colormap names in the constants module needs to be kept up
 AVAILABLE_COLORMAPS = {CM_RAINBOW:       cm.jet,
-                       CM_GRAY:          cm.bone}
+                       CM_RAINBOW_REV:   cm.jet_r,
+                       CM_RAINBOW_DESAT: DESAT_MAP,
+                       CM_GRAY:          cm.bone,
+                       CM_GRAY_REV:      cm.bone_r,
+                       CM_SPECTRAL:      cm.spectral}
 
 class GlanceGUIFigures (object) :
     """
@@ -87,8 +95,10 @@ class GlanceGUIFigures (object) :
         
         # only load the data if it will be needed for the plot
         if ( self.dataModel.getShouldShowOriginalPlotsInSameRange() or
-             ((imageType == ORIGINAL_A) and (filePrefix == "A") or
-              (imageType == ORIGINAL_B) and (filePrefix == "B") or
+             ((imageType == ORIGINAL_A)  and (filePrefix == "A") or
+              (imageType == ORIGINAL_B)  and (filePrefix == "B") or
+              (imageType == HISTOGRAM_A) and (filePrefix == "A") or
+              (imageType == HISTOGRAM_B) and (filePrefix == "B") or
               (imageType in COMPARISON_IMAGES))) :
             varName, dataObject, unitsText = self._getVariableInformation(filePrefix)
         
@@ -214,7 +224,12 @@ class GlanceGUIFigures (object) :
         if (self.dataModel.getShouldShowOriginalPlotsInSameRange() and (aDataObject is not None) and (bDataObject is not None)) :
             rangeInfo = [min(aDataObject.get_min(), bDataObject.get_min()), max(aDataObject.get_max(), bDataObject.get_max())]
         
-        if (dataForm == MAPPED_2D) and (imageType != HISTOGRAM) and (imageType != model.SCATTER) and (imageType != model.HEX_PLOT) :
+        # if the user asked for a mapped plotting format and type of plot that is mapped
+        if ((dataForm == MAPPED_2D) and (imageType != HISTOGRAM) and
+                                        (imageType != HISTOGRAM_A) and
+                                        (imageType != HISTOGRAM_B) and 
+                                        (imageType != model.SCATTER) and
+                                        (imageType != model.HEX_PLOT)) :
             lonNames = {
                         "A": self.dataModel.getLongitudeName("A"),
                         "B": self.dataModel.getLongitudeName("B")
@@ -247,51 +262,59 @@ class GlanceGUIFigures (object) :
         
         # create whichever type of plot was asked for
         
-        if   imageType == ORIGINAL_A :
+        if (imageType == ORIGINAL_A) or (imageType == ORIGINAL_B) :
+            
+            # sort out some values based on which of the data sets we're showing
+            data_object_to_use = aDataObject if (imageType == ORIGINAL_A) else bDataObject
+            var_name_to_use    = aVarName    if (imageType == ORIGINAL_A) else bVarName
+            file_char_to_use   = "A"         if (imageType == ORIGINAL_A) else "B"
+            units_text_to_use  = aUnitsText  if (imageType == ORIGINAL_A) else bUnitsText
+            oneD_color_to_use  = 'b'         if (imageType == ORIGINAL_A) else 'c'
             
             # if the data doesn't exist, we can't make this plot
-            if aDataObject is None :
+            if data_object_to_use is None :
                 
                 raise ValueError(NO_DATA_MESSAGE)
             
             if dataForm == SIMPLE_2D :
-                tempFigure = figures.create_simple_figure(aDataObject.data, aVarName + "\nin File A",
-                                                          invalidMask=~aDataObject.masks.valid_mask, colorMap=colorMapToUse,
-                                                          colorbarLimits=rangeInfo, units=aUnitsText)
+                tempFigure = figures.create_simple_figure(data_object_to_use.data, var_name_to_use + "\nin File " + file_char_to_use,
+                                                          invalidMask=~data_object_to_use.masks.valid_mask, colorMap=colorMapToUse,
+                                                          colorbarLimits=rangeInfo, units=units_text_to_use)
             elif dataForm == MAPPED_2D :
-                #_, tempLatObj, _ = self._getVariableInformation("A", variableName=self.dataModel.getLatitudeName ("A"))
-                #_, tempLonObj, _ = self._getVariableInformation("A", variableName=self.dataModel.getLongitudeName("A"))
+                #_, tempLatObj, _ = self._getVariableInformation(file_char_to_use, variableName=self.dataModel.getLatitudeName (file_char_to_use))
+                #_, tempLonObj, _ = self._getVariableInformation(file_char_to_use, variableName=self.dataModel.getLongitudeName(file_char_to_use))
                 # TODO ***
-                #tempFigure = figures.create_mapped_figure(aDataObject.data, tempLatObj.data, tempLonObj.data, baseMapInstance, boundingAxes, title,
+                #tempFigure = figures.create_mapped_figure(data_object_to_use.data, tempLatObj.data, tempLonObj.data, baseMapInstance, boundingAxes, title,
                 #          invalidMask=None, colorMap=None, tagData=None,
                 #          dataRanges=None, dataRangeNames=None, dataRangeColors=None, units=None, **kwargs)
                 pass
                 
             elif dataForm == ONLY_1D :
-                temp = [(aDataObject.data, ~aDataObject.masks.valid_mask, 'b', None, None, None)]
-                tempFigure = figures.create_line_plot_figure(temp, aVarName + "\n in File A")
+                temp = [(data_object_to_use.data, ~data_object_to_use.masks.valid_mask, oneD_color_to_use, None, None, None)]
+                tempFigure = figures.create_line_plot_figure(temp, var_name_to_use + "\n in File " + file_char_to_use)
             else :
                 raise ValueError(UNKNOWN_DATA_FORM)
             
+        elif (imageType == HISTOGRAM_A) or (imageType == HISTOGRAM_B) :
             
-        elif imageType == ORIGINAL_B :
+            # Note: histograms don't care about data format requested, they are histogram formatted
+            
+            # select the things that are file A or B specific
+            file_desc_to_use   = "A"         if (imageType == HISTOGRAM_A) else "B"
+            var_name_to_use    = aVarName    if (imageType == HISTOGRAM_A) else bVarName
+            data_object_to_use = aDataObject if (imageType == HISTOGRAM_A) else bDataObject
+            units_text_to_use  = aUnitsText  if (imageType == HISTOGRAM_A) else bUnitsText
             
             # if the data doesn't exist, we can't make this plot
-            if bDataObject is None :
+            if data_object_to_use is None :
                 
                 raise ValueError(NO_DATA_MESSAGE)
             
-            if dataForm == SIMPLE_2D :
-                tempFigure = figures.create_simple_figure(bDataObject.data, bVarName + "\nin File B",
-                                                          invalidMask=~bDataObject.masks.valid_mask, colorMap=colorMapToUse,
-                                                          colorbarLimits=rangeInfo, units=bUnitsText)
-            elif dataForm == MAPPED_2D :
-                pass # TODO
-            elif dataForm == ONLY_1D :
-                temp = [(bDataObject.data, ~bDataObject.masks.valid_mask, 'c', None, None, None)]
-                tempFigure = figures.create_line_plot_figure(temp, bVarName + "\n in File B")
-            else :
-                raise ValueError(UNKNOWN_DATA_FORM)
+            # build the histogram
+            clean_data = data_object_to_use.data[data_object_to_use.masks.valid_mask]
+            # TODO, should the range option be added here?
+            tempFigure = figures.create_histogram(clean_data, DEFAULT_NUM_BINS, var_name_to_use + "\nin File " + file_desc_to_use,
+                                                  "Value of data at a given point", "Number of points with a given value", units=units_text_to_use)
             
         elif imageType in COMPARISON_IMAGES :
             
@@ -343,8 +366,9 @@ class GlanceGUIFigures (object) :
                 # Note: histograms don't care about data format requested, they are histogram formatted
                 
                 rawDiffDataClean = diffData.diff_data_object.data[diffData.diff_data_object.masks.valid_mask]
+                titleText = ("Difference in\n" + aVarName) if (aVarName == bVarName) else str( "Value of\n" + bVarName + " - " + aVarName )
                 # TODO, should the range option be added here?
-                tempFigure = figures.create_histogram(rawDiffDataClean, DEFAULT_NUM_BINS, "Difference in\n" + aVarName,
+                tempFigure = figures.create_histogram(rawDiffDataClean, DEFAULT_NUM_BINS, titleText,
                                                       "Value of (B - A) at each data point", "Number of points with a given difference", units=aUnitsText)
                 
             elif (imageType == SCATTER) or (imageType == HEX_PLOT) :
