@@ -17,6 +17,10 @@ The constants module handles generally useful constants in the Glance GUI.
 It not only stores values that are intended to be unchangable and globally available.
 """
 
+# constants to represent to two data sets
+A_CONST     = "A"
+B_CONST     = "B"
+
 # constants for the possible image types
 ORIGINAL_A  = "Original A Data"
 ORIGINAL_B  = "Original B Data"
@@ -58,7 +62,7 @@ ONLY_1D   = "One Dimensional"
 
 # a list of data handling types, for conveinence
 DATA_FORMS = [SIMPLE_2D,
-#              MAPPED_2D, TODO add this back in when the mapped stuff is ready
+              MAPPED_2D,
               ONLY_1D]
 
 # the default names that the model will try to select for the latitude and longitude
@@ -78,7 +82,7 @@ CM_GRAY_REV      = "Grayscale, Reverse"
 CM_SPECTRAL      = "Rainbow2"
 COLORMAP_NAMES   = [CM_RAINBOW, CM_RAINBOW_REV, CM_RAINBOW_DESAT, CM_GRAY, CM_GRAY_REV, CM_SPECTRAL]
 
-NO_DATA_MESSAGE = "Requested data was not available or did not exist."
+NO_DATA_MESSAGE   = "Requested data was not available or did not exist."
 UNKNOWN_DATA_FORM = "An ununsupported plot format was requested. Aborting attempt to plot data."
 
 
