@@ -14,6 +14,8 @@ from mako.lookup   import TemplateLookup
 import glance.stats as stats
 import glance.data  as dataobjects
 
+from glance.gui_constants import A_CONST, B_CONST
+
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -65,12 +67,12 @@ class GlanceGUIStats (object) :
         """
         
         # get Variable names
-        aVarName    = self.dataModel.getVariableName("A")
-        bVarName    = self.dataModel.getVariableName("B")
+        aVarName    = self.dataModel.getVariableName(A_CONST)
+        bVarName    = self.dataModel.getVariableName(B_CONST)
         
         # get Data objects
-        aDataObject = self.dataModel.getVariableData("A", aVarName)
-        bDataObject = self.dataModel.getVariableData("B", bVarName)
+        aDataObject = self.dataModel.getVariableData(A_CONST, aVarName)
+        bDataObject = self.dataModel.getVariableData(B_CONST, bVarName)
         
         # check the minimum validity of our data; this call can raise an IncompatableDataObjects exception
         dataobjects.DiffInfoObject.verifyDataCompatability(aDataObject, bDataObject, aVarName, bVarName)
