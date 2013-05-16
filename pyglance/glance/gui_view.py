@@ -13,6 +13,8 @@ from PyQt4 import QtGui, QtCore
 
 from functools import partial
 
+from glance.gui_constants import A_CONST, B_CONST
+
 LOG = logging.getLogger(__name__)
 
 """
@@ -125,6 +127,11 @@ class GlanceGUIView (QtGui.QWidget) :
         tempWidget.setLayout(self._build_settings_tab())
         self.tabWidget.addTab(tempWidget, "settings")
         
+        # add a tab that allows more complex filtering options
+        tempWidget = QtGui.QWidget()
+        tempWidget.setLayout(self._build_filters_tab())
+        self.tabWidget.addTab(tempWidget, "filters")
+        
         tempLayout = QtGui.QGridLayout()
         tempLayout.addWidget(self.tabWidget)
         self.setLayout(tempLayout)
@@ -156,9 +163,9 @@ class GlanceGUIView (QtGui.QWidget) :
         currentRow = 0
         
         # set up the file info for the A file
-        currentRow = self._add_file_related_controls("A", layoutToUse, currentRow)
+        currentRow = self._add_file_related_controls(A_CONST, layoutToUse, currentRow)
         # set up the file info for the B file
-        currentRow = self._add_file_related_controls("B", layoutToUse, currentRow)
+        currentRow = self._add_file_related_controls(B_CONST, layoutToUse, currentRow)
         
         # set up the epsilon input box
         layoutToUse.addWidget(QtGui.QLabel("epsilon:"), currentRow, 0)
@@ -312,7 +319,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.colormapDropDown.activated.connect(self.colormapSelected)
         layoutToUse.addWidget(self.colormapDropDown, currentRow, 1, 1, 2)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # add the drop down for selecting the data display form
         layoutToUse.addWidget(QtGui.QLabel("Data Form:"), currentRow, 0)
@@ -320,7 +327,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.dataDisplayFormDropDown.activated.connect(self.reportDataFormSelected)
         layoutToUse.addWidget(self.dataDisplayFormDropDown, currentRow, 1, 1, 2)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # add a check box to constrain originals to the same range
         showOriginalsInSameRange = QtGui.QCheckBox("show original plots in same range")
@@ -331,19 +338,10 @@ class GlanceGUIView (QtGui.QWidget) :
         self.useSameRangeWidget = showOriginalsInSameRange
         layoutToUse.addWidget(showOriginalsInSameRange, currentRow, 1, 1, 2)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # add lon/lat controls
         
-        # add the lon/lat controls that are separated by file TODO add these back in
-        #currentRow = self._add_lon_lat_controls("A", layoutToUse, currentRow)
-        #currentRow = self._add_lon_lat_controls("B", layoutToUse, currentRow)
-        
-        # add the filtering related controls
-        currentRow = self._add_filter_controls("A", layoutToUse, currentRow)
-        currentRow = self._add_filter_controls("B", layoutToUse, currentRow)
-        
-        """ TODO, add this back when the lon/lat epsilon is being used
         # add box to enter lon/lat epsilon
         layoutToUse.addWidget(QtGui.QLabel("lon/lat epsilon:"), currentRow, 0)
         llepsilonWidget = QtGui.QLineEdit()
@@ -355,20 +353,58 @@ class GlanceGUIView (QtGui.QWidget) :
         llepsilonWidget.setValidator(tempValidator)
         llepsilonWidget.editingFinished.connect(self.reportLLEpsilonChanged)
         layoutToUse.addWidget(llepsilonWidget, currentRow, 1, 1, 2)
+        
+        currentRow += 1
+        
+        """ TODO, why did I create this control in the first place? remove this...
+        # add a checkbox to let the user hide data that's spatially invalid based on epsilon
+        hideDataAssociatedWithInvalidNavigation = QtGui.QCheckBox("hide data associated with mismatched navigation")
+        hideDataAssociatedWithInvalidNavigation.setToolTip("Check to treat all data matching navigation that differ by more than the " +
+                                                           "defined lon/lat epsilon as fill data.\n" +
+                                                           "Whether or not this is checked, if you plot mapped images data matching invalid " +
+                                                           "(fill or outside of valid range) navigation will be treated as fill data.")
+        hideDataAssociatedWithInvalidNavigation.setDisabled(False)
+        hideDataAssociatedWithInvalidNavigation.stateChanged.connect(self.reportHideInvalidNavToggled)
+        self.hideInvalidNavWidget = hideDataAssociatedWithInvalidNavigation
+        layoutToUse.addWidget(hideDataAssociatedWithInvalidNavigation, currentRow, 1, 1, 2)
+        
+        currentRow += 1
         """
+        
+        # add the lon/lat controls that are separated by file
+        currentRow = self._add_lon_lat_controls(A_CONST, layoutToUse, currentRow)
+        currentRow = self._add_lon_lat_controls(B_CONST, layoutToUse, currentRow)
         
         return layoutToUse
     
-    def _add_filter_controls (self, file_prefix, grid_layout, current_row) :
+    def _build_filters_tab (self) :
         """
-        Add controls for the user to enter the filter function and any adjunct
-        support code needed to set up that function using the given grid_layout
+        built the basic qt controls for the filters tab and lay them out in a grid layout
+        """
+        
+        # create the layout and set up some of the overall record keeping
+        layoutToUse = QtGui.QGridLayout()
+        currentRow = 0
+        
+        # add the filtering related controls
+        currentRow = self._add_simple_filter_controls(A_CONST, layoutToUse, currentRow)
+        currentRow = self._add_simple_filter_controls(B_CONST, layoutToUse, currentRow)
+        
+        return layoutToUse
+    
+    def _add_simple_filter_controls (self, file_prefix, grid_layout, current_row) :
+        """
+        Add controls for the user to enter the simple filters; simple filters
+        include restricting data to a range and correcting for AWIPS types
         
         return the next free current_row number when finished adding widgets
         """
         
         # label the specific section
-        grid_layout.addWidget(QtGui.QLabel(str(file_prefix) + " filtering:"), current_row, 0)
+        tempLabel = QtGui.QLabel(str(file_prefix) + " simple filtering:")
+        #tempLabel.setToolTip("Simple filters are applied after any complex filters are resolved.") # TODO need to specify this once there are complex filters
+        tempLabel.setToolTip("Simple filters that will be applied to the data before display or analysis.")
+        grid_layout.addWidget(tempLabel, current_row, 0)
         
         current_row = current_row + 1
         
@@ -435,7 +471,9 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         
         # add the label so we know which file this is for
-        grid_layout.addWidget(QtGui.QLabel(file_prefix + " Navigation:"), current_row, 0)
+        tempLabel = QtGui.QLabel(file_prefix + " Navigation:")
+        tempLabel.setToolTip("Navigation variables will only be used when drawing mapped plots.")
+        grid_layout.addWidget(tempLabel, current_row, 0)
         
         current_row = current_row + 1
         
@@ -538,8 +576,6 @@ class GlanceGUIView (QtGui.QWidget) :
         when the lon/lat epsilon changes, report it to user update listeners
         """
         
-        pass
-        """ TODO uncomment when this is needed
         newLLEpsilon = self.llepsilonWidget.text()
         # it's still possible for epsilon to not be a number, so fix that
         newLLEpsilon = self._extra_number_validation(newLLEpsilon)
@@ -548,7 +584,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # let our user update listeners know the llepsilon changed
         for listener in self.userUpdateListeners :
             listener.userChangedLLEpsilon(newLLEpsilon)
-        """
+        
     
     
     def reportEpsilonPercentChanged (self) :
@@ -636,6 +672,23 @@ class GlanceGUIView (QtGui.QWidget) :
         # let our listeners know the user changed an overload setting
         for listener in self.userUpdateListeners :
             listener.userToggledSharedRange(shouldUseSharedRange)
+    
+    def reportHideInvalidNavToggled (self) :
+        """
+        the user toggled whether or not they want the data corresponding
+        with navigation that's "too different" to be hidden
+        """
+        
+        # this must be recorded before we tamper with the focus, because that will
+        # trigger other events that may erase this information temporarily
+        shouldHideMismatchedNav = self.hideInvalidNavWidget.isChecked()
+        
+        # first we need to clean up focus in case it's in one of the line-edit boxes
+        self.setFocus()
+        
+        # let our listeners know the user changed an overload setting
+        for listener in self.userUpdateListeners :
+            listener.userToggledHideMismatchedNav(shouldHideMismatchedNav)
     
     def reportRestrictRangeToggled (self, file_prefix=None) :
         """
@@ -832,8 +885,7 @@ class GlanceGUIView (QtGui.QWidget) :
         Update the latitude and longitude names that are selected in the drop down,
         if a list is given, then replace the list of options that are being displayed for that file.
         """
-        pass
-        """ TODO uncomment this when these controls are finished
+        
         # if we got a new list, set up the appropriate drop down lists
         if lonlatList is not None :
             
@@ -850,7 +902,7 @@ class GlanceGUIView (QtGui.QWidget) :
         # set the selected longitude
         tempPosition = self.widgetInfo[filePrefix]['lonName'].findText(newLongitude)
         self.widgetInfo[filePrefix]['lonName'].setCurrentIndex(tempPosition)
-        """
+        
     
     def updateEpsilon (self, epsilon) :
         """
@@ -873,8 +925,7 @@ class GlanceGUIView (QtGui.QWidget) :
         update the epsilon for longitude and latitude displayed to the user
         """
         
-        #self.llepsilonWidget.setText(str(newLonLatEpsilon)) TODO, uncomment when we need this contro
-        pass
+        self.llepsilonWidget.setText(str(newLonLatEpsilon))
     
     def updateImageTypes (self, imageType, list=None) :
         """
@@ -927,6 +978,14 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         
         self.useSameRangeWidget.setChecked(doUseSharedRange)
+    
+    def updateHideMismatchNav(self, shouldHideBasedOnNavMismatch) :
+        """
+        update whether or not the data corresponding to mismatched navigation
+        should be hidden when plotting
+        """
+        
+        #self.hideInvalidNavWidget.setChecked(shouldHideBasedOnNavMismatch)
     
     def updateDoRestrictRange (self, filePrefix, doRestrictRange) :
         """
