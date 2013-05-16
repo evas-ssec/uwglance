@@ -1288,9 +1288,6 @@ class jpss_adl(object):
         # TODO, are there any bad types for these files?
         return True
 
-
-
-
 def open(pathname, allowWrite=False):
     suffix = os.path.splitext(pathname)[1][1:].lower()
     if (not suffix) or (suffix not in globals()):
@@ -1301,8 +1298,6 @@ def open(pathname, allowWrite=False):
         LOG.info('overriding unknown load format to "%s"' % suffix)
     cls = globals()[suffix]
     return cls(pathname, allowWrite=allowWrite)
-
-
 
 if __name__=='__main__':
     import doctest
