@@ -94,6 +94,8 @@ class GlanceGUIModel (object) :
     self.dataForm       - the form the data should be considered to be
     self.useSharedRange - True if images for the original data should be displayed in a range
                           that includeds the data from both files, False if not
+    self.hideMismatchNav - True if data corresponding to navigation that's more different
+                           than self.llEpsilon should be hidden when plotting, False if not
     
     self.fileSettings - a dictionary of settings specific to a file, in the form:
                                 {
@@ -119,28 +121,31 @@ class GlanceGUIModel (object) :
         
         # set up the file related data structures
         self.fileData      = { }
-        self.fileData["A"] = _FileModelData( )
-        self.fileData["B"] = _FileModelData( )
+        self.fileData[A_CONST] = _FileModelData( )
+        self.fileData[B_CONST] = _FileModelData( )
         
         # general settings
-        self.epsilon        = 0.0
-        self.epsilonPercent = None
-        self.llEpsilon      = None
-        self.imageType      = IMAGE_TYPES[0]
-        self.colormap       = COLORMAP_NAMES[0]
-        self.dataForm       = SIMPLE_2D
-        self.useSharedRange = False
+        self.epsilon         = 0.0
+        self.epsilonPercent  = None
+        self.llEpsilon       = None
+        self.imageType       = IMAGE_TYPES[0]
+        self.colormap        = COLORMAP_NAMES[0]
+        self.dataForm        = SIMPLE_2D
+        self.useSharedRange  = False
+        self.hideMismatchNav = False
         
         # This is obviously only going to work for these two prefixes, would need
         # to add a fully formed sub-class to make this more general
         self.fileSettings = { }
-        self.fileSettings["A"]   = {
+        self.fileSettings[A_CONST] = \
+                               {
                                 GlanceGUIModel.DO_RANGE:  False,
                                 GlanceGUIModel.MIN_RANGE: None,
                                 GlanceGUIModel.MAX_RANGE: None,
                                 GlanceGUIModel.IS_AWIPS:  False
                                }
-        self.fileSettings["B"]   = {
+        self.fileSettings[B_CONST] = \
+                               {
                                 GlanceGUIModel.DO_RANGE:  False,
                                 GlanceGUIModel.MIN_RANGE: None,
                                 GlanceGUIModel.MAX_RANGE: None,
@@ -293,9 +298,10 @@ class GlanceGUIModel (object) :
             dataListener.updateColormaps(self.colormap, list=COLORMAP_NAMES)
             dataListener.updateDataForms(self.dataForm, list=DATA_FORMS)
             dataListener.updateUseSharedRange(self.useSharedRange)
+            dataListener.updateHideMismatchNav(self.hideMismatchNav)
         
-        self.sendFileSettings("A")
-        self.sendFileSettings("B")
+        self.sendFileSettings(A_CONST)
+        self.sendFileSettings(B_CONST)
     
     def sendFileSettings (self, file_prefix) :
         """
@@ -364,7 +370,8 @@ class GlanceGUIModel (object) :
     
     def updateSettingsDataSelection (self, newEpsilonValue=np.nan, newImageType=None, newDataForm=None,
                                      newEpsilonPercent=np.nan, newllEpsilon=np.nan,
-                                     useSharedRangeForOriginals=None, newColormap=None) :
+                                     useSharedRangeForOriginals=None, newColormap=None,
+                                     doHideDataFromMismatchedNav=None,) :
         """
         someone has changed one or more of the general settings related data values
         
@@ -396,21 +403,21 @@ class GlanceGUIModel (object) :
         if (newImageType is not None) and (newImageType != self.imageType) :
             if newImageType in IMAGE_TYPES :
                 LOG.debug("Setting image type to: " + newImageType)
-                self.imageType = newImageType
+                self.imageType = str(newImageType)
                 didUpdate = True
         
         # update the colormap if needed
         if (newColormap is not None) and (newColormap != self.colormap) :
             if newColormap in COLORMAP_NAMES :
                 LOG.debug("Setting colormap to: " + newColormap)
-                self.colormap = newColormap
+                self.colormap = str(newColormap)
                 didUpdate = True
         
         # update the data form if needed
         if (newDataForm is not None) and (newDataForm != self.dataForm) :
             if newDataForm in DATA_FORMS :
                 LOG.debug("Setting data form to: " + newDataForm)
-                self.dataForm = newDataForm
+                self.dataForm = str(newDataForm)
                 didUpdate = True
         
         # update the shared range settings if needed
@@ -418,6 +425,13 @@ class GlanceGUIModel (object) :
             if useSharedRangeForOriginals is True or useSharedRangeForOriginals is False :
                 LOG.debug("Setting use shared range for originals to: " + str(useSharedRangeForOriginals))
                 self.useSharedRange = useSharedRangeForOriginals
+                didUpdate = True
+        
+        # update whether or not we'll hide data based on the lon/lat comparison
+        if (doHideDataFromMismatchedNav is not None) and (doHideDataFromMismatchedNav != self.hideMismatchNav) :
+            if doHideDataFromMismatchedNav is True or doHideDataFromMismatchedNav is False :
+                LOG.debug("Setting hide data based on mismatched navigation to: " + str(doHideDataFromMismatchedNav))
+                self.hideMismatchNav = doHideDataFromMismatchedNav
                 didUpdate = True
         
         # let our data listeners know about any changes
@@ -430,6 +444,7 @@ class GlanceGUIModel (object) :
                 listener.updateColormaps(self.colormap)
                 listener.updateDataForms(self.dataForm)
                 listener.updateUseSharedRange(self.useSharedRange)
+                listener.updateHideMismatchNav(self.hideMismatchNav)
     
     def updateFileSettings (self, file_prefix, doRestrictRange=None,
                             newRangeMin=np.nan, newRangeMax=np.nan,
@@ -485,17 +500,17 @@ class GlanceGUIModel (object) :
         # update the latitude name
         if (new_latitude_name is not None) and (new_latitude_name != self.fileData[file_prefix].latitude) :
             LOG.debug ("Setting latitude name to: " + new_latitude_name)
-            self.fileData[file_prefix].latitude = new_latitude_name
+            self.fileData[file_prefix].latitude = str(new_latitude_name)
             # make sure that this variable is in the cache for use later
-            _ = self._load_variable_data (file_prefix, new_latitude_name)
+            _ = self._load_variable_data (file_prefix, str(new_latitude_name))
             didUpdate = True
         
         # update the longitude name
         if new_longitude_name is not None :
             LOG.debug ("Setting longitude name to: " + new_longitude_name)
-            self.fileData[file_prefix].longitude = new_longitude_name
+            self.fileData[file_prefix].longitude = str(new_longitude_name)
             # make sure that this variable is in the cache for use later
-            _ = self._load_variable_data (file_prefix, new_longitude_name)
+            _ = self._load_variable_data (file_prefix, str(new_longitude_name))
             didUpdate = True
         
         # let our listeners know if we did any updating
@@ -541,7 +556,7 @@ class GlanceGUIModel (object) :
         
         return toReturn
     
-    def getVariableData (self, filePrefix, variableName, doCorrections=False) :
+    def getVariableData (self, filePrefix, variableName, doCorrections=True) :
         """
         get the data object for the variable of variableName associated with the file prefix
         or None if that variable is not loaded
@@ -555,23 +570,21 @@ class GlanceGUIModel (object) :
         toReturn = None
         
         if (filePrefix in self.fileData) and (variableName in self.fileData[filePrefix].var_data_cache) :
-            toReturn = self.fileData[filePrefix].var_data_cache[variableName]
+            toReturn = self.fileData[filePrefix].var_data_cache[variableName].copy()
             
-            if (self.fileSettings[filePrefix][GlanceGUIModel.IS_AWIPS] or
-                self.fileSettings[filePrefix][GlanceGUIModel.DO_RANGE]) :
-                toReturn = toReturn.copy()
-            
-            if self.fileSettings[filePrefix][GlanceGUIModel.IS_AWIPS] :
-                fill_mask = toReturn.data == toReturn.fill_value if toReturn.fill_value is not None else np.zeros(toReturn.data.shape, dtype=np.bool)
-                toReturn.data = toReturn.data.astype(np.uint8) # TODO, will setting this break anything?
-                toReturn.data = toReturn.data.astype(np.int32) # make the range larger so we can do comparisons without overflow
-                toReturn.data[fill_mask] = toReturn.fill_value
-            
-            if self.fileSettings[filePrefix][GlanceGUIModel.DO_RANGE] :
-                if self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE] is not None :
-                    toReturn.data[toReturn.data < self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE]] = toReturn.fill_value
-                if self.fileSettings[filePrefix][GlanceGUIModel.MAX_RANGE] is not None :
-                    toReturn.data[toReturn.data > self.fileSettings[filePrefix][GlanceGUIModel.MAX_RANGE]] = toReturn.fill_value
+            # if we should do automatic corrections, do those
+            if doCorrections :
+                if self.fileSettings[filePrefix][GlanceGUIModel.IS_AWIPS] :
+                    fill_mask = toReturn.data == toReturn.fill_value if toReturn.fill_value is not None else np.zeros(toReturn.data.shape, dtype=np.bool)
+                    toReturn.data = toReturn.data.astype(np.uint8) # TODO, will setting this break anything?
+                    toReturn.data = toReturn.data.astype(np.int32) # make the range larger so we can do comparisons without overflow
+                    toReturn.data[fill_mask] = toReturn.fill_value
+                
+                if self.fileSettings[filePrefix][GlanceGUIModel.DO_RANGE] :
+                    if self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE] is not None :
+                        toReturn.data[toReturn.data < self.fileSettings[filePrefix][GlanceGUIModel.MIN_RANGE]] = toReturn.fill_value
+                    if self.fileSettings[filePrefix][GlanceGUIModel.MAX_RANGE] is not None :
+                        toReturn.data[toReturn.data > self.fileSettings[filePrefix][GlanceGUIModel.MAX_RANGE]] = toReturn.fill_value
         
         return toReturn
     
@@ -659,6 +672,14 @@ class GlanceGUIModel (object) :
         """
         
         return self.useSharedRange
+    
+    def getDoHideDataBasedOnMismatchedNavigation (self) :
+        """
+        get whether or not mapped plots should hide data in places where the
+        navigation is more different than llEpsilon
+        """
+        
+        return self.hideMismatchNav
     
     def registerDataListener (self, objectToRegister) :
         """
