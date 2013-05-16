@@ -190,7 +190,8 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
             if (numMismatchPoints > 1000000) :
                 new_kwargs = {}
                 new_kwargs['cmap'] = greenColorMap
-                p = maps.show_x_y_data(x, y, bMap, data=tagData, **new_kwargs)
+                cleanTagData = ma.array(tagData, mask=~tagData)
+                p = maps.show_x_y_data(x, y, bMap, data=cleanTagData, **new_kwargs)
             else :
                 # plot our point on top of the existing figure
                 p = bMap.plot(newX, newY, '.', color='#00FF00', markersize=1)
@@ -483,7 +484,6 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
         kwargs['cmap'] = colorMap
     
     # draw our data placed on a map
-    #bMap, x, y = maps.mapshow(longitudeClean, latitudeClean, data, boundingAxes, **kwargs)
     maps.draw_basic_features(baseMapInstance, boundingAxes)
     bMap, x, y = maps.show_lon_lat_data(longitudeClean, latitudeClean, baseMapInstance, data=data, **kwargs)
     
