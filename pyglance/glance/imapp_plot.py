@@ -759,8 +759,7 @@ python -m glance.imapp_plot otPlot  otData.hdf
     """
     
     def otPlot(*args):
-        """
-        plot Overshooting Tops informational images
+        """plot Overshooting Tops informational images
         Given a file with overshooting tops data, plot out *** TODO, details on the plots?
         """
         
