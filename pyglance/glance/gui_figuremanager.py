@@ -18,6 +18,8 @@ import matplotlib.cm     as cm
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
+from mpl_toolkits.basemap import Basemap
+
 import logging
 import numpy as np
 
@@ -25,6 +27,7 @@ import glance.data      as dataobjects
 import glance.figures   as figures
 import glance.gui_model as model
 from   glance.gui_constants import *
+from   glance.plotcreatefns import select_projection
 
 LOG = logging.getLogger(__name__)
 
@@ -33,13 +36,42 @@ temp_dict = {'blue': [(0.0, 0.58333333333333326, 0.58333333333333326), (0.11, 0.
 DESAT_MAP = matplotlib.colors.LinearSegmentedColormap('colormap', temp_dict, 1024)
 
 # colormaps that are available in the GUI
-# TODO, if this changes the list of colormap names in the constants module needs to be kept up
+# if this changes the list of colormap names in the constants module needs to be kept up
 AVAILABLE_COLORMAPS = {CM_RAINBOW:       cm.jet,
                        CM_RAINBOW_REV:   cm.jet_r,
                        CM_RAINBOW_DESAT: DESAT_MAP,
                        CM_GRAY:          cm.bone,
                        CM_GRAY_REV:      cm.bone_r,
                        CM_SPECTRAL:      cm.spectral}
+
+# whether or not the plot can be drawn on a map
+CAN_BE_MAPPED = {
+                    ORIGINAL_A      : True,
+                    ORIGINAL_B      : True,
+                    ABS_DIFF        : True,
+                    RAW_DIFF        : True,
+                    HISTOGRAM_A     : False,
+                    HISTOGRAM_B     : False,
+                    HISTOGRAM       : False,
+                    MISMATCH        : True,
+                    SCATTER         : False,
+                    HEX_PLOT        : False,
+                }
+
+# which data sets the plot needs
+NEEDED_DATA_PER_PLOT = \
+                {
+                    ORIGINAL_A      : set([A_CONST]),
+                    ORIGINAL_B      : set([         B_CONST]),
+                    ABS_DIFF        : set([A_CONST, B_CONST]),
+                    RAW_DIFF        : set([A_CONST, B_CONST]),
+                    HISTOGRAM_A     : set([A_CONST]),
+                    HISTOGRAM_B     : set([         B_CONST]),
+                    HISTOGRAM       : set([A_CONST, B_CONST]),
+                    MISMATCH        : set([A_CONST, B_CONST]),
+                    SCATTER         : set([A_CONST, B_CONST]),
+                    HEX_PLOT        : set([A_CONST, B_CONST]),
+                }
 
 class GlanceGUIFigures (object) :
     """
@@ -70,7 +102,7 @@ class GlanceGUIFigures (object) :
         if objectToRegister not in self.errorHandlers :
             self.errorHandlers.append(objectToRegister)
     
-    def _getVariableInformation (self, filePrefix, variableName=None) :
+    def _getVariableInformation (self, filePrefix, variableName=None, doCorrections=True) :
         """
         Pull the name, data, and units for the variable currently selected in the given file prefix
         """
@@ -78,7 +110,7 @@ class GlanceGUIFigures (object) :
         if varNameToUse is None :
             varNameToUse = self.dataModel.getVariableName(filePrefix) # get the currently selected variable
         
-        dataObject           = self.dataModel.getVariableData(filePrefix, varNameToUse,  doCorrections=True)
+        dataObject           = self.dataModel.getVariableData(filePrefix, varNameToUse,  doCorrections=doCorrections)
         unitsText            = self.dataModel.getUnitsText   (filePrefix, varNameToUse)
         
         if dataObject is not None :
@@ -95,14 +127,39 @@ class GlanceGUIFigures (object) :
         
         # only load the data if it will be needed for the plot
         if ( self.dataModel.getShouldShowOriginalPlotsInSameRange() or
-             ((imageType == ORIGINAL_A)  and (filePrefix == "A") or
-              (imageType == ORIGINAL_B)  and (filePrefix == "B") or
-              (imageType == HISTOGRAM_A) and (filePrefix == "A") or
-              (imageType == HISTOGRAM_B) and (filePrefix == "B") or
-              (imageType in COMPARISON_IMAGES))) :
-            varName, dataObject, unitsText = self._getVariableInformation(filePrefix)
+             ( filePrefix in NEEDED_DATA_PER_PLOT[imageType] ) ) :
+            
+            shouldUseRGBVersion = self.dataModel.getDoPlotAsRGB(filePrefix) and ( (imageType == ORIGINAL_A) or (imageType == ORIGINAL_B) )
+            varName, dataObject, unitsText = self._getVariableInformation(filePrefix) if not shouldUseRGBVersion else self._makeRGBdata(filePrefix)
         
         return varName, dataObject, unitsText
+    
+    def _makeRGBdata (self, filePrefix) :
+        """
+        build an RGB or RGBA version of the data
+        """
+        
+        # get the red, green, and blue data
+        canGetData = self.dataModel.makeSureVariablesAreAvailable(filePrefix, [RED_VAR_NAME, GREEN_VAR_NAME, BLUE_VAR_NAME])
+        if not canGetData : # if the basic rgb data doesn't exist, stop now
+            "", None, ""
+        _, rDataObj, _ = self._getVariableInformation(filePrefix, variableName=RED_VAR_NAME,   doCorrections=False)
+        _, gDataObj, _ = self._getVariableInformation(filePrefix, variableName=GREEN_VAR_NAME, doCorrections=False)
+        _, bDataObj, _ = self._getVariableInformation(filePrefix, variableName=BLUE_VAR_NAME,  doCorrections=False)
+        
+        # if possible get alpha data
+        _ = self.dataModel.makeSureVariablesAreAvailable(filePrefix, [ALPHA_VAR_NAME]) # we need to make sure the model loads the data, but it's optional
+        _, aDataObj, _ = self._getVariableInformation(filePrefix, variableName=ALPHA_VAR_NAME, doCorrections=False)
+        
+        # build the finished rgb set
+        rawData = [rDataObj.data, gDataObj.data, bDataObj.data] if aDataObj is None else [rDataObj.data, gDataObj.data, bDataObj.data, aDataObj.data]
+        rawData = np.rot90(np.fliplr(np.transpose(np.array(rawData))))
+        # now that the data is in the right shape/orientation make the data object
+        newDataObj = dataobjects.DataObject(rawData, fillValue=rDataObj.fill_value) # TODO, need to fix the fill values if they differ
+        newDataObj.self_analysis()
+        
+        # return varName, dataObject, unitsText
+        return "rgb data", newDataObj, ""
     
     def _buildDiffInfoObjectSmart (self, imageType, dataObjectA, dataObjectB, varNameA, varNameB,
                                    epsilon_value=None, epsilon_percent=None) :
@@ -126,7 +183,7 @@ class GlanceGUIFigures (object) :
         
         return diffObject
     
-    def _load_and_analyse_lonlat (self, listOfFilePrefixes=["A", "B"], lonNames=None, latNames=None, stopIfComparisonFails=False) :
+    def _load_and_analyse_lonlat (self, listOfFilePrefixes=[A_CONST, B_CONST], lonNames=None, latNames=None, stopIfComparisonFails=False) :
         """
         load information on the longidue and latitude,
         if there are multiple file prefixes given:
@@ -149,9 +206,8 @@ class GlanceGUIFigures (object) :
             
             # get information on the lon/lat from the current file
             currentLonObj, currentLatObj, currentLonRange, currentLatRange = self._load_lonlat(filePrefix, lonNames[filePrefix], latNames[filePrefix])
-            
-            # TODO, this will currently crash if there's a problem, we don't really want that
-            assert currentLonObj.data.shape == currentLatObj.data.shape
+            currentLonObj.self_analysis()
+            currentLatObj.self_analysis()
             
             # expand our lon/lat ranges if we need to
             if lonRange is None :
@@ -165,12 +221,19 @@ class GlanceGUIFigures (object) :
                 latRange[0] = min(currentLatRange[0], latRange[0])
                 latRange[1] = max(currentLatRange[1], latRange[1])
             
+            # we can't use longitude and latitude that don't match in size
+            if currentLonObj.data.shape != currentLatObj.data.shape :
+                raise ValueError ("Longitude and Latitude for file " + filePrefix + " are different shapes." +
+                                  "\nCannot match differently shaped navigation data.")
+            
             # compare this file to whatever other data we have
             for filePrefixToCompare in lonlatData.keys() :
                 lonToCompare, latToCompare = lonlatData[filePrefixToCompare]
-                # TODO, this is going to crash if there's a problem, we don't really want that
-                assert lonToCompare.data.shape == currentLatObj.data.shape
-                assert lonToCompare.data.shape == currentLonObj.data.shape
+                # make sure the files are the same shape
+                if (currentLonObj.data.shape != lonToCompare.data.shape) :
+                    raise ValueError ("Navigation data for file " + filePrefix +
+                                      " is a different shape than that for file " + filePrefixToCompare + "." +
+                                      "\nCannot match differently shaped navigation data.")
             
             # add this data to the list of lonlat data
             lonlatData[filePrefix] = [currentLonObj, currentLatObj]
@@ -184,13 +247,63 @@ class GlanceGUIFigures (object) :
         present in both
         """
         
-        _, lonObject, _ = self._getVariableInformation(filePrefix, lonName)
-        _, latObject, _ = self._getVariableInformation(filePrefix, latName)
+        _, lonObject, _ = self._getVariableInformation(filePrefix, lonName, doCorrections=False)
+        _, latObject, _ = self._getVariableInformation(filePrefix, latName, doCorrections=False)
         
         lonRange = [lonObject.get_min(), lonObject.get_max()]
         latRange = [latObject.get_min(), latObject.get_max()]
         
         return lonObject, latObject, lonRange, latRange
+    
+    def _find_common_lonlat (self, lonlatData, doUnion=False) :
+        """
+        given lonlatData like that created by _load_and_analyse_lonlat
+        find a common set of longitude and latitude
+        
+        If doUnion is True, create a set that contains valid
+        longitudes and latitudes in as many places as possible.
+        Navigation data will be chosen preferentially based on
+        the sorting order of the keys in lonlatData.
+        If doUnion is False, the intersection of the data will
+        be produced instead (using the first data set by key
+        order and masking by data placement in later sets).
+        """
+        
+        commonLon = None
+        commonLat = None
+        validMask = None
+        
+        # look through each of the possible data sets
+        for file_prefix in sorted(lonlatData.keys()) :
+            tempLonObj, tempLatObj = lonlatData[file_prefix]
+            if commonLon is None :
+                commonLon = tempLonObj.copy()
+                commonLat = tempLatObj.copy()
+                commonLon.self_analysis()
+                commonLat.self_analysis()
+                validMask = commonLon.masks.valid_mask & commonLat.masks.valid_mask
+            else :
+                tempLonObj.self_analysis()
+                tempLatObj.self_analysis()
+                if doUnion :
+                    newValid = (tempLatObj.masks.valid_mask & tempLonObj.masks.valid_mask) & ~ validMask
+                    commonLon.data[newValid] = tempLonObj.data[newValid]
+                    commonLat.data[newValid] = tempLatObj.data[newValid]
+                    validMask |= newValid
+                else:
+                    newInvalid = ~(tempLatObj.masks.valid_mask & tempLonObj.masks.valid_mask) & validMask
+                    commonLon.data[newInvalid] = commonLon.fill_value
+                    commonLat.data[newInvalid] = commonLat.fill_value
+                    validMask &= ~newInvalid
+        
+        # since we changed the data, rebuild the internal analysis
+        commonLat.self_analysis(re_do_analysis=True)
+        commonLon.self_analysis(re_do_analysis=True)
+        
+        LOG.debug("common lon/lat validMask.shape: " + str(validMask.shape))
+        LOG.debug("common lon/lat sum(validMask):  " + str(sum(validMask)))
+        
+        return commonLon, commonLat, validMask
     
     def spawnPlot (self) :
         """
@@ -210,8 +323,8 @@ class GlanceGUIFigures (object) :
         LOG.info ("Preparing variable data for plotting...")
         
         # load the variable data
-        aVarName, aDataObject, aUnitsText = self._getVariableInfoSmart("A", imageType)
-        bVarName, bDataObject, bUnitsText = self._getVariableInfoSmart("B", imageType)
+        aVarName, aDataObject, aUnitsText = self._getVariableInfoSmart(A_CONST, imageType)
+        bVarName, bDataObject, bUnitsText = self._getVariableInfoSmart(B_CONST, imageType)
         # compare the variables 
         diffData = self._buildDiffInfoObjectSmart(imageType,
                                                   aDataObject, bDataObject,
@@ -225,36 +338,76 @@ class GlanceGUIFigures (object) :
             rangeInfo = [min(aDataObject.get_min(), bDataObject.get_min()), max(aDataObject.get_max(), bDataObject.get_max())]
         
         # if the user asked for a mapped plotting format and type of plot that is mapped
-        if ((dataForm == MAPPED_2D) and (imageType != HISTOGRAM) and
-                                        (imageType != HISTOGRAM_A) and
-                                        (imageType != HISTOGRAM_B) and 
-                                        (imageType != model.SCATTER) and
-                                        (imageType != model.HEX_PLOT)) :
-            lonNames = {
-                        "A": self.dataModel.getLongitudeName("A"),
-                        "B": self.dataModel.getLongitudeName("B")
-                        }
-            latNames = {
-                        "A": self.dataModel.getLatitudeName("A"),
-                        "B": self.dataModel.getLatitudeName("B")
-                        }
-            lonlatData, lonRange, latRange = self._load_and_analyse_lonlat(listOfFilePrefixes=["A", "B"],
+        lonlatData     = None
+        basemapObject  = None
+        lonlatWarnings = ""
+        if ((dataForm == MAPPED_2D) and CAN_BE_MAPPED[imageType]) :
+            
+            # get the longitude and latitude information for the files, as needed
+            dataNeeded = list(NEEDED_DATA_PER_PLOT[imageType]) # this is naturally a set, use a list here
+            lonNames = { }
+            latNames = { }
+            for file_const in dataNeeded :
+                lonNames[file_const] = self.dataModel.getLongitudeName(file_const)
+                latNames[file_const] = self.dataModel.getLatitudeName (file_const)
+            lonlatData, lonRange, latRange = self._load_and_analyse_lonlat(listOfFilePrefixes=dataNeeded,
                                                                            lonNames=lonNames, latNames=latNames)
             
             # double check that lon/lat are compatable with the data
-            if aDataObject is not None :
-                assert(lonlatData["A"][0].shape == aDataObject.shape)
-            if bDataObject is not None :
-                assert(lonlatData["B"][0].shape == bDataObject.shape)
-            # make composite valid mask
-            allValidMask = ( lonlatData["A"][0].masks.valid_mask & lonlatData["A"][1].masks.valid_mask &
-                             lonlatData["B"][0].masks.valid_mask & lonlatData["B"][1].masks.valid_mask )
+            if (aDataObject is not None) and (A_CONST in dataNeeded) :
+                if lonlatData[A_CONST][0].data.shape != aDataObject.data.shape :
+                    raise ValueError("Unable to use selected navigation variables for file " + A_CONST +
+                                     "\nbecause they differ in size from the selected data variable for that file.")
+            if (bDataObject is not None) and (B_CONST in dataNeeded) :
+                if lonlatData[B_CONST][0].data.shape != bDataObject.data.shape :
+                    raise ValueError("Unable to use selected navigation variables for file " + B_CONST +
+                                     "\nbecause they differ in size from the selected data variable for that file.")
+            # FUTURE if there were ever more data sets, they'd need to be checked individually or make this more general?
             
-            # build basemap, FUTURE, don't hard code so much of this stuff
-            basemapObject = Basemap(llcrnrlon=lonRange[0], llcrnrlat=latRange[0], urcrnrlon=lonRange[1], urcrnrlat=latRange[1],
-                                    resolution='i', area_thresh=10000, projection="merc")
-            # TODO get all these variables outside the if statement
+            # build basemap and axes,
+            # FUTURE, don't hard code so much of this stuff, let the projection and possibly others be selected
+            # FUTURE, some of this is in graphics.py, but needs to be refactored so I can call it in a different way
+            # FUTURE (may go with the axis finding changes from Graeme)
+            boundingAxes  = [lonRange[0], lonRange[1], latRange[0], latRange[1]]
+            projToUse     = select_projection(boundingAxes)
+            LOG.debug("Selecting projection: " + projToUse)
+            midLat        = (latRange[0] + latRange[1]) / 2.0 # this will fail horribly where we cross discontinious lines
+            midLon        = (lonRange[0] + lonRange[1]) / 2.0 # this will fail horribly where we cross discontinious lines
+            if projToUse is 'ortho' :
+                basemapObject = Basemap(lat_0=midLat, lon_0=midLon, resolution='i', area_thresh=10000., projection=projToUse)
+            else :
+                basemapObject = Basemap(llcrnrlon=lonRange[0], urcrnrlon=lonRange[1],
+                                        llcrnrlat=latRange[0], urcrnrlat=latRange[1],
+                                        lat_1=midLat, lon_0=midLon,
+                                        resolution='i', area_thresh=10000., projection=projToUse)
             
+            # do a rough comparison of the longitude and latitude
+            if (aDataObject is not None) and (bDataObject is not None) :
+                llEpsilon = self.dataModel.getLLEpsilon()
+                lonDiffInfo = dataobjects.DiffInfoObject(lonlatData[A_CONST][0],
+                                                         lonlatData[B_CONST][0],
+                                                         epsilonValue=llEpsilon)
+                latDiffInfo = dataobjects.DiffInfoObject(lonlatData[A_CONST][1],
+                                                         lonlatData[B_CONST][1],
+                                                         epsilonValue=llEpsilon)
+                validA = lonlatData[A_CONST][0].masks.valid_mask & lonlatData[A_CONST][1].masks.valid_mask
+                validB = lonlatData[B_CONST][0].masks.valid_mask & lonlatData[B_CONST][1].masks.valid_mask
+                
+                if sum(validA ^ validB) > 0 :
+                    lonlatWarnings += "Valid areas in the two files do not match.\n"
+                    lonlatWarnings += ("File " + A_CONST + " contains " + str(sum(validA & ~ validB)) +
+                                       " points which are not valid in file " + B_CONST + ".\n")
+                    lonlatWarnings += ("File " + B_CONST + " contains " + str(sum(validB & ~ validA)) +
+                                       " points which are not valid in file " + A_CONST + ".\n")
+                
+                if sum(lonDiffInfo.diff_data_object.masks.outside_epsilon_mask) > 0 :
+                    lonlatWarnings += (str(sum(lonDiffInfo.diff_data_object.masks.outside_epsilon_mask)) +
+                                       " longitude points differed by more than the epsilon of " +
+                                       str(llEpsilon) + " between the two files.\n")
+                if sum(latDiffInfo.diff_data_object.masks.outside_epsilon_mask) > 0 :
+                    lonlatWarnings += (str(sum(latDiffInfo.diff_data_object.masks.outside_epsilon_mask)) +
+                                       " latitude points differed by more than the epsilon of " +
+                                       str(llEpsilon) + " between the two files.\n")
         
         LOG.info("Spawning plot window: " + imageType)
         
@@ -267,9 +420,11 @@ class GlanceGUIFigures (object) :
             # sort out some values based on which of the data sets we're showing
             data_object_to_use = aDataObject if (imageType == ORIGINAL_A) else bDataObject
             var_name_to_use    = aVarName    if (imageType == ORIGINAL_A) else bVarName
-            file_char_to_use   = "A"         if (imageType == ORIGINAL_A) else "B"
+            file_char_to_use   = A_CONST     if (imageType == ORIGINAL_A) else B_CONST
             units_text_to_use  = aUnitsText  if (imageType == ORIGINAL_A) else bUnitsText
             oneD_color_to_use  = 'b'         if (imageType == ORIGINAL_A) else 'c'
+            
+            plotAsRGB          = self.dataModel.getDoPlotAsRGB(A_CONST if imageType == ORIGINAL_A else B_CONST)
             
             # if the data doesn't exist, we can't make this plot
             if data_object_to_use is None :
@@ -277,17 +432,25 @@ class GlanceGUIFigures (object) :
                 raise ValueError(NO_DATA_MESSAGE)
             
             if dataForm == SIMPLE_2D :
-                tempFigure = figures.create_simple_figure(data_object_to_use.data, var_name_to_use + "\nin File " + file_char_to_use,
-                                                          invalidMask=~data_object_to_use.masks.valid_mask, colorMap=colorMapToUse,
-                                                          colorbarLimits=rangeInfo, units=units_text_to_use)
+                if plotAsRGB :
+                    figures.create_raw_image_plot(data_object_to_use.data, "RGB image in File " + file_char_to_use)
+                else :
+                    tempFigure = figures.create_simple_figure(data_object_to_use.data, var_name_to_use + "\nin File " + file_char_to_use,
+                                                              invalidMask=~data_object_to_use.masks.valid_mask, colorMap=colorMapToUse,
+                                                              colorbarLimits=rangeInfo, units=units_text_to_use)
+                
             elif dataForm == MAPPED_2D :
-                #_, tempLatObj, _ = self._getVariableInformation(file_char_to_use, variableName=self.dataModel.getLatitudeName (file_char_to_use))
-                #_, tempLonObj, _ = self._getVariableInformation(file_char_to_use, variableName=self.dataModel.getLongitudeName(file_char_to_use))
-                # TODO ***
-                #tempFigure = figures.create_mapped_figure(data_object_to_use.data, tempLatObj.data, tempLonObj.data, baseMapInstance, boundingAxes, title,
-                #          invalidMask=None, colorMap=None, tagData=None,
-                #          dataRanges=None, dataRangeNames=None, dataRangeColors=None, units=None, **kwargs)
-                pass
+                tempLonObj = lonlatData[file_char_to_use][0]
+                tempLatObj = lonlatData[file_char_to_use][1]
+                tempValid  = data_object_to_use.masks.valid_mask
+                tempValid  &= tempLonObj.masks.valid_mask
+                tempValid  &= tempLatObj.masks.valid_mask
+                tempFigure = figures.create_mapped_figure(data_object_to_use.data,
+                                                          tempLatObj.data, tempLonObj.data,
+                                                          basemapObject, boundingAxes, 
+                                                          var_name_to_use + "\nin File " + file_char_to_use,
+                                                          invalidMask=~tempValid, colorMap=colorMapToUse,
+                                                          units=units_text_to_use)
                 
             elif dataForm == ONLY_1D :
                 temp = [(data_object_to_use.data, ~data_object_to_use.masks.valid_mask, oneD_color_to_use, None, None, None)]
@@ -300,7 +463,7 @@ class GlanceGUIFigures (object) :
             # Note: histograms don't care about data format requested, they are histogram formatted
             
             # select the things that are file A or B specific
-            file_desc_to_use   = "A"         if (imageType == HISTOGRAM_A) else "B"
+            file_desc_to_use   = A_CONST     if (imageType == HISTOGRAM_A) else B_CONST
             var_name_to_use    = aVarName    if (imageType == HISTOGRAM_A) else bVarName
             data_object_to_use = aDataObject if (imageType == HISTOGRAM_A) else bDataObject
             units_text_to_use  = aUnitsText  if (imageType == HISTOGRAM_A) else bUnitsText
@@ -333,7 +496,16 @@ class GlanceGUIFigures (object) :
                                                               invalidMask=~diffData.diff_data_object.masks.valid_mask,
                                                               colorMap=colorMapToUse, units=aUnitsText)
                 elif dataForm == MAPPED_2D :
-                    pass # TODO
+                    
+                    tempLonObj, tempLatObj, tempValid = self._find_common_lonlat(lonlatData)
+                    tempValid &= diffData.diff_data_object.masks.valid_mask
+                    tempFigure = figures.create_mapped_figure(dataToUse,
+                                                              tempLatObj.data, tempLonObj.data,
+                                                              basemapObject, boundingAxes, 
+                                                              titlePrefix + aVarName,
+                                                              invalidMask=~tempValid, colorMap=colorMapToUse,
+                                                              units=aUnitsText)
+                    
                 elif dataForm == ONLY_1D :
                     tempTitle = titlePrefix + aVarName
                     if aVarName != bVarName :
@@ -346,13 +518,26 @@ class GlanceGUIFigures (object) :
             elif imageType == MISMATCH :
                 
                 mismatchMask = diffData.diff_data_object.masks.mismatch_mask
+                
                 if dataForm == SIMPLE_2D :
                     tempFigure = figures.create_simple_figure(aDataObject.data, "Areas of mismatch data\nin " + aVarName,
                                                               invalidMask=~aDataObject.masks.valid_mask, tagData=mismatchMask,
                                                               colorMap=figures.MEDIUM_GRAY_COLOR_MAP, units=aUnitsText)
-                                                                # TODO, change colormap?
                 elif dataForm == MAPPED_2D :
-                    pass # TODO
+                    
+                    tempLonObj, tempLatObj, tempValid = self._find_common_lonlat(lonlatData, doUnion=True)
+                    tempValid &= (aDataObject.masks.valid_mask | bDataObject.masks.valid_mask)
+                    tempData = aDataObject.copy()
+                    tempMask = bDataObject.masks.valid_mask & ~aDataObject.masks.valid_mask
+                    tempData.data[tempMask] = bDataObject.data[tempMask]
+                    tempFigure = figures.create_mapped_figure(tempData.data,
+                                                              tempLatObj.data, tempLonObj.data,
+                                                              basemapObject, boundingAxes, 
+                                                              "Areas of mismatch data\nin " + aVarName,
+                                                              invalidMask=~tempValid,
+                                                              tagData=mismatchMask,
+                                                              colorMap=figures.MEDIUM_GRAY_COLOR_MAP,
+                                                              units=aUnitsText)
                 elif dataForm == ONLY_1D :
                     
                     temp = [(aDataObject.data, ~aDataObject.masks.valid_mask, 'k', None, mismatchMask, None)]
@@ -396,6 +581,8 @@ class GlanceGUIFigures (object) :
                                                     "File B Value in " + bVarName,
                                                     epsilon=self.dataModel.getEpsilon(),
                                                     units_x=aUnitsText, units_y=bUnitsText)
-            
         
         plt.draw()
+        
+        if lonlatWarnings != "" :
+            raise ValueError(lonlatWarnings)
