@@ -16,7 +16,8 @@ import glance.gui_model         as gui_model
 import glance.gui_statsprovider as gui_stats
 import glance.gui_figuremanager as gui_figs
 
-from glance.data import IncompatableDataObjects
+from glance.gui_constants import A_CONST, B_CONST
+from glance.data          import IncompatableDataObjects
 
 LOG = logging.getLogger(__name__)
 
@@ -168,12 +169,26 @@ class GlanceGUIController (object) :
         
         self.model.updateSettingsDataSelection(newDataForm=new_data_form)
     
-    def userToggledSharedRange(self, should_use_shared_range) :
+    def userToggledSharedRange (self, should_use_shared_range) :
         """
         the user has toggled whether or not the original data should use a shared range
         """
         
         self.model.updateSettingsDataSelection(useSharedRangeForOriginals=should_use_shared_range)
+    
+    def userToggledGeoTiffAsRGB (self, should_plot_geotiffs_as_rgb) :
+        """
+        the user has toggled whether or multi-channel geotiff data should be plotted as an rgb image
+        """
+        
+        self.model.updateSettingsDataSelection(doPlotGeoTiffAsRGB=should_plot_geotiffs_as_rgb)
+    
+    def userToggledHideMismatchedNav (self, should_hide_data_from_mismatched_nav) :
+        """
+        the user has toggled whether or not data associated with mismatched navigation should be hidden
+        """
+        
+        self.model.updateSettingsDataSelection(doHideDataFromMismatchedNav=should_hide_data_from_mismatched_nav)
     
     def userToggledRestrictRange(self, file_prefix, should_restrict_range) :
         """
@@ -219,8 +234,8 @@ class GlanceGUIController (object) :
         """
         
         # show the data for whatever's loaded
-        self.stats.sendRawData("A")
-        self.stats.sendRawData("B")
+        self.stats.sendRawData(A_CONST)
+        self.stats.sendRawData(B_CONST)
         
     
     def userRequestsPlot (self) :
