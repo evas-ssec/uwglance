@@ -72,6 +72,12 @@ DEFAULT_LATITUDE  = 'pixel_latitude'
 # the number of bins to use for histograms
 DEFAULT_NUM_BINS = 50
 
+# some geotiff related constants
+RED_VAR_NAME     = "red"
+GREEN_VAR_NAME   = "green"
+BLUE_VAR_NAME    = "blue"
+ALPHA_VAR_NAME   = "alpha"
+
 # colormaps that are available in the GUI
 # TODO, this needs to be upkept when the list of colormaps in the figure manager changes
 CM_RAINBOW       = "Rainbow"
