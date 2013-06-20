@@ -1071,7 +1071,7 @@ class tiff (object):
         
         self._tiff     = gdal.Open(filename)
         self.niceNames = useMeaningfulNames
-        self.revIndex  = self.REV_INFO[self._tiff.RasterCount]
+        self.revIndex  = self.REV_INFO[self._tiff.RasterCount] if self._tiff.RasterCount in self.REV_INFO else { }
 
     def __call__(self):
         "yield names of variables to be compared"
