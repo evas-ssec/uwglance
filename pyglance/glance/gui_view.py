@@ -322,8 +322,8 @@ class GlanceGUIView (QtGui.QWidget) :
         currentRow += 1
         
         # add a check box so the user can plot geotiffs as rgb images
-        doPlotRGB = QtGui.QCheckBox("plot multi-channel geoTIFFs as RGB images")
-        doPlotRGB.setToolTip("When plotting original images for multi-channel geoTIFFs, plot them as RGB images regardless of the selected variable.\n" +
+        doPlotRGB = QtGui.QCheckBox("plot multi-channel GeoTIFFs as RGB images")
+        doPlotRGB.setToolTip("When plotting original images for multi-channel GeoTIFFs, plot them as RGB images regardless of the selected variable.\n" +
                              "This setting won't change how comparison images and simpler plots like histograms appear.")
         doPlotRGB.setDisabled(False)
         doPlotRGB.stateChanged.connect(self.reportPlotGeoTiffsAsRGBToggled)
