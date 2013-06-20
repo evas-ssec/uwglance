@@ -9,6 +9,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 
 import logging
 import numpy as np
+from   os import path
 
 import glance.data as dataobjects
 import glance.io   as io
@@ -94,6 +95,7 @@ class GlanceGUIModel (object) :
     self.dataForm       - the form the data should be considered to be
     self.useSharedRange - True if images for the original data should be displayed in a range
                           that includeds the data from both files, False if not
+    self.plotGeoTiffAsRGB - True if multi-channel geotiff images should be treated as RGB or RGBA images
     self.hideMismatchNav - True if data corresponding to navigation that's more different
                            than self.llEpsilon should be hidden when plotting, False if not
     
@@ -125,14 +127,15 @@ class GlanceGUIModel (object) :
         self.fileData[B_CONST] = _FileModelData( )
         
         # general settings
-        self.epsilon         = 0.0
-        self.epsilonPercent  = None
-        self.llEpsilon       = None
-        self.imageType       = IMAGE_TYPES[0]
-        self.colormap        = COLORMAP_NAMES[0]
-        self.dataForm        = SIMPLE_2D
-        self.useSharedRange  = False
-        self.hideMismatchNav = False
+        self.epsilon          = 0.0
+        self.epsilonPercent   = None
+        self.llEpsilon        = None
+        self.imageType        = IMAGE_TYPES[0]
+        self.colormap         = COLORMAP_NAMES[0]
+        self.dataForm         = SIMPLE_2D
+        self.useSharedRange   = False
+        self.plotGeoTiffAsRGB = False
+        self.hideMismatchNav  = False
         
         # This is obviously only going to work for these two prefixes, would need
         # to add a fully formed sub-class to make this more general
@@ -298,6 +301,7 @@ class GlanceGUIModel (object) :
             dataListener.updateColormaps(self.colormap, list=COLORMAP_NAMES)
             dataListener.updateDataForms(self.dataForm, list=DATA_FORMS)
             dataListener.updateUseSharedRange(self.useSharedRange)
+            dataListener.updatePlotGeoTiffAsRGB(self.plotGeoTiffAsRGB)
             dataListener.updateHideMismatchNav(self.hideMismatchNav)
         
         self.sendFileSettings(A_CONST)
@@ -371,7 +375,8 @@ class GlanceGUIModel (object) :
     def updateSettingsDataSelection (self, newEpsilonValue=np.nan, newImageType=None, newDataForm=None,
                                      newEpsilonPercent=np.nan, newllEpsilon=np.nan,
                                      useSharedRangeForOriginals=None, newColormap=None,
-                                     doHideDataFromMismatchedNav=None,) :
+                                     doHideDataFromMismatchedNav=None,
+                                     doPlotGeoTiffAsRGB=None) :
         """
         someone has changed one or more of the general settings related data values
         
@@ -427,6 +432,13 @@ class GlanceGUIModel (object) :
                 self.useSharedRange = useSharedRangeForOriginals
                 didUpdate = True
         
+        # update the geotiff plotting settings if needed
+        if (doPlotGeoTiffAsRGB is not None) and (doPlotGeoTiffAsRGB != self.plotGeoTiffAsRGB) :
+            if doPlotGeoTiffAsRGB is True or doPlotGeoTiffAsRGB is False :
+                LOG.debug("Setting plot geoTiff data as RGB images to: " + str(doPlotGeoTiffAsRGB))
+                self.plotGeoTiffAsRGB = doPlotGeoTiffAsRGB
+                didUpdate = True
+        
         # update whether or not we'll hide data based on the lon/lat comparison
         if (doHideDataFromMismatchedNav is not None) and (doHideDataFromMismatchedNav != self.hideMismatchNav) :
             if doHideDataFromMismatchedNav is True or doHideDataFromMismatchedNav is False :
@@ -444,6 +456,7 @@ class GlanceGUIModel (object) :
                 listener.updateColormaps(self.colormap)
                 listener.updateDataForms(self.dataForm)
                 listener.updateUseSharedRange(self.useSharedRange)
+                listener.updatePlotGeoTiffAsRGB(self.plotGeoTiffAsRGB)
                 listener.updateHideMismatchNav(self.hideMismatchNav)
     
     def updateFileSettings (self, file_prefix, doRestrictRange=None,
@@ -673,6 +686,23 @@ class GlanceGUIModel (object) :
         
         return self.useSharedRange
     
+    def getDoPlotAsRGB (self, filePrefix) :
+        """
+        get whether or not multi-channel geotiffs should be treated as RGB or RGBA
+        """
+        
+        isGeoTiff = False
+        if ( self.fileData[filePrefix].file is not None ) :
+            extension_temp = path.splitext(self.fileData[filePrefix].file.path)[-1]
+            isGeoTiff      = (extension_temp == '.tiff') or (extension_temp == '.tif') or (extension_temp == '.tifa')
+        
+        LOG.debug ("Checking for file " + str(filePrefix) + " geoTiff status... ")
+        toReturn = self.plotGeoTiffAsRGB and isGeoTiff
+        if toReturn :
+            LOG.debug ("file " + str(filePrefix) + " is a geoTiff and should be plotted as an RGB image.")
+        
+        return toReturn
+    
     def getDoHideDataBasedOnMismatchedNavigation (self) :
         """
         get whether or not mapped plots should hide data in places where the
@@ -680,6 +710,26 @@ class GlanceGUIModel (object) :
         """
         
         return self.hideMismatchNav
+    
+    # FUTURE, use this to do more last minute loading?
+    def makeSureVariablesAreAvailable (self, filePrefix, listOfVariableNames) :
+        """
+        given a list of variable names, make sure that they're all loaded
+        and available for use.
+        
+        If the model is able to load all the requested variables (or they're
+        already loaded) it will return True, otherwise it will load whichever
+        ones it can and return False.
+        """
+        
+        couldLoadAll = True
+        
+        for varName in listOfVariableNames :
+            varDataObj = self._load_variable_data(filePrefix, varName) if varName in self.fileData[filePrefix].ALL_VARIABLES else None
+            
+            couldLoadAll = couldLoadAll and (varDataObj is not None)
+        
+        return couldLoadAll
     
     def registerDataListener (self, objectToRegister) :
         """
