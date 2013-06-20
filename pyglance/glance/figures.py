@@ -573,7 +573,31 @@ def create_quiver_mapped_figure(data, latitude, longitude, baseMapInstance, boun
     
     return figure
 
-def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colorMap=None, colorbarLimits=None, units=None) :
+def create_raw_image_plot(data, figureTitle, hideAxesLabels=True) :
+    """
+    for drawing rgb and rgba images we want an uncomplicated version of this call
+    """
+    
+    # build the plot
+    figure = plt.figure()
+    axes = figure.add_subplot(111)
+    
+    if (data is not None) :
+        # draw our data
+        im = plt.imshow(data)
+    
+    # set the title
+    axes.set_title(figureTitle)
+    
+    if hideAxesLabels :
+        axes.get_xaxis().set_visible(False)
+        axes.get_yaxis().set_visible(False)
+    
+    return figure
+
+def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None,
+                         colorMap=None, colorbarLimits=None, units=None,
+                         drawColorbar=True) :
     """
     create a simple figure showing the data given masked by the invalid mask
     any tagData passed in will be interpreted as mismatch points on the image and plotted as a
@@ -594,20 +618,23 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None, colo
     # if we've got a color map, pass it to the list of things we want to tell the plotting function
     if not (colorMap is None) :
         kwargs['cmap'] = colorMap
+    if colorMap is np.nan :
+        kwargs['cmap'] = None
     
     if (data is not None) and (np.sum(invalidMask) < invalidMask.size) :
         # draw our data
         im = imshow(cleanData, **kwargs)
         
-        # if our colorbar has limits set those
-        if colorbarLimits is not None :
-            LOG.debug("setting colorbar limits: " + str(colorbarLimits))
-            clim(vmin=colorbarLimits[0], vmax=colorbarLimits[-1])
-        # make a color bar
-        cbar = colorbar(format='%.3g')
-        # add the units to the colorbar
-        if str.lower(str(units)) != "none" :
-            cbar.set_label(units)
+        if drawColorbar :
+            # if our colorbar has limits set those
+            if colorbarLimits is not None :
+                LOG.debug("setting colorbar limits: " + str(colorbarLimits))
+                clim(vmin=colorbarLimits[0], vmax=colorbarLimits[-1])
+            # make a color bar
+            cbar = colorbar(format='%.3g')
+            # add the units to the colorbar
+            if str.lower(str(units)) != "none" :
+                cbar.set_label(units)
     
     # and some informational stuff
     axes.set_title(figureTitle)
