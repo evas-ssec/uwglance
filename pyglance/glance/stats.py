@@ -567,14 +567,15 @@ class GeneralStatistics (StatisticalData) :
             
             # grab the valid data for some calculations
             tempGoodData = dataObject.data[dataObject.masks.valid_mask]
+            noData = (tempGoodData.size <= 0)
             
             # fill in our statistics
             self.missing_value   = dataObject.select_fill_value()
-            self.max             =    np.max(tempGoodData)
-            self.min             =    np.min(tempGoodData)
-            self.mean            =   np.mean(tempGoodData)
-            self.median          = np.median(tempGoodData)
-            self.std_val         =    np.std(tempGoodData)
+            self.max             =    np.max(tempGoodData) if not noData else np.nan
+            self.min             =    np.min(tempGoodData) if not noData else np.nan
+            self.mean            =   np.mean(tempGoodData) if not noData else np.nan
+            self.median          = np.median(tempGoodData) if not noData else np.nan
+            self.std_val         =    np.std(tempGoodData) if not noData else np.nan
             # also calculate the invalid points
             self.spatially_invalid_pts_ignored = np.sum(dataObject.masks.ignore_mask)
             
