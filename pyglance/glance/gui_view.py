@@ -321,6 +321,17 @@ class GlanceGUIView (QtGui.QWidget) :
         
         currentRow += 1
         
+        # add a check box so the user can plot geotiffs as rgb images
+        doPlotRGB = QtGui.QCheckBox("plot multi-channel geoTIFFs as RGB images")
+        doPlotRGB.setToolTip("When plotting original images for multi-channel geoTIFFs, plot them as RGB images regardless of the selected variable.\n" +
+                             "This setting won't change how comparison images and simpler plots like histograms appear.")
+        doPlotRGB.setDisabled(False)
+        doPlotRGB.stateChanged.connect(self.reportPlotGeoTiffsAsRGBToggled)
+        self.plotGeoTiffsAsRGB = doPlotRGB
+        layoutToUse.addWidget(doPlotRGB, currentRow, 1, 1, 2)
+        
+        currentRow += 1
+        
         # add the drop down for selecting the data display form
         layoutToUse.addWidget(QtGui.QLabel("Data Form:"), currentRow, 0)
         self.dataDisplayFormDropDown = QtGui.QComboBox()
@@ -673,6 +684,23 @@ class GlanceGUIView (QtGui.QWidget) :
         for listener in self.userUpdateListeners :
             listener.userToggledSharedRange(shouldUseSharedRange)
     
+    def reportPlotGeoTiffsAsRGBToggled (self) :
+        """
+        the user toggled whether or not they want their original plots to be
+        displayed in a shared range
+        """
+        
+        # this must be recorded before we tamper with the focus, because that will
+        # trigger other events that may erase this information temporarily
+        doPlotRGB = self.plotGeoTiffsAsRGB.isChecked()
+        
+        # first we need to clean up focus in case it's in one of the line-edit boxes
+        self.setFocus()
+        
+        # let our listeners know the user changed an overload setting
+        for listener in self.userUpdateListeners :
+            listener.userToggledGeoTiffAsRGB(doPlotRGB)
+    
     def reportHideInvalidNavToggled (self) :
         """
         the user toggled whether or not they want the data corresponding
@@ -978,6 +1006,13 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         
         self.useSameRangeWidget.setChecked(doUseSharedRange)
+    
+    def updatePlotGeoTiffAsRGB (self, doPlotGeoTiffAsRGB) :
+        """
+        update whether or not to plot geotiffs as rgb images
+        """
+        
+        self.plotGeoTiffsAsRGB.setChecked(doPlotGeoTiffAsRGB)
     
     def updateHideMismatchNav(self, shouldHideBasedOnNavMismatch) :
         """
