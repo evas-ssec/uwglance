@@ -527,6 +527,8 @@ def get_simple_variable_defaults ( ) :
     
     tempOptions = { }
     tempOptions.update(glance_analysis_defaults)
+    
+    return tempOptions
 
 # FUTURE, at some point set up test cases
 if __name__=='__main__':
