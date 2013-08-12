@@ -1468,10 +1468,10 @@ python -m glance.compare inspectStats A.hdf
         return 9
     else:
         # call the function the user named, given the arguments from the command line  
-        locals()[args[0]](*args[1:])
-
-    return 0
-
+        rc = locals()[args[0]](*args[1:])
+        return 0 if rc is None else rc
+    
+    return 0 # it shouldn't be possible to get here any longer
 
 if __name__=='__main__':
     sys.exit(main())
