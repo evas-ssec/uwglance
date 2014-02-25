@@ -333,6 +333,3 @@ def get_sounding_profile_at_index(profile_data_3d, index_desired) :
     assert(len(profile_data_3d.shape) > 1)
     
     return profile_data_3d[index_desired].copy()
-
-if __name__=='__main__':
-    sys.exit(main())

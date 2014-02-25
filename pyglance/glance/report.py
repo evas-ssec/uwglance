@@ -447,6 +447,3 @@ def generate_and_save_inspection_summary_report(files,
         shutil.copy(originalConfigFile, outputPath)
     
     return
-
-if __name__=='__main__':
-    sys.exit(main())

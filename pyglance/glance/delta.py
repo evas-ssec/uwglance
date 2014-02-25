@@ -9,7 +9,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import logging
 import math
-import numpy as np
+import numpy as numpy
 from numpy import * # todo, remove this line
 
 from scipy.stats import pearsonr
@@ -65,7 +65,7 @@ def min_with_mask(data, goodMask=None) :
     goodData = data[goodMask]
     
     # if we have any good data, get the minimum
-    toReturn = np.min(goodData) if goodData.size > 0 else None
+    toReturn = numpy.min(goodData) if goodData.size > 0 else None
     
     return toReturn
 
@@ -90,7 +90,7 @@ def max_with_mask(data, goodMask=None) :
     goodData = data[goodMask]
     
     # if we have any good data, get the maximum
-    toReturn = np.max(goodData) if goodData.size > 0 else None
+    toReturn = numpy.max(goodData) if goodData.size > 0 else None
     
     return toReturn
 
@@ -109,11 +109,11 @@ def compute_correlation(xData, yData, goodMask, compute_r_function=pearsonr):
     good_y_data = yData[goodMask]
     
     # make sure that there is no remaining bad data
-    assert(np.all(np.isfinite(good_x_data)))
-    assert(np.all(np.isfinite(good_y_data)))
+    assert(numpy.all(numpy.isfinite(good_x_data)))
+    assert(numpy.all(numpy.isfinite(good_y_data)))
     
     # if we have enough data, try to build the correlation
-    toReturn = np.nan
+    toReturn = numpy.nan
     if (good_x_data.size >= 2) and (good_y_data.size >= 2) :
         toReturn = compute_r_function(good_x_data, good_y_data)[0]
     
@@ -130,9 +130,9 @@ def calculate_root_mean_square (data, goodMask=None) :
     # get a count of how many good data points we have
     numGoodPoints = data.size
     if goodMask is not None:
-        numGoodPoints = np.sum(goodMask)
+        numGoodPoints = numpy.sum(goodMask)
     
-    rootMeanSquare = np.sqrt( np.sum( data[goodMask] ** 2 ) / numGoodPoints )
+    rootMeanSquare = numpy.sqrt( numpy.sum( data[goodMask] ** 2 ) / numGoodPoints )
     
     return rootMeanSquare
 
@@ -146,19 +146,19 @@ def convert_mag_dir_to_U_V_vector(magnitude_data, direction_data, invalidMask=No
     """
     
     if invalidMask is None :
-        invalidMask = np.zeros(magnitude_data.shape, dtype=bool)
+        invalidMask = numpy.zeros(magnitude_data.shape, dtype=bool)
     
     new_direction_data = direction_data[:] + offset_degrees
     
     LOG.debug ("direction data: " + str(new_direction_data[~invalidMask]))
     
-    uData = np.zeros(magnitude_data.shape, dtype=float)
-    uData[invalidMask]  = np.nan
-    uData[~invalidMask] = magnitude_data[~invalidMask] * np.sin (deg2rad(new_direction_data[~invalidMask]))
+    uData = numpy.zeros(magnitude_data.shape, dtype=float)
+    uData[invalidMask]  = numpy.nan
+    uData[~invalidMask] = magnitude_data[~invalidMask] * numpy.sin (deg2rad(new_direction_data[~invalidMask]))
     
-    vData = np.zeros(magnitude_data.shape, dtype=float)
-    vData[invalidMask]  = np.nan
-    vData[~invalidMask] = magnitude_data[~invalidMask] * np.cos (deg2rad(new_direction_data[~invalidMask]))
+    vData = numpy.zeros(magnitude_data.shape, dtype=float)
+    vData[invalidMask]  = numpy.nan
+    vData[~invalidMask] = magnitude_data[~invalidMask] * numpy.cos (deg2rad(new_direction_data[~invalidMask]))
     
     return uData, vData
 
@@ -172,9 +172,8 @@ class BinTupleMapping (object) :
     [bin][case][tuple] form. It also allows for the reverse calculation of
     indexes so that you can recreate positioning information in the original
     data set based on the new shape of the case dimension. 
-    """
-    
-    """
+
+
     internal instance variables:
     
     bin_dimension_index   - the original index of the bin dimension
@@ -231,7 +230,7 @@ class BinTupleMapping (object) :
             temp_data_shape = temp_data_shape + [dataShape[index]]
         temp_data_shape = tuple(temp_data_shape)
         """
-        temp_data_shape          = np.array(dataShape).transpose(self.new_index_order)
+        temp_data_shape          = numpy.array(dataShape).transpose(self.new_index_order)
         """
         self.original_case_shape = temp_data_shape[1:-1]
         
@@ -239,13 +238,13 @@ class BinTupleMapping (object) :
         number_of_cases     = 0
         self.new_data_shape = (temp_data_shape[0], temp_data_shape[-1])
         if len(self.original_case_shape) > 0 :
-            number_of_cases = np.multiply.accumulate(self.original_case_shape)[-1]
+            number_of_cases = numpy.multiply.accumulate(self.original_case_shape)[-1]
             self.new_data_shape = (temp_data_shape[0], number_of_cases, temp_data_shape[-1])
         
         # build the reverse index for looking up flat case indexes
         self.reverse_case_index     = None
         if len(self.original_case_shape) > 0 :
-            self.reverse_case_index = np.arange(number_of_cases).reshape(self.original_case_shape)
+            self.reverse_case_index = numpy.arange(number_of_cases).reshape(self.original_case_shape)
     
     @staticmethod
     def _make_new_index_list(numberOfIndexes, firstIndexNumber, lastIndexNumber) :
@@ -309,7 +308,7 @@ class BinTupleMapping (object) :
             return None
         
         # find the flat index in our reverse case index
-        positionOfIndex = np.where(self.reverse_case_index == flatIndex)
+        positionOfIndex = numpy.where(self.reverse_case_index == flatIndex)
         
         return positionOfIndex
 

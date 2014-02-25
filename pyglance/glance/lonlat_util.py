@@ -9,11 +9,14 @@ Copyright (c) 2012 University of Wisconsin SSEC. All rights reserved.
 """
 
 import numpy
+import logging
 
 import glance.data   as dataobj
 import glance.plot   as plot
 from   glance.util      import get_percentage_from_mask
 from   glance.constants import *
+
+LOG = logging.getLogger(__name__)
 
 # TODO, this comparison needs to encorporate epsilon percent as well
 def check_lon_lat_equality(longitudeADataObject, latitudeADataObject,
