@@ -501,7 +501,12 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
             if not (len(dataRangeNames) is (len(dataRanges) - 1)) :
                 cbar.ax.set_yticklabels(dataRangeNames)
             else : # we will want to label the ranges themselves
-                cbar.ax.set_yticklabels(dataRangeNames) # todo, this line is temporary
+                # FUTURE this is not a general solution for getting the labels right
+                newNames = []
+                newNames.extend(dataRangeNames)
+                newNames.append("")
+                newNames = [x + '\n\n\n' for x in newNames]
+                cbar.ax.set_yticklabels(newNames)
                 doLabelRanges = True
         else :
             # add the units to the colorbar
