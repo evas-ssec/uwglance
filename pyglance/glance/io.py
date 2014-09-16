@@ -28,6 +28,14 @@ except ImportError:
     LOG.info('no h5py module available for reading HDF5')
     h5py = None
 
+# the newer netCDF library that replaced pycdf
+try:
+    import netCDF4
+except:
+    LOG.info("unable to import netcdf4 library")
+    netCDF4 = None
+
+""" this is the previous netCDF library, remove this once the new one is fully tested
 try:    
     import pycdf
     from pycdf import CDF, NC, strerror
@@ -37,6 +45,7 @@ except:
     CDF = NC = object
     def strerror(*args):
         return 'no pycdf module installed'
+"""
 
 try:
     import dmv as dmvlib
@@ -379,20 +388,20 @@ class nc (object):
     
     def __init__(self, filename, allowWrite=False):
         
-        if pycdf is None:
-            LOG.error('pycdf is not installed and is needed in order to read NetCDF files')
-            assert(pycdf is not None)
+        if netCDF4 is None:
+            LOG.error('netCDF4 is not installed and is needed in order to read NetCDF files')
+            assert(netCDF4 is not None)
         
-        mode = NC.NOWRITE
+        mode = 'r'
         if allowWrite :
-            mode = NC.WRITE
+            mode = 'w'
         
-        self._nc = CDF(filename, mode)
+        self._nc = netCDF4.Dataset(filename, mode)
         self.attributeCache = CaseInsensitiveAttributeCache(self)
 
     def __call__(self):
         "yield names of variables to be compared"
-        return self._nc.variables().keys()
+        return self._nc.variables.keys()
     
     # this returns a numpy array with a copy of the full, scaled
     # data for this variable, if the data type must be changed to allow
@@ -411,22 +420,6 @@ class nc (object):
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
         
-        # do a check to see if this is a multi-dimensional character array
-        # (right now pycdf can't handle those correctly)
-        if (variable_object.inq_type() is NC.CHAR) and (len(variable_object.shape()) > 1) :
-            raise ValueError(name + " is a multidimensional character array, which is not currently supported.")
-        
-        #print str("** inq: " + str(variable_object.inq_type()))
-        #print str("types reference: ")
-        #print str("NC.BYTE:   " + str(NC.BYTE))
-        #print str("NC.CHAR:   " + str(NC.CHAR))
-        #print str("NC.SHORT:  " + str(NC.SHORT))
-        #print str("NC.INT:    " + str(NC.INT))
-        #print str("NC.FLOAT:  " + str(NC.FLOAT))
-        #print str("NC.DOUBLE: " + str(NC.DOUBLE))
-        
-        #print str("shape: " + str(variable_object.shape()))
-        
         raw_data_copy = variable_object[:]
         # load the scale factor and add offset
         
@@ -435,7 +428,6 @@ class nc (object):
             scale_factor = temp[SCALE_FACTOR_STR]
         if ADD_OFFSET_STR in temp.keys() :
             add_offset = temp[ADD_OFFSET_STR]
-        # todo, does cdf have an equivalent of endaccess to close the variable?
         
         # don't do lots of work if we don't need to scale things
         if (scale_factor == 1.0) and (add_offset == 0.0) :
@@ -456,9 +448,9 @@ class nc (object):
     def close (self) :
         self._nc.close()
         self._nc = None
-    
+
     def get_variable_object(self, name):
-        return self._nc.var(name)
+        return self._nc.variables[name]
     
     def missing_value(self, name):
         
@@ -472,19 +464,9 @@ class nc (object):
             if temp is not None :
                 toReturn = temp
         
-        """ todo, why was the getattr method being used with 3 params? I can't find this documented anywhere...
-        variable_object = self._nc.var(name)
-        
-        to_return = None
-        if hasattr(variable_object, fillValConst1) \
-           or \
-           hasattr(variable_object, fillValConst2) :
-            to_return = getattr(variable_object, fillValConst1,
-                                getattr(variable_object, fillValConst2, None))
-        """
-        
         return toReturn
-    
+
+    # TODO, convert this to the new netCDF4 format
     def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
         """
         create a new variable with the given name
@@ -497,7 +479,7 @@ class nc (object):
         self._nc.redef()
         
         # if the variable already exists, stop with a warning
-        if variablename in self._nc.variables().keys() :
+        if variablename in self._nc.variables.keys() :
             LOG.warn("New variable name requested (" + variablename + ") is already present in file. " +
                      "Skipping generation of new variable.")
             return None
@@ -551,7 +533,8 @@ class nc (object):
             newVariable.put(data.tolist()) 
         
         return newVariable
-    
+
+    # TODO convert this to the new netCDF4 format
     def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
         """
         if the attribute exists for the given variable, set it to the new value
@@ -580,7 +563,7 @@ class nc (object):
         if caseInsensitive :
             toReturn = self.attributeCache.get_variable_attributes(variableName)
         else :
-            toReturn = self.get_variable_object(variableName).attributes()
+            toReturn = self.get_variable_object(variableName).ncattrs()
         
         return toReturn
     
@@ -596,7 +579,7 @@ class nc (object):
             temp_attributes = self.get_variable_attributes(variableName, caseInsensitive=False)
             
             if attributeName in temp_attributes :
-                toReturn = temp_attributes[attributeName]
+                toReturn = self.get_variable_object.attributeName
         
         return toReturn
     
@@ -610,7 +593,7 @@ class nc (object):
         if caseInsensitive :
             self.attributeCache.get_global_attributes()
         else :
-            toReturn = self._nc.attributes()
+            toReturn = self._nc.ncattrs()
         
         return toReturn
     
@@ -624,8 +607,8 @@ class nc (object):
         if caseInsensitive :
             toReturn = self.attributeCache.get_global_attribute(attributeName)
         else :
-            if attributeName in self._nc.attributes() :
-                toReturn = self._nc.attributes()[attributeName]
+            if attributeName in self._nc.ncattrs() :
+                toReturn = self._nc.attributeName # TODO, will this work?
         
         return toReturn
     
@@ -633,9 +616,8 @@ class nc (object):
         """
         check to see if the indicated variable is a type that can be loaded
         """
-        
-        variable_object = self.get_variable_object(name)
-        return (variable_object.inq_type() is not NC.CHAR)
+
+        return True
 
 nc4 = nc
 cdf = nc

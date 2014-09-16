@@ -23,6 +23,7 @@ DO_TEST_PASSFAIL_KEY       = 'usePassFail'
 DO_IMAGES_ONLY_ON_FAIL_KEY = 'only_plot_on_fail'
 USE_NO_LON_OR_LAT_VARS_KEY = 'noLonLatVars'
 SHORT_CIRCUIT_DIFFS_KEY    = 'short_circuit_diffs'
+USE_CUSTOM_PROJ_KEY        = 'use_custom_projection'
 
 # constants related to storing information from the run
 

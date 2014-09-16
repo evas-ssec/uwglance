@@ -495,17 +495,21 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
         cbar = colorbar(format='%.3g')
         # if there are specific requested labels, add them
         if not (dataRangeNames is None) :
-            
+
+            # set the number of ticks on the axis to match the ranges they defined
+            cbar.set_ticks(dataRanges)
+
             # if we don't have exactly the right number of range names to label the ranges
             # then label the tick marks
             if not (len(dataRangeNames) is (len(dataRanges) - 1)) :
                 cbar.ax.set_yticklabels(dataRangeNames)
             else : # we will want to label the ranges themselves
-                # FUTURE this is not a general solution for getting the labels right
+                # FUTURE this is not a general solution for getting the labels centered
+                offsetSpace = '\n\n\n' if len(dataRangeNames) <= 8 else '\n\n'
                 newNames = []
                 newNames.extend(dataRangeNames)
                 newNames.append("")
-                newNames = [x + '\n\n\n' for x in newNames]
+                newNames = [x + offsetSpace for x in newNames]
                 cbar.ax.set_yticklabels(newNames)
                 doLabelRanges = True
         else :
