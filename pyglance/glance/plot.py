@@ -59,19 +59,22 @@ def _handle_fig_creation_task(child_figure_function, log_message,
         plt.ioff()
         figure = child_figure_function() 
         LOG.info(log_message)
-        figure.savefig(os.path.join(outputPath, fullFigName), dpi=fullDPI)
-        if (shouldMakeSmall) :
-            
-            tempImage = Image.open(os.path.join(outputPath, fullFigName))
-            scaleFactor = float(thumbDPI) / float(fullDPI)
-            originalSize = tempImage.size
-            newSize = (int(originalSize[0] * scaleFactor), int(originalSize[1] * scaleFactor))
-            tempImage = tempImage.resize(newSize, Image.ANTIALIAS)
-            tempImage.save(os.path.join(outputPath, 'small.' + fullFigName))
-        
-        # get rid of the figure 
-        plt.close(figure)
-        del(figure)
+        if figure is not None :
+            figure.savefig(os.path.join(outputPath, fullFigName), dpi=fullDPI)
+            if (shouldMakeSmall) :
+
+                tempImage = Image.open(os.path.join(outputPath, fullFigName))
+                scaleFactor = float(thumbDPI) / float(fullDPI)
+                originalSize = tempImage.size
+                newSize = (int(originalSize[0] * scaleFactor), int(originalSize[1] * scaleFactor))
+                tempImage = tempImage.resize(newSize, Image.ANTIALIAS)
+                tempImage.save(os.path.join(outputPath, 'small.' + fullFigName))
+
+            # get rid of the figure
+            plt.close(figure)
+            del(figure)
+        else:
+            LOG.warn("Unable to create plot.")
     
     # if we've reached this point and we did fork,
     # then we're the child process and we should stop now

@@ -141,6 +141,7 @@ THUMBNAIL_DPI_KEY          = 'thumb_DPI'
 
 HIST_FUNCTION_KEY          = 'histogram'
 SCATTER_FUNCTION_KEY       = 'scatter'
+DENSITY_SCATTER_FN_KEY     = 'density-scatter'
 MULTI_SCATTER_FUNCTION_KEY = 'multi-scatter'
 HEX_PLOT_FUNCTION_KEY      = 'scatterD'
 ORIG_FUNCTION_KEY          = 'original'

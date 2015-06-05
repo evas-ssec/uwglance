@@ -31,6 +31,7 @@ HISTOGRAM_A = "Historgram of A Data"
 HISTOGRAM_B = "Historgram of B Data"
 MISMATCH    = "Mismatch Areas"
 SCATTER     = "Scatter Plot"
+D_SCATTER   = "Density Scatter Plot"
 HEX_PLOT    = "Hex Plot"
 
 # a list of all the image types, for convenience
@@ -43,6 +44,7 @@ IMAGE_TYPES = [ORIGINAL_A,
                HISTOGRAM,
                MISMATCH,
                SCATTER,
+               D_SCATTER,
                HEX_PLOT
               ]
 
@@ -52,6 +54,7 @@ COMPARISON_IMAGES = [ABS_DIFF,
                      HISTOGRAM,
                      MISMATCH,
                      SCATTER,
+                     D_SCATTER,
                      HEX_PLOT
                     ]
 
