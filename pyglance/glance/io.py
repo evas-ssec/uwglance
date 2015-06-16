@@ -379,7 +379,7 @@ class hdf (object):
         return True
 
 class nc (object):
-    """wrapper for NetCDF3/4/opendap dataset for comparison
+    """wrapper for netcdf4-python data access for comparison
     __call__ yields sequence of variable names
     __getitem__ returns individual variables ready for slicing to numpy arrays
     """
@@ -563,7 +563,11 @@ class nc (object):
         if caseInsensitive :
             toReturn = self.attributeCache.get_variable_attributes(variableName)
         else :
-            toReturn = self.get_variable_object(variableName).ncattrs()
+            toReturn = { }
+            tempVarObj   = self.get_variable_object(variableName)
+            tempAttrKeys = tempVarObj.ncattrs()
+            for attrKey in tempAttrKeys :
+                toReturn[attrKey] = getattr(tempVarObj, attrKey)
         
         return toReturn
     
@@ -579,7 +583,7 @@ class nc (object):
             temp_attributes = self.get_variable_attributes(variableName, caseInsensitive=False)
             
             if attributeName in temp_attributes :
-                toReturn = self.get_variable_object.attributeName
+                toReturn = getattr(self.get_variable_object, attributeName)
         
         return toReturn
     
@@ -593,7 +597,10 @@ class nc (object):
         if caseInsensitive :
             self.attributeCache.get_global_attributes()
         else :
-            toReturn = self._nc.ncattrs()
+            toReturn = { }
+            tempAttrKeys = self._nc.ncattrs()
+            for attrKey in tempAttrKeys :
+                toReturn[attrKey] = getattr(self._nc, attrKey)
         
         return toReturn
     
@@ -608,7 +615,7 @@ class nc (object):
             toReturn = self.attributeCache.get_global_attribute(attributeName)
         else :
             if attributeName in self._nc.ncattrs() :
-                toReturn = self._nc.attributeName # TODO, will this work?
+                toReturn = getattr(self._nc, attributeName)
         
         return toReturn
     
