@@ -273,26 +273,46 @@ class BasicComparisonPlotsFunctionFactory (PlottingFunctionFactory) :
             assert(goodInBothMask.shape == outsideEpsilonMask.shape)
             
             # TODO, if there's an epsilon percent, how should the epsilon lines be drawn?
-            functionsToReturn[SCATTER_FUNCTION_KEY]   = ((lambda : figures.create_scatter_plot(aData[goodInBothMask], bData[goodInBothMask],
-                                                                                               "Value in File A vs Value in File B",
-                                                                                               "File A Value", "File B Value",
-                                                                                               outsideEpsilonMask[goodInBothMask],
-                                                                                               epsilon, units_x=units_a, units_y=units_b)),
-                                                         "scatter plot of file a values vs file b values for " + variableDisplayName,
-                                                         "Scatter.png", compared_fig_list)
+
+            good_a_data = aData[goodInBothMask]
+            good_b_data = bData[goodInBothMask]
+
+            if good_a_data.size <= figures.MAX_SCATTER_PLOT_DATA :
+                # make a basic scatter plot
+                functionsToReturn[SCATTER_FUNCTION_KEY]   = ((lambda : figures.create_scatter_plot(good_a_data, good_b_data,
+                                                                                                   "Value in File A vs Value in File B",
+                                                                                                   "File A Value", "File B Value",
+                                                                                                   outsideEpsilonMask[goodInBothMask],
+                                                                                                   epsilon, units_x=units_a, units_y=units_b)),
+                                                             "scatter plot of file a values vs file b values for " + variableDisplayName,
+                                                             "Scatter.png", compared_fig_list)
+            else :
+                LOG.warn("Too much data to allow creation of scatter plot for " + variableDisplayName + ".")
+
+            # make a density scatter plot as well
+            functionsToReturn[DENSITY_SCATTER_FN_KEY] = ((lambda : figures.create_density_scatter_plot(good_a_data, good_b_data,
+                                                                                                       "Density of Value in File A vs Value in File B",
+                                                                                                       "File A Value", "File B Value",
+                                                                                                       epsilon=epsilon,
+                                                                                                       units_x=units_a, units_y=units_b)),
+                                                         "density scatter plot of file a values vs file b values for " + variableDisplayName,
+                                                         "DensityScatter.png", compared_fig_list)
         
         # make a hexplot, which is like a scatter plot with density
         if (DO_PLOT_HEX_KEY not in doPlotSettingsDict) or (doPlotSettingsDict[DO_PLOT_HEX_KEY]) :
             
             assert(aData.shape == bData.shape)
             assert(bData.shape == goodInBothMask.shape)
-            
-            functionsToReturn[HEX_PLOT_FUNCTION_KEY]  = ((lambda : figures.create_hexbin_plot(aData[goodInBothMask], bData[goodInBothMask],
-                                                                                              "Value in File A vs Value in File B",
-                                                                                              "File A Value", "File B Value", epsilon,
-                                                                                              units_x=units_a, units_y=units_b)),
-                                                         "density of file a values vs file b values for " + variableDisplayName,
-                                                         "Hex.png", compared_fig_list)
+
+            if np.sum(goodInBothMask) <= figures.MAX_HEX_PLOT_DATA :
+                functionsToReturn[HEX_PLOT_FUNCTION_KEY]  = ((lambda : figures.create_hexbin_plot(aData[goodInBothMask], bData[goodInBothMask],
+                                                                                                  "Value in File A vs Value in File B",
+                                                                                                  "File A Value", "File B Value", epsilon,
+                                                                                                  units_x=units_a, units_y=units_b)),
+                                                             "density of file a values vs file b values for " + variableDisplayName,
+                                                             "Hex.png", compared_fig_list)
+            else :
+                LOG.warn("Too much data to allow creation of hex plot for " + variableDisplayName + ".")
         
         return functionsToReturn
 

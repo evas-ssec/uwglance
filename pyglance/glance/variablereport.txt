@@ -149,7 +149,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
                         <% inSubSet = False %>
                     % endif
                     <a href="./${image}"><img src="./small.${image}"></a>
-                
+
                 ## if we have a subset of images, separate it from the rest
                 % elif (type(image) is list) :
                     <% inSubSet = True %>

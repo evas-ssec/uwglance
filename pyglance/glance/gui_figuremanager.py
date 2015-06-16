@@ -55,6 +55,7 @@ CAN_BE_MAPPED = {
                     HISTOGRAM       : False,
                     MISMATCH        : True,
                     SCATTER         : False,
+                    D_SCATTER       : False,
                     HEX_PLOT        : False,
                 }
 
@@ -70,6 +71,7 @@ NEEDED_DATA_PER_PLOT = \
                     HISTOGRAM       : set([A_CONST, B_CONST]),
                     MISMATCH        : set([A_CONST, B_CONST]),
                     SCATTER         : set([A_CONST, B_CONST]),
+                    D_SCATTER       : set([A_CONST, B_CONST]),
                     HEX_PLOT        : set([A_CONST, B_CONST]),
                 }
 
@@ -556,7 +558,7 @@ class GlanceGUIFigures (object) :
                 tempFigure = figures.create_histogram(rawDiffDataClean, DEFAULT_NUM_BINS, titleText,
                                                       "Value of (B - A) at each data point", "Number of points with a given difference", units=aUnitsText)
                 
-            elif (imageType == SCATTER) or (imageType == HEX_PLOT) :
+            elif (imageType == SCATTER) or (imageType == D_SCATTER) or (imageType == HEX_PLOT) :
                 
                 # Note: scatter and hex plots don't care about data format requested, they're scatter or hex plots
                 
@@ -567,18 +569,29 @@ class GlanceGUIFigures (object) :
                 if imageType == SCATTER :
                     
                     cleanMismatchMask = diffData.diff_data_object.masks.mismatch_mask[tempCleanMask]
-                    figures.create_scatter_plot(aDataClean, bDataClean, "Value in File A vs Value in File B", 
-                                        "File A Value in " + aVarName,
-                                        "File B Value in " + bVarName,
-                                        badMask=cleanMismatchMask, epsilon=self.dataModel.getEpsilon(),
-                                        units_x=aUnitsText, units_y=bUnitsText)
-                
+                    tempFigure = figures.create_scatter_plot(aDataClean, bDataClean,
+                                                             "Value in File A vs Value in File B",
+                                                             "File A Value for " + aVarName,
+                                                             "File B Value for " + bVarName,
+                                                             badMask=cleanMismatchMask,
+                                                             epsilon=self.dataModel.getEpsilon(),
+                                                             units_x=aUnitsText, units_y=bUnitsText)
+
+                elif imageType == D_SCATTER :
+
+                    tempFigure = figures.create_density_scatter_plot(aDataClean, bDataClean,
+                                                                     "Density of Value in File A vs Value in File B",
+                                                                     "File A Value for " + aVarName,
+                                                                     "File B Value for " + bVarName,
+                                                                     epsilon=self.dataModel.getEpsilon(),
+                                                                     units_x=aUnitsText, units_y=bUnitsText)
+
                 else:
                     
                     tempFigure = figures.create_hexbin_plot(aDataClean, bDataClean,
                                                     "Value in File A vs Value in File B",
-                                                    "File A Value in " + aVarName,
-                                                    "File B Value in " + bVarName,
+                                                    "File A Value for " + aVarName,
+                                                    "File B Value for " + bVarName,
                                                     epsilon=self.dataModel.getEpsilon(),
                                                     units_x=aUnitsText, units_y=bUnitsText)
         

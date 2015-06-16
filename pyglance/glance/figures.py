@@ -29,6 +29,10 @@ LOG = logging.getLogger(__name__)
 # and how it handles range boundaries. Find a better solution if at all possible.
 offsetToRange = 0.0000000000000000001
 
+# how much data are we willing to put into the matplotlib functions?
+MAX_SCATTER_PLOT_DATA = 1e6 # FUTURE: this limit was determined experimentally on Eva's laptop, may need to revisit this
+MAX_HEX_PLOT_DATA     = 1e7 # FUTURE: this limit was determined experimentally on Eva's laptop, may need to revisit this
+
 # make a custom medium grayscale color map for putting our bad data on top of
 mediumGrayColorMapData = {
     'red'   : ((0.0, 1.00, 1.00),
@@ -219,11 +223,22 @@ def create_scatter_plot(dataX, dataY, title, xLabel, yLabel, badMask=None, epsil
     
     by default this plot uses blue for data points and red for data marked by the bad mask
     """
-    
-    return create_complex_scatter_plot ([(dataX, dataY, badMask,
-                                          'b', 'r',
-                                          'within\nepsilon', 'outside\nepsilon')],
-                                        title, xLabel, yLabel, epsilon=epsilon, units_x=units_x, units_y=units_y)
+
+    to_return = None
+
+    # make a regular scatter plot if we don't have too much data
+    if dataX.size < MAX_SCATTER_PLOT_DATA :
+        to_return = create_complex_scatter_plot ([(dataX, dataY, badMask,
+                                                 'b', 'r',
+                                                 'within\nepsilon', 'outside\nepsilon')],
+                                                 title,
+                                                 xLabel, yLabel,
+                                                 epsilon=epsilon,
+                                                 units_x=units_x, units_y=units_y)
+    else :
+        LOG.warn("Too much data present to allow creation of scatter plot for \"" + title + "\". Plot will not be created.")
+
+    return to_return
 
 def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None, units_x=None, units_y=None) :
     """
@@ -234,10 +249,12 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None, u
     where a set looks like:
     (x data, y data, mask of bad points or None, matlab color code for display, matlab color code for 'bad' points, good label, bad label)
     
-    if a mask of bad points is given, it will be applyed to both the x and y data
+    if a mask of bad points is given, it will be applied to both the x and y data
     
     at least one data set must be given or no image will be created.
     """
+
+    # TODO, there is currently no cutoff at this level for data size, this should only affect the bin-tuple analysis
     
     # make the figure
     figure = plt.figure()
@@ -253,7 +270,7 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None, u
         # if we have "bad" data to plot, pull it out
         badX = None
         badY = None
-        if (badMask != None) :
+        if (badMask is not None) :
             badX  = dataX[badMask]
             badY  = dataY[badMask]
             dataX = dataX[~badMask]
@@ -298,13 +315,88 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None, u
     
     return figure
 
-# build a hexbin plot of the x,y points and show the density of the point distribution
-def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None, units_x=None, units_y=None) :
-    
+def create_density_scatter_plot(dataX, dataY,
+                                title,
+                                xLabel, yLabel,
+                                epsilon=None,
+                                units_x=None, units_y=None,
+                                num_bins=200) :
+    """
+    build a density scatter plot of the X data vs the Y data
+    """
+
     # make the figure
     figure = plt.figure()
     axes = figure.add_subplot(111)
-    
+
+    # if we have no data, stop now
+    if (dataX is None) or (dataY is None) or (dataX.size <= 0) or (dataY.size <= 0) :
+        LOG.warn ("Insufficient data present to create density scatter plot.")
+        return figure
+    # if our data sizes don't match, warn and stop
+    if (dataX.size != dataY.size) :
+        LOG.warn ("The X and Y data given to create scatter plot \"" + "\" were different sizes and could not be compared." )
+        return figure
+
+    # figure out the range of the data
+    min_value = min(np.min(dataX), np.min(dataY))
+    max_value = max(np.max(dataX), np.max(dataY))
+    # bounds should be defined in the form [[xmin, xmax], [ymin, ymax]]
+    bounds = [[min_value, max_value], [min_value, max_value]]
+
+    # make our data flat if needed
+    dataX = dataX.ravel if len(dataX.shape) > 1 else dataX
+    dataY = dataY.ravel if len(dataY.shape) > 1 else dataY
+
+    # make the binned density map for this data set
+    density_map, _, _ = np.histogram2d(dataX, dataY, bins=num_bins, range=bounds)
+    # mask out zero counts; flip because y goes the opposite direction in an imshow graph
+    density_map = np.flipud(np.transpose(np.ma.masked_array(density_map, mask=density_map == 0)))
+
+    # display the density map data
+    imshow(density_map, extent=[min_value, max_value, min_value, max_value],
+           interpolation='nearest', norm=matplotlib.colors.LogNorm())
+
+    # draw some extra informational lines
+    _draw_x_equals_y_line(axes, epsilon=epsilon)
+
+    # show a color bar
+    cb = plt.colorbar()
+    cb.set_label('log(count of data points)')
+
+    # add the units to the x and y labels
+    tempXLabel = xLabel
+    tempYLabel = yLabel
+    if str.lower(str(units_x)) != "none" :
+        tempXLabel = tempXLabel + " in " + units_x
+    if str.lower(str(units_y)) != "none" :
+        tempYLabel = tempYLabel + " in " + units_y
+
+    # and some informational stuff
+    axes.set_title(title)
+    plt.xlabel(tempXLabel)
+    plt.ylabel(tempYLabel)
+
+    # format our axes so they display gracefully
+    yFormatter = FormatStrFormatter("%4.4g")
+    axes.yaxis.set_major_formatter(yFormatter)
+    xFormatter = FormatStrFormatter("%4.4g")
+    axes.xaxis.set_major_formatter(xFormatter)
+
+    return figure
+
+# build a hexbin plot of the x,y points and show the density of the point distribution
+def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None, units_x=None, units_y=None) :
+
+    # if we have too much data, stop now
+    if dataX.size > MAX_HEX_PLOT_DATA :
+        LOG.warn("Too much data present to allow creation of hex plot for \"" + title + "\". Plot will not be created.")
+        return None
+
+    # make the figure
+    figure = plt.figure()
+    axes = figure.add_subplot(111)
+
     # for some reason, if you give the hexplot a data set that's all the same number it dies horribly
     if ( ((dataX is None) or (len(dataX) <= 0)) or ((dataY is None) or (len(dataY) <= 0)) or
          ((dataX.max() == dataX.min()) and (dataY.max() == dataY.min())) ):

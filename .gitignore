@@ -57,3 +57,6 @@ nosetests.xml
 ._.DS_Store
 Thumbs.db
 
+### ide files ###
+.idea
+

@@ -1136,14 +1136,22 @@ class NumpyArrayTableModel (QtCore.QAbstractTableModel) :
         return self.np_array.shape[0]
 
     def columnCount(self, parent=None):
-        return self.np_array.shape[1]
+        to_return = 1
+        if len(self.np_array.shape) > 1 :
+            to_return = self.np_array.shape[1]
+
+        return to_return
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if index.isValid():
             if role == QtCore.Qt.DisplayRole:
                 row = index.row()
                 col = index.column()
-                return QtCore.QVariant("%.5f"%self.np_array[row, col])
+                if len(self.np_array.shape) > 1 :
+                    return QtCore.QVariant("%.5f"%self.np_array[row, col])
+                else :
+                    return QtCore.QVariant("%.5f"%self.np_array[row])
+
         return QtCore.QVariant()
 
 class RawDataDisplayWindow (QtGui.QWidget) :
