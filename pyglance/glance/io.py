@@ -419,7 +419,9 @@ class nc (object):
         # get the variable object and use it to
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
-        
+
+        #print ("*** opened variable: " + name)
+
         raw_data_copy = variable_object[:]
         # load the scale factor and add offset
         
@@ -437,11 +439,11 @@ class nc (object):
         missing_val = self.missing_value(name)
         missing_mask = np.zeros(raw_data_copy.shape, dtype=np.bool)
         missing_mask[raw_data_copy == missing_val] = True
-        
+
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
         scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
-        
+
         return scaled_data_copy 
     
     # TODO, this hasn't been supported in other file types
@@ -450,6 +452,7 @@ class nc (object):
         self._nc = None
 
     def get_variable_object(self, name):
+
         return self._nc.variables[name]
     
     def missing_value(self, name):
@@ -466,7 +469,6 @@ class nc (object):
         
         return toReturn
 
-    # TODO, convert this to the new netCDF4 format
     def create_new_variable(self, variablename, missingvalue=None, data=None, variabletocopyattributesfrom=None):
         """
         create a new variable with the given name
@@ -476,7 +478,7 @@ class nc (object):
         be created
         """
         
-        self._nc.redef()
+        self._nc.nc_redef()
         
         # if the variable already exists, stop with a warning
         if variablename in self._nc.variables.keys() :
@@ -491,14 +493,14 @@ class nc (object):
         
         dataType = None
         if np.issubdtype(data.dtype, int) :
-            dataType = NC.INT
+            dataType = np.int
             #print("Picked INT")
         # TODO, at the moment the fill type is forcing me to use a double, when sometimes I want a float
         #elif np.issubdtype(data.dtype, np.float32) :
-        #    dataType = NC.FLOAT
+        #    dataType = np.float
         #    print("Picked FLOAT")
         elif np.issubdtype(data.dtype, float) :
-            dataType = NC.DOUBLE
+            dataType = np.float64
             #print("Picked DOUBLE")
         # what do we do if it's some other type?
         
@@ -506,14 +508,14 @@ class nc (object):
         dimensions = [ ]
         dimensionNum = 0
         for dimSize in data.shape :
-            dimensions.append(self._nc.def_dim(variablename + '-index' + str(dimensionNum), dimSize))
+            dimensions.append(self._nc.createDimension(variablename + '-index' + str(dimensionNum), dimSize))
             dimensionNum = dimensionNum + 1
         
         # create the new variable
         #print('variable name: ' + variablename)
         #print('data type:     ' + str(dataType))
         #print('dimensions:    ' + str(dimensions))
-        newVariable = self._nc.def_var(variablename, dataType, tuple(dimensions))
+        newVariable = self._nc.createVariable(variablename, dataType, tuple(dimensions))
         
         # if a missing value was given, use that
         if missingvalue is not None :
@@ -521,20 +523,19 @@ class nc (object):
         
         # if we have a variable to copy attributes from, do so
         if variabletocopyattributesfrom is not None :
-            tocopyfrom = self.get_variable_object(variabletocopyattributesfrom)
-            attributes = tocopyfrom.attributes()
+            attributes = self.get_variable_attributes(variabletocopyattributesfrom, caseInsensitive=False)
+
             for attribute in attributes.keys() :
-                newVariable.__setattr__(attribute, attributes[attribute])
-        
-        self._nc.enddef()
-        
+                setattr(newVariable, attribute, attributes[attribute])
+
+        self._nc.nc_enddef()
+
         # if data was given, use that
         if data is not None :
-            newVariable.put(data.tolist()) 
-        
+            newVariable[:](data.tolist())
+
         return newVariable
 
-    # TODO convert this to the new netCDF4 format
     def add_attribute_data_to_variable(self, variableName, newAttributeName, newAttributeValue) :
         """
         if the attribute exists for the given variable, set it to the new value
@@ -542,14 +543,15 @@ class nc (object):
         """
         variableObject = self.get_variable_object(variableName)
         
-        self._nc.redef()
-        
-        variableObject.__setattr__(newAttributeName, newAttributeValue)
+        self._nc.nc_redef()
+
+        setattr(variableObject, newAttributeName, newAttributeValue)
+
+        self._nc.nc_enddef()
+
         # TODO, this will cause our attribute cache to be wrong!
         # TODO, for now, brute force clear the cache
         self.attributeCache = CaseInsensitiveAttributeCache(self)
-        
-        self._nc.enddef()
         
         return
     
