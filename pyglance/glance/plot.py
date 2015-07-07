@@ -329,10 +329,14 @@ def plot_and_save_comparison_figures (aData, bData,
         
         # only plot the compared images if we aren't short circuiting them
         if (outputInfoList is not compared_images) or (not shortCircuitComparisons) :
-            _log_spawn_and_wait_if_needed(figLongDesc, childPids, figFunction, outputPath, figFileName,
-                                          makeSmall, doFork, shouldClearMemoryWithThreads, fullDPI=fullDPI, thumbDPI=thumbDPI)
-            # if we made an attempt to make the file, hang onto the name
-            outputInfoList.append(figFileName)
+            try :
+                _log_spawn_and_wait_if_needed(figLongDesc, childPids, figFunction, outputPath, figFileName,
+                                              makeSmall, doFork, shouldClearMemoryWithThreads, fullDPI=fullDPI, thumbDPI=thumbDPI)
+                # if we made an attempt to make the file, hang onto the name
+                outputInfoList.append(figFileName)
+            except ValueError, ve :
+                LOG.warn("Unable to create " + figDesc + " figure for " + variableDisplayName + ": " + str(ve))
+
     
     # now we need to wait for all of our child processes to terminate before returning
     if (isParent) : # just in case

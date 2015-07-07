@@ -78,8 +78,8 @@ def _make_range(data_a, valid_a_mask, num_intervals, offset_to_range=0.0, data_b
         minVal = min(delta.min_with_mask(data_b, valid_b_mask), minVal)
         maxVal = max(delta.max_with_mask(data_b, valid_b_mask), maxVal)
     
-    minVal = minVal - offset_to_range
-    maxVal = maxVal + offset_to_range
+    minVal -= offset_to_range
+    maxVal += offset_to_range
     
     return np.linspace(minVal, maxVal, num_intervals)
 

@@ -420,11 +420,9 @@ class nc (object):
         # get our raw data and scaling info
         variable_object = self.get_variable_object(name)
 
-        #print ("*** opened variable: " + name)
-
+        """ # This scaling code is no longer required because the library automatically handles scaling
         raw_data_copy = variable_object[:]
         # load the scale factor and add offset
-        
         temp = self.attributeCache.get_variable_attributes(name)
         if SCALE_FACTOR_STR in temp.keys() :
             scale_factor = temp[SCALE_FACTOR_STR]
@@ -443,8 +441,11 @@ class nc (object):
         # create the scaled version of the data
         scaled_data_copy = np.array(raw_data_copy, dtype=data_type)
         scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
+        """
 
-        return scaled_data_copy 
+        scaled_data_copy = np.array(variable_object[:], dtype=data_type)
+
+        return scaled_data_copy
     
     # TODO, this hasn't been supported in other file types
     def close (self) :
