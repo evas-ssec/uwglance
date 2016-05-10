@@ -297,9 +297,9 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None, u
     # add the units to the x and y labels
     tempXLabel = xLabel
     tempYLabel = yLabel
-    if str.lower(str(units_x)) != "none" :
+    if (str.lower(str(units_x)) != "none") and (str.lower(str(units_x)) != "1") :
         tempXLabel = tempXLabel + " in " + units_x
-    if str.lower(str(units_y)) != "none" :
+    if (str.lower(str(units_y)) != "none") and (str.lower(str(units_y)) != "1") :
         tempYLabel = tempYLabel + " in " + units_y
     
     # and some informational stuff
@@ -367,9 +367,9 @@ def create_density_scatter_plot(dataX, dataY,
     # add the units to the x and y labels
     tempXLabel = xLabel
     tempYLabel = yLabel
-    if str.lower(str(units_x)) != "none" :
+    if (str.lower(str(units_x)) != "none") and (str.lower(str(units_x)) != "1") :
         tempXLabel = tempXLabel + " in " + units_x
-    if str.lower(str(units_y)) != "none" :
+    if (str.lower(str(units_y)) != "none") and (str.lower(str(units_y)) != "1") :
         tempYLabel = tempYLabel + " in " + units_y
 
     # and some informational stuff
@@ -419,9 +419,9 @@ def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None, units_
     # add the units to the x and y labels
     tempXLabel = xLabel
     tempYLabel = yLabel
-    if str.lower(str(units_x)) != "none" :
+    if (str.lower(str(units_x)) != "none") and (str.lower(str(units_x)) != "1") :
         tempXLabel = tempXLabel + " in " + units_x
-    if str.lower(str(units_y)) != "none" :
+    if (str.lower(str(units_y)) != "none") and (str.lower(str(units_y)) != "1") :
         tempYLabel = tempYLabel + " in " + units_y
     
     # and some informational stuff
@@ -492,7 +492,7 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, unit
     
     # add the units to the x and y labels
     tempXLabel = xLabel
-    if str.lower(str(units)) != "none" :
+    if (str.lower(str(units)) != "none") and (str.lower(str(units)) != "1") :
         tempXLabel = tempXLabel + " in " + units
     
     # and some informational stuff
@@ -606,7 +606,7 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
                 doLabelRanges = True
         else :
             # add the units to the colorbar
-            if str.lower(str(units)) != "none" :
+            if (str.lower(str(units)) != "none") and (str.lower(str(units)) != "1") :
                 cbar.set_label(units)
     
     numMismatchPoints = _plot_tag_data_mapped(bMap, tagData, x, y)
@@ -666,7 +666,7 @@ def create_quiver_mapped_figure(data, latitude, longitude, baseMapInstance, boun
     if colorData is not None :
         cbar = plt.colorbar(format='%.3g')
         # add the units to the colorbar
-        if str.lower(str(units)) != "none" :
+        if (str.lower(str(units)) != "none") and (str.lower(str(units)) != "1") :
             cbar.set_label(units)
     """
     
@@ -734,7 +734,7 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None,
             # make a color bar
             cbar = colorbar(format='%.3g')
             # add the units to the colorbar
-            if str.lower(str(units)) != "none" :
+            if (str.lower(str(units)) != "none") and (str.lower(str(units)) != "1") :
                 cbar.set_label(units)
     
     # and some informational stuff
@@ -809,7 +809,7 @@ def create_line_plot_figure(dataList, figureTitle) :
                     cleanTagData = ma.array(dataSet.ravel(), mask=~tagData.ravel() | invalidMask.ravel())
                     axes.plot(indexData, cleanTagData, 'yo', label='mismatch point')
             
-            if str.lower(str(units)) !="none" :
+            if (str.lower(str(units)) !="none") and (str.lower(str(units)) != "1") :
                 labelName = labelName + " in " + units
             
             axes.plot(indexData, cleanData, '-' + colorString, label=labelName)

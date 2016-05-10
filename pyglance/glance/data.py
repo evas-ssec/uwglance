@@ -199,9 +199,12 @@ class DataObject (object) :
             # nonfinite, or ignored
             #valid_mask = ~ (missing_mask | non_finite_mask | self.masks.ignore_mask)
             valid_mask = np.zeros(shape, dtype=np.bool)
-            np.logical_or(missing_mask, non_finite_mask, valid_mask)
-            np.logical_or(self.masks.ignore_mask, valid_mask, valid_mask)
-            np.logical_not(valid_mask, valid_mask)
+            if len(shape) > 0 :
+                np.logical_or(missing_mask, non_finite_mask, valid_mask)
+                np.logical_or(self.masks.ignore_mask, valid_mask, valid_mask)
+                np.logical_not(valid_mask, valid_mask)
+            else :
+                np.array([ ], dtype=np.bool)
             
             # set our masks
             self.masks = BasicMaskSetObject(self.masks.ignore_mask, valid_mask,
@@ -223,7 +226,7 @@ class DataObject (object) :
         """
         
         self.self_analysis()
-        return delta.min_with_mask(self.data, self.masks.valid_mask)
+        return delta.min_with_mask(self.data, self.masks.valid_mask) if len(self.data.shape) > 0 else np.nan
     
     def get_max (self) :
         """
@@ -231,7 +234,7 @@ class DataObject (object) :
         """
         
         self.self_analysis()
-        return delta.max_with_mask(self.data, self.masks.valid_mask)
+        return delta.max_with_mask(self.data, self.masks.valid_mask) if len(self.data.shape) > 0 else np.nan
 
 class DiffInfoObject (object) :
     """
@@ -266,6 +269,7 @@ class DiffInfoObject (object) :
                        }
     # FUTURE: right now the actual range of the data isn't being considered when upcasting
     # (Note: numpy.finfo and numpy.iinfo can be used to get more data on types)
+    # TODO, replace this with syntax like: np.iinfo(np.uint16).max
     TYPE_MAXIMUM = {
                     np.int16:    32767,
                     np.int32:    2147483647,
@@ -399,8 +403,8 @@ class DiffInfoObject (object) :
         
         # mismatch points = mismatched nans, mismatched missing-values, differences that are too large 
         mismatch_pt_mask = ( (aDataObject.masks.non_finite_mask ^ bDataObject.masks.non_finite_mask) |
-                            (aDataObject.masks.missing_mask    ^ bDataObject.masks.missing_mask)    |
-                            outside_epsilon_mask )
+                             (aDataObject.masks.missing_mask    ^ bDataObject.masks.missing_mask)    |
+                             outside_epsilon_mask )
         
         # make our diff data object
         diff_data_object = DataObject(raw_diff, fillValue=fill_data_value)

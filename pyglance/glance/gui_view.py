@@ -178,7 +178,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.epsilonWidget.editingFinished.connect(self.reportEpsilonChanged)
         layoutToUse.addWidget(self.epsilonWidget, currentRow, 1, 1, 2)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # set up the epsilon percent input box
         layoutToUse.addWidget(QtGui.QLabel("epsilon percent:"), currentRow, 0)
@@ -191,7 +191,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.epsilonPerWidget.editingFinished.connect(self.reportEpsilonPercentChanged)
         layoutToUse.addWidget(self.epsilonPerWidget, currentRow, 1, 1, 2)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # set up the drop down to allow image type selection
         layoutToUse.addWidget(QtGui.QLabel("Image Type:"), currentRow, 0)
@@ -199,7 +199,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.imageSelectionDropDown.activated.connect(self.reportImageTypeSelected)
         layoutToUse.addWidget(self.imageSelectionDropDown, currentRow, 1, 1, 2)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # set up a button that shows the numerical data
         self.rawDataButton = QtGui.QPushButton("Display Data")
@@ -244,7 +244,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]['load'] = loadButton
         grid_layout.addWidget(loadButton, currentRow, 4)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # set up the drop down for the variable select
         grid_layout.addWidget(QtGui.QLabel("variable name:"), currentRow, 1)
@@ -254,7 +254,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]['variable'] = variableSelection
         grid_layout.addWidget(variableSelection, currentRow, 2, 1, 3)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # set up a label to display the variable dimension information
         tempShapeLabel = QtGui.QLabel("data shape:")
@@ -264,7 +264,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]['dims'] = dimensionsLabel
         grid_layout.addWidget(dimensionsLabel, currentRow, 2, 1, 3)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # set up a table to display variable attribute information
         tempAttributesTable = QtGui.QTableWidget()
@@ -278,7 +278,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]['attrs'] = tempAttributesTable
         grid_layout.addWidget(tempAttributesTable, currentRow, 1, 1, 4)
         
-        currentRow = currentRow + 1
+        currentRow += 1
         
         # set up a check box to override the fill value loaded from the file
         overrideFillButton = QtGui.QCheckBox("override fill value")
@@ -300,7 +300,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]['fillValue'] = fillValue
         grid_layout.addWidget(fillValue, currentRow+1, 2, 1, 3)
         
-        currentRow = currentRow + 2
+        currentRow += 2
         
         return currentRow
     
@@ -321,7 +321,7 @@ class GlanceGUIView (QtGui.QWidget) :
         
         currentRow += 1
         
-        # add a check box so the user can plot geotiffs as rgb images
+        # add a check box so the user can plot geoTIFFs as rgb images
         doPlotRGB = QtGui.QCheckBox("plot multi-channel GeoTIFFs as RGB images")
         doPlotRGB.setToolTip("When plotting original images for multi-channel GeoTIFFs, plot them as RGB images regardless of the selected variable.\n" +
                              "This setting won't change how comparison images and simpler plots like histograms appear.")
@@ -367,21 +367,6 @@ class GlanceGUIView (QtGui.QWidget) :
         
         currentRow += 1
         
-        """ TODO, why did I create this control in the first place? remove this...
-        # add a checkbox to let the user hide data that's spatially invalid based on epsilon
-        hideDataAssociatedWithInvalidNavigation = QtGui.QCheckBox("hide data associated with mismatched navigation")
-        hideDataAssociatedWithInvalidNavigation.setToolTip("Check to treat all data matching navigation that differ by more than the " +
-                                                           "defined lon/lat epsilon as fill data.\n" +
-                                                           "Whether or not this is checked, if you plot mapped images data matching invalid " +
-                                                           "(fill or outside of valid range) navigation will be treated as fill data.")
-        hideDataAssociatedWithInvalidNavigation.setDisabled(False)
-        hideDataAssociatedWithInvalidNavigation.stateChanged.connect(self.reportHideInvalidNavToggled)
-        self.hideInvalidNavWidget = hideDataAssociatedWithInvalidNavigation
-        layoutToUse.addWidget(hideDataAssociatedWithInvalidNavigation, currentRow, 1, 1, 2)
-        
-        currentRow += 1
-        """
-        
         # add the lon/lat controls that are separated by file
         currentRow = self._add_lon_lat_controls(A_CONST, layoutToUse, currentRow)
         currentRow = self._add_lon_lat_controls(B_CONST, layoutToUse, currentRow)
@@ -417,7 +402,7 @@ class GlanceGUIView (QtGui.QWidget) :
         tempLabel.setToolTip("Simple filters that will be applied to the data before display or analysis.")
         grid_layout.addWidget(tempLabel, current_row, 0)
         
-        current_row = current_row + 1
+        current_row += 1
         
         # add something to give range restrictions
         restrictToRangeCheckbox = QtGui.QCheckBox("restrict data to range:")
@@ -427,7 +412,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]["doRestrictRangeCheckbox"] = restrictToRangeCheckbox
         grid_layout.addWidget(restrictToRangeCheckbox, current_row, 1, 1, 2)
         
-        current_row = current_row + 1
+        current_row += 1
         
         # add the areas to enter the range boundaries
         
@@ -458,7 +443,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]["maxRangeRestriction"] = maxRangeValue
         grid_layout.addWidget(maxRangeValue, current_row, 3) #1, 1, 2)
         
-        current_row = current_row + 1
+        current_row += 1
         
         # add a check box to filter AWIPS data
         isAWIPSdata = QtGui.QCheckBox("correct for AWIPS data types")
@@ -469,7 +454,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]["isAWIPScheckbox"] = isAWIPSdata
         grid_layout.addWidget(isAWIPSdata, current_row, 1, 1, 2)
         
-        current_row = current_row + 1
+        current_row += 1
         
         return current_row
     
@@ -486,7 +471,7 @@ class GlanceGUIView (QtGui.QWidget) :
         tempLabel.setToolTip("Navigation variables will only be used when drawing mapped plots.")
         grid_layout.addWidget(tempLabel, current_row, 0)
         
-        current_row = current_row + 1
+        current_row += 1
         
         # add drop down to select latitude
         grid_layout.addWidget(QtGui.QLabel("Latitude:"), current_row, 1)
@@ -495,7 +480,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]["latName"] = latNameDropDown
         grid_layout.addWidget(latNameDropDown, current_row, 2, 1, 2)
         
-        current_row = current_row + 1
+        current_row += 1
         
         # add drop down to select longitude
         grid_layout.addWidget(QtGui.QLabel("Longitude:"), current_row, 1)
@@ -504,7 +489,7 @@ class GlanceGUIView (QtGui.QWidget) :
         self.widgetInfo[file_prefix]["lonName"] = lonNameDropDown
         grid_layout.addWidget(lonNameDropDown, current_row, 2, 1, 2)
         
-        current_row = current_row + 1
+        current_row += 1
         
         return current_row
     
@@ -540,7 +525,7 @@ class GlanceGUIView (QtGui.QWidget) :
     
     def reportOverrideChange (self, file_prefix=None) :
         """
-        when the user checks or unchecks one of the override checkboxes, report it to user update listeners
+        when the user checked or unchecked one of the override checkboxes, report it to user update listeners
         """
         
         # this must be recorded before we tamper with the focus, because that will
@@ -853,15 +838,21 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         given variable data, pop a window to show it to the user
         """
-        
-        tempID                = self.dataShowCounter
-        self.dataShowCounter += 1
-        
-        # not the best solution ever, but it works for now
-        self.dataShowWindows[tempID] = RawDataDisplayWindow(tempID,
-                                                            variableDataObject, variableName,
-                                                            file_descriptor=fileDescriptor,
-                                                            stored_in=self.dataShowWindows)
+
+        if len(variableDataObject.data.shape) > 0 and len(variableDataObject.data.shape) <= 2 :
+
+            tempID                = self.dataShowCounter
+            self.dataShowCounter += 1
+
+            # not the best solution ever, but it works for now
+            self.dataShowWindows[tempID] = RawDataDisplayWindow(tempID,
+                                                                variableDataObject, variableName,
+                                                                file_descriptor=fileDescriptor,
+                                                                stored_in=self.dataShowWindows)
+        else:
+
+            LOG.debug("Unable to display data for variable " + variableName + " because it's shape of "
+                      + str(variableDataObject.data.shape) + " will not work in display window.")
     
     def fileDataUpdate (self, file_prefix, file_path, selected_variable, use_fill_override, new_fill_value, variable_dimensions,
                         variable_list=None, attribute_list=None) :
@@ -900,7 +891,7 @@ class GlanceGUIView (QtGui.QWidget) :
             for attributeKey in sorted(attribute_list.keys()) :
                 temp_table.setCellWidget(rowCounter, 0, QtGui.QLabel(str(attributeKey)))
                 temp_table.setCellWidget(rowCounter, 1, QtGui.QLabel(str(attribute_list[attributeKey])))
-                rowCounter = rowCounter + 1
+                rowCounter += 1
         
         # if there is a file selected, enable some of the other controls
         if file_path != "" :
@@ -937,7 +928,7 @@ class GlanceGUIView (QtGui.QWidget) :
         update the comparison epsilon displayed to the user
         """
         
-        stringToUse = str(epsilon) if epsilon is not None else ""
+        #stringToUse = str(epsilon) if epsilon is not None else ""
         
         self.epsilonWidget.setText(str(epsilon))
     
@@ -1013,14 +1004,6 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         
         self.plotGeoTiffsAsRGB.setChecked(doPlotGeoTiffAsRGB)
-    
-    def updateHideMismatchNav(self, shouldHideBasedOnNavMismatch) :
-        """
-        update whether or not the data corresponding to mismatched navigation
-        should be hidden when plotting
-        """
-        
-        #self.hideInvalidNavWidget.setChecked(shouldHideBasedOnNavMismatch)
     
     def updateDoRestrictRange (self, filePrefix, doRestrictRange) :
         """

@@ -302,7 +302,6 @@ class GlanceGUIModel (object) :
             dataListener.updateDataForms(self.dataForm, list=DATA_FORMS)
             dataListener.updateUseSharedRange(self.useSharedRange)
             dataListener.updatePlotGeoTiffAsRGB(self.plotGeoTiffAsRGB)
-            dataListener.updateHideMismatchNav(self.hideMismatchNav)
         
         self.sendFileSettings(A_CONST)
         self.sendFileSettings(B_CONST)
@@ -457,8 +456,7 @@ class GlanceGUIModel (object) :
                 listener.updateDataForms(self.dataForm)
                 listener.updateUseSharedRange(self.useSharedRange)
                 listener.updatePlotGeoTiffAsRGB(self.plotGeoTiffAsRGB)
-                listener.updateHideMismatchNav(self.hideMismatchNav)
-    
+
     def updateFileSettings (self, file_prefix, doRestrictRange=None,
                             newRangeMin=np.nan, newRangeMax=np.nan,
                             doCorrectForAWIPS=None) :

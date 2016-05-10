@@ -1449,26 +1449,42 @@ python -m glance.compare inspectStats A.hdf
     def help(command=None):
         """print help for a specific command or list of commands
         e.g. help stats
-        """
+        """ # TODO, need to double check that this still works with the lowercase names?
+
+        print_all_summary = False
         if command is None: 
+            print_all_summary = True
+        else:
+            if command in commands :
+                print commands[command].__doc__
+            else :
+                print_all_summary = True
+
+        # print out a list of summaries for each command
+        if print_all_summary :
             # print first line of docstring
             for cmd in commands:
                 ds = commands[cmd].__doc__.split('\n')[0]
                 print "%-16s %s" % (cmd,ds)
-        else:
-            print commands[command].__doc__
-    
+
     # all the local public functions are considered part of glance, collect them up
-    commands.update(dict(x for x in locals().items() if x[0] not in prior))    
-    
+    commands.update(dict(x for x in locals().items() if x[0] not in prior))
+
+    # lowercase locals
+    # Future: this is an awkward use and could be made more elegant
+    lower_locals = { }
+    for command_key in commands.keys() :
+        lower_locals[command_key.lower()] = locals()[command_key]
+
     # if what the user asked for is not one of our existing functions, print the help
-    if (not args) or (args[0] not in commands): 
-        parser.print_help()
-        help()
+    if ((not args) or (args[0].lower() not in lower_locals)):
+        if not options.version :
+            parser.print_help()
+            help()
         return 9
     else:
-        # call the function the user named, given the arguments from the command line  
-        rc = locals()[args[0]](*args[1:])
+        # call the function the user named, given the arguments from the command line, lowercase the request to ignore case
+        rc = lower_locals[args[0].lower()](*args[1:])
         return 0 if rc is None else rc
     
     return 0 # it shouldn't be possible to get here any longer

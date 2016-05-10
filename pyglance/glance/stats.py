@@ -13,8 +13,8 @@ import glance.delta as delta
 
 import numpy as np
 
-# TODO, I don't like this design, but it's what I could come up
-# with for now. Reconsider this again later.
+# I don't like this design, but it's what I could come up
+# with for now. FUTURE: Reconsider this design again later.
 class StatisticalData (object) :
     """
     This class represents a set of statistical data generated from
@@ -135,21 +135,24 @@ class MissingValueStatistics (StatisticalData) :
             # we have one data set and should save the prefix information
             self.is_one_data_set = True
             self.desc_text     = dataSetDescription
+            noData = len(dataObject.data.shape) <= 0
             
             # figure out some basic statistics
             self.missing_count    = np.sum(dataObject.masks.missing_mask)
-            self.missing_fraction = float(self.missing_count) / float(dataObject.data.size)
+            self.missing_fraction = float(self.missing_count) / float(dataObject.data.size) if not noData else np.nan
             
         # if we have a comparison object analyze the data associated with that comparison
         elif diffInfoObject is not None :
-            
+
+            noData = len(diffInfoObject.a_data_object.data.shape) <= 0
+
             # analyze each of the original data sets that are being compared
             self.a_missing_stats = MissingValueStatistics(dataObject=diffInfoObject.a_data_object, dataSetDescription="a")
             self.b_missing_stats = MissingValueStatistics(dataObject=diffInfoObject.b_data_object, dataSetDescription="b")
             
             # common statistics
             self.common_missing_count    = np.sum(diffInfoObject.a_data_object.masks.missing_mask & diffInfoObject.b_data_object.masks.missing_mask)
-            self.common_missing_fraction = float(self.common_missing_count)          / float(diffInfoObject.a_data_object.data.size)
+            self.common_missing_fraction = float(self.common_missing_count) / float(diffInfoObject.a_data_object.data.size) if not noData else np.nan
             
         else :
             raise ValueError ("No data set was given when requesting statistical analysis of missing values.")
@@ -268,23 +271,29 @@ class FiniteDataStatistics (StatisticalData) :
             self.desc_text       = dataSetDescription
             
             # figure out some basic statistics
-            self.finite_count    = np.sum(dataObject.masks.valid_mask)
-            self.finite_fraction = float(self.finite_count) / float(dataObject.data.size)
+            self.finite_count    = np.sum(dataObject.masks.valid_mask) if len(dataObject.data.shape) > 0 else 0
+            self.finite_fraction = float(self.finite_count) / float(dataObject.data.size) if len(dataObject.data.shape) > 0 else np.nan
             
         # if we have a comparison object analyze the data associated with that comparison
         elif diffInfoObject is not None :
-            
+
+            no_data = len(diffInfoObject.a_data_object.data.shape) <= 0
+
             # analyze each of the original data sets that are being compared
             self.a_finite_stats = FiniteDataStatistics(dataObject=diffInfoObject.a_data_object, dataSetDescription="a")
             self.b_finite_stats = FiniteDataStatistics(dataObject=diffInfoObject.b_data_object, dataSetDescription="b")
             
             # calculate some common statistics
-            self.common_finite_count = np.sum(diffInfoObject.a_data_object.masks.valid_mask & diffInfoObject.b_data_object.masks.valid_mask)
+            self.common_finite_count = np.sum(diffInfoObject.a_data_object.masks.valid_mask & diffInfoObject.b_data_object.masks.valid_mask) \
+                                        if not no_data else 0
             # use an exclusive or to check which points are finite in only one of the two data sets
             self.finite_in_only_one_count = np.sum((diffInfoObject.a_data_object.masks.valid_mask ^ diffInfoObject.b_data_object.masks.valid_mask) \
-                                                    & ~diffInfoObject.diff_data_object.masks.ignore_mask)
-            self.common_finite_fraction      = float(self.common_finite_count)      / float(diffInfoObject.a_data_object.data.size)
-            self.finite_in_only_one_fraction = float(self.finite_in_only_one_count) / float(diffInfoObject.a_data_object.data.size)
+                                                    & ~diffInfoObject.diff_data_object.masks.ignore_mask) \
+                                            if not no_data else 0
+            self.common_finite_fraction      = float(self.common_finite_count)      / float(diffInfoObject.a_data_object.data.size) \
+                                                if not no_data else np.nan
+            self.finite_in_only_one_fraction = float(self.finite_in_only_one_count) / float(diffInfoObject.a_data_object.data.size) \
+                                                if not no_data else np.nan
             
         else:
             raise ValueError ("No data set was given when requesting statistical analysis of finite values.")
@@ -396,21 +405,24 @@ class NotANumberStatistics (StatisticalData) :
             # we have one data set and should save the prefix information
             self.is_one_data_set = True
             self.desc_text       = dataSetDescription
+            noData = len(dataObject.data.shape) <= 0
             
             # get some basic statistics
             self.nan_count = np.sum(dataObject.masks.non_finite_mask)
-            self.nan_fraction = float(self.nan_count) / float(dataObject.data.size)
+            self.nan_fraction = float(self.nan_count) / float(dataObject.data.size) if not noData else np.nan
             
         # if we have a comparison object analyze the data associated with that comparison
         elif diffInfoObject is not None :
-            
+
+            noData = len(diffInfoObject.a_data_object.data.shape) <= 0
+
             # analyze each of the original data sets that are being compared
             self.a_nan_stats = NotANumberStatistics(dataObject=diffInfoObject.a_data_object, dataSetDescription="a")
             self.b_nan_stats = NotANumberStatistics(dataObject=diffInfoObject.b_data_object, dataSetDescription="b")
             
             # calculate some common statistics
             self.common_nan_count = np.sum(diffInfoObject.a_data_object.masks.non_finite_mask & diffInfoObject.b_data_object.masks.non_finite_mask)
-            self.common_nan_fraction = float(self.common_nan_count) / float(diffInfoObject.a_data_object.data.size)
+            self.common_nan_fraction = float(self.common_nan_count) / float(diffInfoObject.a_data_object.data.size) if not noData else np.nan
             
         else:
             raise ValueError ("No data set was given when requesting statistical analysis of NaN values.")
@@ -567,8 +579,8 @@ class GeneralStatistics (StatisticalData) :
             
             # grab the valid data for some calculations
             tempGoodData = dataObject.data[dataObject.masks.valid_mask]
-            noData = (tempGoodData.size <= 0)
-            
+            noData = (tempGoodData.size <= 0) or (len(dataObject.data.shape) <= 0)
+
             # fill in our statistics
             self.missing_value   = dataObject.select_fill_value()
             self.max             =    np.max(tempGoodData) if not noData else np.nan
@@ -581,12 +593,14 @@ class GeneralStatistics (StatisticalData) :
             
             # if we should also do extra stats, do so
             if (doExtras) :
-                self.num_data_points = dataObject.masks.missing_mask.size
+                self.num_data_points = dataObject.masks.missing_mask.size if not noData else 0
                 self.shape           = dataObject.masks.missing_mask.shape
             
         # if we have a comparison object analyze the data associated with that comparison
         elif diffInfoObject is not None :
-            
+
+            noData = len(diffInfoObject.a_data_object.data.shape) <= 0
+
             # analyze each of the original data sets that are being compared
             self.a_gen_stats = GeneralStatistics(dataObject=diffInfoObject.a_data_object, dataSetDescription="a")
             self.b_gen_stats = GeneralStatistics(dataObject=diffInfoObject.b_data_object, dataSetDescription="b")
@@ -594,7 +608,7 @@ class GeneralStatistics (StatisticalData) :
             # fill in our statistics
             self.epsilon         = diffInfoObject.epsilon_value
             self.epsilon_percent = diffInfoObject.epsilon_percent
-            self.num_data_points = diffInfoObject.a_data_object.masks.missing_mask.size
+            self.num_data_points = diffInfoObject.a_data_object.masks.missing_mask.size if not noData else 0
             self.shape           = diffInfoObject.a_data_object.masks.missing_mask.shape
             # also calculate the invalid points
             self.spatially_invalid_pts_ignored_in_a = np.sum(diffInfoObject.a_data_object.masks.ignore_mask)
@@ -725,31 +739,32 @@ class NumericalComparisonStatistics (StatisticalData) :
         aData                   = diffInfoObject.a_data_object.data
         bData                   = diffInfoObject.b_data_object.data
         total_num_finite_values = np.sum(valid_in_both) # just the finite values, not all data
-        
+        noData = len(diffInfoObject.a_data_object.data.shape) <= 0
+
         # fill in some simple statistics
         self.diff_outside_epsilon_count = np.sum(diffInfoObject.diff_data_object.masks.outside_epsilon_mask)
         self.perfect_match_count        = NumericalComparisonStatistics._get_num_perfect(aData, bData,
                                                                                          goodMask=valid_in_both)
-        self.correlation                = delta.compute_correlation(aData, bData, valid_in_both)
-        self.r_squared_correlation      = self.correlation * self.correlation
+        self.correlation                = delta.compute_correlation(aData, bData, valid_in_both)  if not noData else np.nan
+        self.r_squared_correlation      = self.correlation * self.correlation  if not noData else np.nan
         self.mismatch_points_count      = np.sum(diffInfoObject.diff_data_object.masks.mismatch_mask)
         
         # calculate some more complex statistics, be careful not to divide by zero
-        self.mismatch_points_fraction      = float(self.mismatch_points_count)      / float(aData.size)              if (aData.size > 0)              else 0.0
-        self.diff_outside_epsilon_fraction = float(self.diff_outside_epsilon_count) / float(total_num_finite_values) if (total_num_finite_values > 0) else 0.0
-        self.perfect_match_fraction        = float(self.perfect_match_count)        / float(total_num_finite_values) if (total_num_finite_values > 0) else 0.0
+        self.mismatch_points_fraction      = float(self.mismatch_points_count)      / float(aData.size)              if not noData                    else np.nan
+        self.diff_outside_epsilon_fraction = float(self.diff_outside_epsilon_count) / float(total_num_finite_values) if (total_num_finite_values > 0) else np.nan
+        self.perfect_match_fraction        = float(self.perfect_match_count)        / float(total_num_finite_values) if (total_num_finite_values > 0) else np.nan
         
         # if desired, do the basic analysis
         self.temp_analysis = NumericalComparisonStatistics.basic_analysis(diffInfoObject.diff_data_object.data, valid_in_both) if include_basic_analysis else { }
-        self.rms_val       = self.temp_analysis['rms_val']      if (len(self.temp_analysis) > 0) else np.nan
-        self.std_val       = self.temp_analysis['std_val']      if (len(self.temp_analysis) > 0) else np.nan
-        self.mean_diff     = self.temp_analysis['mean_diff']    if (len(self.temp_analysis) > 0) else np.nan
-        self.median_diff   = self.temp_analysis['median_diff']  if (len(self.temp_analysis) > 0) else np.nan
-        self.max_diff      = self.temp_analysis['max_diff']     if (len(self.temp_analysis) > 0) else np.nan
-        self.mean_delta    = self.temp_analysis['mean_delta']   if (len(self.temp_analysis) > 0) else np.nan
-        self.median_delta  = self.temp_analysis['median_delta'] if (len(self.temp_analysis) > 0) else np.nan
-        self.max_delta     = self.temp_analysis['max_delta']    if (len(self.temp_analysis) > 0) else np.nan
-        self.min_delta     = self.temp_analysis['min_delta']    if (len(self.temp_analysis) > 0) else np.nan
+        self.rms_val       = self.temp_analysis['rms_val']      if not noData else np.nan
+        self.std_val       = self.temp_analysis['std_val']      if not noData else np.nan
+        self.mean_diff     = self.temp_analysis['mean_diff']    if not noData else np.nan
+        self.median_diff   = self.temp_analysis['median_diff']  if not noData else np.nan
+        self.max_diff      = self.temp_analysis['max_diff']     if not noData else np.nan
+        self.mean_delta    = self.temp_analysis['mean_delta']   if not noData else np.nan
+        self.median_delta  = self.temp_analysis['median_delta'] if not noData else np.nan
+        self.max_delta     = self.temp_analysis['max_delta']    if not noData else np.nan
+        self.min_delta     = self.temp_analysis['min_delta']    if not noData else np.nan
     
     def dictionary_form(self) :
         """
@@ -772,38 +787,34 @@ class NumericalComparisonStatistics (StatisticalData) :
     
     @staticmethod
     def doc_strings( ) :
-        """
-        get documentation strings that match the
-        dictionary form of the statistics
+        """get documentation strings that match the dictionary form of the statistics
         """
         
         return NumericalComparisonStatistics._doc_strings
     
     @staticmethod
     def basic_analysis(diffData, valid_mask):
-        """
-        do some very minimal analysis of the differences
+        """do some very minimal analysis of the differences
         """
         
         # if everything's invalid, stop now
-        if np.sum(valid_mask) <= 0 :
-            return { }
+        noData = np.sum(valid_mask) <= 0
         
         # calculate and return statistics
-        root_mean_square_value = delta.calculate_root_mean_square(diffData, valid_mask)
-        tempDiffData           = diffData[valid_mask]
-        absDiffData            = np.abs(tempDiffData)
+        root_mean_square_value = delta.calculate_root_mean_square(diffData, valid_mask) if not noData else np.nan
+        tempDiffData           = diffData[valid_mask] if not noData else None
+        absDiffData            = np.abs(tempDiffData) if not noData else None
         return {    'rms_val':       root_mean_square_value, 
-                    'std_val':         np.std(tempDiffData),
+                    'std_val':         np.std(tempDiffData)  if not noData else np.nan,
                     
-                    'mean_diff':       np.mean(absDiffData), 
-                    'median_diff':   np.median(absDiffData),
-                    'max_diff':         np.max(absDiffData),
+                    'mean_diff':       np.mean(absDiffData) if not noData else np.nan,
+                    'median_diff':   np.median(absDiffData) if not noData else np.nan,
+                    'max_diff':         np.max(absDiffData) if not noData else np.nan,
                     
-                    'mean_delta':     np.mean(tempDiffData), 
-                    'median_delta': np.median(tempDiffData),
-                    'max_delta':       np.max(tempDiffData),
-                    'min_delta':       np.min(tempDiffData)
+                    'mean_delta':     np.mean(tempDiffData) if not noData else np.nan,
+                    'median_delta': np.median(tempDiffData) if not noData else np.nan,
+                    'max_delta':       np.max(tempDiffData) if not noData else np.nan,
+                    'min_delta':       np.min(tempDiffData) if not noData else np.nan,
                     }
     
     @staticmethod
@@ -984,9 +995,7 @@ class StatisticalAnalysis (StatisticalData) :
     # TODO, use this method instead of the dictionary at the bottom of this module
     @staticmethod
     def doc_strings( ) :
-        """
-        get documentation strings that match the
-        dictionary form of the statistics
+        """get documentation strings that match the dictionary form of the statistics
         """
         
         toReturn = { }

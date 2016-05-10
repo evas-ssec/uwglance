@@ -77,6 +77,15 @@ ADD_OFFSET_STR   = 'add_offset'
 SCALE_FACTOR_STR = 'scale_factor'
 SCALE_METHOD_STR = 'scaling_method'
 
+UNSIGNED_ATTR_STR = "_unsigned"
+
+SIGNED_TO_UNSIGNED_DTYPES = {
+                                np.dtype(np.int8):   np.dtype(np.uint8),
+                                np.dtype(np.int16):   np.dtype(np.uint16),
+                                np.dtype(np.int32):   np.dtype(np.uint32),
+                                np.dtype(np.int64):   np.dtype(np.uint64),
+                            }
+
 class IOUnimplimentedError(Exception):
     """
     The exception raised when a requested io operation is not yet available.
@@ -443,7 +452,33 @@ class nc (object):
         scaled_data_copy[~missing_mask] = (scaled_data_copy[~missing_mask] * scale_factor) + add_offset #TODO, type truncation issues?
         """
 
+        # get our data, save the dtype, and make sure it's a more flexible dtype for now
         scaled_data_copy = np.array(variable_object[:], dtype=data_type)
+
+        temp = self.attributeCache.get_variable_attributes(name)
+        if UNSIGNED_ATTR_STR in temp.keys() and str(temp[UNSIGNED_ATTR_STR]).lower() == ( "true" ) :
+
+            LOG.debug("fixing unsigned values in variable " + name)
+
+            # load the scale factor and add offset
+            scale_factor = 1.0
+            add_offset = 0.0
+            temp = self.attributeCache.get_variable_attributes(name)
+            if SCALE_FACTOR_STR in temp.keys() :
+                scale_factor = temp[SCALE_FACTOR_STR]
+            if ADD_OFFSET_STR in temp.keys() :
+                add_offset = temp[ADD_OFFSET_STR]
+
+            # get the missing value and figure out the dtype of the original data
+            missing_val  = self.missing_value(name)
+            orig_dtype   = np.array([missing_val,]).dtype
+            needed_dtype = SIGNED_TO_UNSIGNED_DTYPES[orig_dtype] if orig_dtype in SIGNED_TO_UNSIGNED_DTYPES.keys() else None
+
+            if needed_dtype is not None :
+                # now figure out where all the corrupted values are, and shift them up to be positive
+                needs_fix_mask = (scaled_data_copy < 0.0) & (scaled_data_copy != missing_val)
+                # we are adding the 2's complement, but first we're scaling it appropriately
+                scaled_data_copy[needs_fix_mask] += ((np.iinfo(np.uint16).max + 1.0) * scale_factor) + add_offset
 
         return scaled_data_copy
     
