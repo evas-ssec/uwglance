@@ -1455,8 +1455,8 @@ glance inspectStats A.hdf
         if command is None: 
             print_all_summary = True
         else:
-            if command in commands :
-                print commands[command].__doc__
+            if (command.lower() in lower_locals):
+                print lower_locals[command.lower()].__doc__
             else :
                 print_all_summary = True
 
