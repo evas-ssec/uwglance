@@ -253,7 +253,7 @@ def load_variable_data(fileObject, variableNameInFile,
             variableData = variableData.astype(numpy.uint8) if correctForAWIPS else variableData
         except Exception, ex :
             import traceback
-            exceptionToRaise = ValueError('Unable to retrieve ' + variableNameInFile + ' data. The variable name ' + 
+            exceptionToRaise = ValueError('Unable to retrieve ' + variableNameInFile + ' data. The variable name' + 
                       ' may not exist in this file or an error may have occured while attempting to' +
                       ' access the data. Details of file access error observed: ' + str(ex))
     
