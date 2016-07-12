@@ -1140,12 +1140,12 @@ def main():
 run "%prog help" to list commands
 examples:
 
-python -m glance.compare info A.hdf
-python -m glance.compare stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0'
-python -m glance.compare plotDiffs A.hdf B.hdf
-python -m glance.compare reportGen A.hdf B.hdf
-python -m glance.compare gui
-python -m glance.compare inspectStats A.hdf
+glance info A.hdf
+glance stats A.hdf B.hdf '.*_prof_retr_.*:1e-4' 'nwp_._index:0'
+glance plotDiffs A.hdf B.hdf
+glance reportGen A.hdf B.hdf
+glance gui
+glance inspectStats A.hdf
 
 """
     
@@ -1201,9 +1201,9 @@ python -m glance.compare inspectStats A.hdf
         If _FillValue is an attribute of a variable, that will be used to find missing values where no value is given.
         Run with -v to get more detailed information on statistics.
         Examples:
-         python -m glance.compare stats hdffile1 hdffile2
-         python -m glance.compare stats --epsilon=0.00001 A.hdf B.hdf baseline_cmask_seviri_cloud_mask:0.002:
-         python -m glance.compare -w stats --epsilon=0.00001 A.hdf A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
+         glance stats hdffile1 hdffile2
+         glance stats --epsilon=0.00001 A.hdf B.hdf baseline_cmask_seviri_cloud_mask:0.002:
+         glance -w stats --epsilon=0.00001 A.hdf A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
         """ 
         afn, bfn = args[:2]
         do_doc = (options.verbose or options.debug)
@@ -1254,9 +1254,9 @@ python -m glance.compare inspectStats A.hdf
         The longitude and latitude variables may be specified with --longitude and --latitude
         If no longitude or latitude are specified the pixel_latitude and pixel_longitude variables will be used.
         Examples:
-         python -m glance.compare plotDiffs A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
-         python -m glance.compare --outputpath=/path/where/output/will/be/placed/ plotDiffs A.hdf B.hdf
-         python -m glance.compare plotDiffs --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
+         glance plotDiffs A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
+         glance --outputpath=/path/where/output/will/be/placed/ plotDiffs A.hdf B.hdf
+         glance plotDiffs --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
         """
         # set the options so that a report will not be generated
         options.imagesOnly = True
@@ -1287,10 +1287,10 @@ python -m glance.compare inspectStats A.hdf
         The longitude and latitude variables may be specified with --longitude and --latitude
         If no longitude or latitude are specified the pixel_latitude and pixel_longitude variables will be used.
         Examples:
-         python -m glance.compare reportGen A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
-         python -m glance.compare --outputpath=/path/where/output/will/be/placed/ reportGen A.hdf B.hdf
-         python -m glance.compare reportGen --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
-         python -m glance.compare reportGen --imagesonly A.hdf B.hdf
+         glance reportGen A.hdf B.hdf variable_name_1:epsilon1: variable_name_2 variable_name_3:epsilon3:missing3 variable_name_4::missing4
+         glance --outputpath=/path/where/output/will/be/placed/ reportGen A.hdf B.hdf
+         glance reportGen --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
+         glance reportGen --imagesonly A.hdf B.hdf
         """
         
         tempOptions = config_organizer.convert_options_to_dict(options)
@@ -1310,9 +1310,9 @@ python -m glance.compare inspectStats A.hdf
         If _FillValue is an attribute of a variable, that will be used to find missing values where no value is given.
         Run with -v to get more detailed information on the statistics provided.
         Examples:
-         python -m glance.compare    inspectStats A.hdf
-         python -m glance.compare    inspectStats A.hdf baseline_cmask_seviri_cloud_mask
-         python -m glance.compare -w inspectStats A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
+         glance    inspectStats A.hdf
+         glance    inspectStats A.hdf baseline_cmask_seviri_cloud_mask
+         glance -w inspectStats A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
         """ 
         afn = args[0]
         do_doc = (options.verbose or options.debug)
@@ -1367,10 +1367,10 @@ python -m glance.compare inspectStats A.hdf
         If no longitude or latitude mappings are desired, the --nolonlat option will disable spatial mapping.
         
         Examples:
-         python -m glance.compare inspect_report A.hdf variable_name_1:: variable_name_2 variable_name_3::missing3 variable_name_4::missing4
-         python -m glance.compare --outputpath=/path/where/output/will/be/placed/ inspect_report A.hdf 
-         python -m glance.compare inspect_report --longitude=lon_variable_name --latitude=lat_variable_name A.hdf variable_name
-         python -m glance.compare inspect_report --reportonly A.hdf
+         glance inspect_report A.hdf variable_name_1:: variable_name_2 variable_name_3::missing3 variable_name_4::missing4
+         glance --outputpath=/path/where/output/will/be/placed/ inspect_report A.hdf 
+         glance inspect_report --longitude=lon_variable_name --latitude=lat_variable_name A.hdf variable_name
+         glance inspect_report --reportonly A.hdf
         """
         
         tempOptions = config_organizer.convert_options_to_dict(options)
@@ -1405,10 +1405,10 @@ python -m glance.compare inspectStats A.hdf
         (replacing "originalFileName" with the names of your input files).
         
         Examples:
-         python -m glance.compare colocateData A.hdf B.hdf variable_name_1 variable_name_2 variable_name_3::missing3 
-         python -m glance.compare colocateData --outputpath=/path/where/output/will/be/placed/ A.nc B.nc
-         python -m glance.compare colocateData --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
-         python -m glance.compare colocateData --llepsilon=0.0001 A.nc B.hdf
+         glance colocateData A.hdf B.hdf variable_name_1 variable_name_2 variable_name_3::missing3 
+         glance colocateData --outputpath=/path/where/output/will/be/placed/ A.nc B.nc
+         glance colocateData --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
+         glance colocateData --llepsilon=0.0001 A.nc B.hdf
         """
         
         # TODO, is this really needed?
@@ -1439,7 +1439,7 @@ python -m glance.compare inspectStats A.hdf
         The various output related arguments (quiet, verbose, debug, etc.) may be used if desired.
         
         Examples:
-         python -m glance.compare gui
+         glance gui
         """
         
         LOG.debug("Launching Glance GUI")
