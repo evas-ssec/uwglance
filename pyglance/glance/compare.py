@@ -1436,11 +1436,13 @@ glance inspectStats A.hdf
         This option launches the graphical user interface for glance. This interface includes only some of the basic
         functionality of glance and may be expanded in the future.
         
-        No arguments are required when using this option.
+        Files to be loaded as File A and File B may be specified on the command line.
         The various output related arguments (quiet, verbose, debug, etc.) may be used if desired.
         
         Examples:
          glance gui
+         glance gui A.nc
+         glance gui A.nc B.hdf
         """
         
         LOG.debug("Launching Glance GUI")
