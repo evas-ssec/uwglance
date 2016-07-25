@@ -40,6 +40,7 @@ from glance.util        import clean_path, rsync_or_copy_files, get_glance_versi
 from glance.load        import get_UV_info_from_magnitude_direction_info, load_variable_data, open_and_process_files, handle_lon_lat_info, handle_lon_lat_info_for_one_file
 from glance.lonlat_util import VariableComparisonError
 from glance.constants   import *
+from glance.gui_constants import A_CONST, B_CONST
 
 LOG = logging.getLogger(__name__)
 
@@ -1435,15 +1436,21 @@ glance inspectStats A.hdf
         This option launches the graphical user interface for glance. This interface includes only some of the basic
         functionality of glance and may be expanded in the future.
         
-        No arguments are required when using this option.
+        Files to be loaded as File A and File B may be specified on the command line.
         The various output related arguments (quiet, verbose, debug, etc.) may be used if desired.
         
         Examples:
          glance gui
+         glance gui A.nc
+         glance gui A.nc B.hdf
         """
         
         LOG.debug("Launching Glance GUI")
         temp_controller = gui_control.GlanceGUIController(get_glance_version_string())
+        if len(args) >= 1:
+            temp_controller.newFileSelected(A_CONST, args[0])
+        if len(args) >= 2:
+            temp_controller.newFileSelected(B_CONST, args[1])
         temp_controller.launch_gui()
     
     def help(command=None):
