@@ -1485,9 +1485,10 @@ glance inspectStats A.hdf
 
     # if what the user asked for is not one of our existing functions, print the help
     if ((not args) or (args[0].lower() not in lower_locals)):
-        if not options.version :
-            parser.print_help()
-            help()
+        if options.version:
+            return 0;
+        parser.print_help()
+        help()
         return 9
     else:
         # call the function the user named, given the arguments from the command line, lowercase the request to ignore case
