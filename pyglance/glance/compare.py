@@ -1024,9 +1024,7 @@ def stats_library_call(afn, bfn, var_list=[ ],
     doc_each  = do_document and len(names)==1
     doc_atend = do_document and len(names)!=1
 
-    sorted_names = sorted(names, None, lambda X:X[0]);
-
-    for name, epsilon, missing in sorted_names:
+    for name, epsilon, missing in sorted(names, key=lambda X:X[0]):
         
         # make sure that it's possible to load this variable
         if not(aFile.is_loadable_type(name)) or not(bFile.is_loadable_type(name)) :
@@ -1105,10 +1103,8 @@ def inspect_stats_library_call (afn, var_list=[ ], options_set={ }, do_document=
     doc_each  = do_document and len(names)==1
     doc_atend = do_document and len(names)!=1
 
-    sorted_names = sorted(names, None, lambda X:X[0]);
-    
-    for name, epsilon, missing in sorted_names:
-        
+    for name, epsilon, missing in sorted(names, key=lambda X:X[0]):
+
         # make sure that it's possible to load this variable
         if not(aFile.is_loadable_type(name)) :
             LOG.warn(name + " is of a type that cannot be loaded using current file handling libraries included with Glance." +
