@@ -1184,6 +1184,7 @@ glance inspectStats A.hdf
         """list information about a list of files
         List available variables for comparison.
         """
+        problems = 0
         for fn in args:
             try :
                 lal = list(io.open(fn)())
@@ -1191,6 +1192,11 @@ glance inspectStats A.hdf
                 print fn + ': ' + ('\n  ' + ' '*len(fn)).join(lal)
             except KeyError :
                 LOG.warn('Unable to open / process file selection: ' + fn)
+                problems += 1
+        if problems > 255:
+            # exit code is 8-bits, limit ourselves.
+            problems = 255
+        return problems
     
     def stats(*args):
         """create statistics summary of variables
