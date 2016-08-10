@@ -8,6 +8,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
 """
 
 import sys, os.path, logging
+import numpy
 
 from PyQt4 import QtGui, QtCore
 
@@ -838,6 +839,14 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         given variable data, pop a window to show it to the user
         """
+
+        if len(variableDataObject.data.shape) == 0:
+			# This is a simple scalar value. Toss it into an array
+			# so the following code can cope
+			newData = variableDataObject.copy()
+			newData.data = numpy.array([variableDataObject.data.item()])
+			variableDataObject = newData
+
 
         if len(variableDataObject.data.shape) > 0 and len(variableDataObject.data.shape) <= 2 :
 
