@@ -841,11 +841,11 @@ class GlanceGUIView (QtGui.QWidget) :
         """
 
         if len(variableDataObject.data.shape) == 0:
-			# This is a simple scalar value. Toss it into an array
-			# so the following code can cope
-			newData = variableDataObject.copy()
-			newData.data = numpy.array([variableDataObject.data.item()])
-			variableDataObject = newData
+            # This is a simple scalar value. Toss it into an array
+            # so the following code can cope
+            newData = variableDataObject.copy()
+            newData.data = numpy.array([variableDataObject.data.item()])
+            variableDataObject = newData
 
 
         if len(variableDataObject.data.shape) > 0 and len(variableDataObject.data.shape) <= 2 :
