@@ -236,6 +236,22 @@ class DataObject (object) :
         self.self_analysis()
         return delta.max_with_mask(self.data, self.masks.valid_mask) if len(self.data.shape) > 0 else np.nan
 
+    def describe_shape(self):
+        """
+        describe my data's shape
+
+        Typically just the shape (ex "(50,50)"), but may have
+        additional information.  For example, single value shapes
+        will also show the value.
+
+        Intended strictly for human viewing, not parsing!
+        """
+        if self.data.size == 1:
+            return str(self.data.shape) + " = " + str(self.data.item())
+        return str(self.data.shape)
+
+
+
 class DiffInfoObject (object) :
     """
     This class represents the full difference between two data sets.
