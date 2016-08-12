@@ -224,7 +224,7 @@ class GlanceGUIModel (object) :
         for dataListener in self.dataListeners :
             LOG.debug("Sending update for file " + filePrefix + " with loaded data.")
             dataListener.fileDataUpdate(filePrefix, newFile.path, tempVariable, tempDataObj.override_fill_value,
-                                        self._select_fill_value(filePrefix), str(tempDataObj.data.shape),
+                                        self._select_fill_value(filePrefix), tempDataObj.describe_shape(),
                                         variable_list=variableList, attribute_list=tempAttrs)
             dataListener.updateSelectedLatLon(filePrefix,
                                               self.fileData[filePrefix].latitude,
@@ -363,7 +363,7 @@ class GlanceGUIModel (object) :
             for listener in self.dataListeners :
                 listener.fileDataUpdate(file_prefix, self.fileData[file_prefix].file.path, tempVariableName,
                                                      tempDataObject.override_fill_value,   self._select_fill_value(file_prefix),
-                                                     str(tempDataObject.data.shape),       attribute_list=tempAttrsList)
+                                                     tempDataObject.describe_shape(),       attribute_list=tempAttrsList)
     
     def _select_fill_value (self, file_prefix) :
         """
