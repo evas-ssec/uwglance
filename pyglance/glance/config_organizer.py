@@ -476,6 +476,9 @@ def set_up_command_line_options (parser) :
     parser.add_option('-f', '--fork', dest=DO_MAKE_FORKS_KEY,
                       action="store_true", default=False, help="start multiple processes to create images in parallel")
 
+    parser.add_option('--parsable', dest=PARSABLE_OUTPUT_KEY,
+                      action="store_true", default=False, help="format output to be programmatically parsed. 'info' only")
+
 def convert_options_to_dict (options) :
     """
     convert the command line options structure created in compare.py into a dictionary of values

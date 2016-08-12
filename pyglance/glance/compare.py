@@ -1189,7 +1189,10 @@ glance inspectStats A.hdf
             try :
                 lal = list(io.open(fn)())
                 lal.sort()
-                print fn + ': ' + ('\n  ' + ' '*len(fn)).join(lal)
+                if options.parsable_output:
+                    print "".join(map(lambda x: fn+"\t"+x+"\n", lal))
+                else:
+                    print fn + ': ' + ('\n  ' + ' '*len(fn)).join(lal)
             except KeyError :
                 LOG.warn('Unable to open / process file selection: ' + fn)
                 problems += 1
