@@ -1064,6 +1064,8 @@ class StatisticalInspectionAnalysis (StatisticalData) :
         """
         build and set all of the statistics sets
         """
+
+        dataObject = dataObject.holding_array()
         
         self.general      = GeneralStatistics(     dataObject=dataObject,
                                                            doExtras=True)
