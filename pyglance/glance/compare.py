@@ -37,7 +37,7 @@ import glance.collocation   as collocation
 import glance.config_organizer as config_organizer
 
 from glance.util        import clean_path, rsync_or_copy_files, get_glance_version_string, get_run_identification_info, setup_dir_if_needed
-from glance.load        import get_UV_info_from_magnitude_direction_info, load_variable_data, open_and_process_files, handle_lon_lat_info, handle_lon_lat_info_for_one_file
+from glance.load        import get_UV_info_from_magnitude_direction_info, load_variable_data, open_and_process_files, handle_lon_lat_info, handle_lon_lat_info_for_one_file, ValueErrorStringToFloat
 from glance.lonlat_util import VariableComparisonError
 from glance.constants   import *
 from glance.gui_constants import A_CONST, B_CONST
@@ -740,226 +740,228 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
     # go through each of the possible variables in our files
     # and make a report section with images for whichever ones we can
     for displayName in finalNames:
-        
-        # pull out the information for this variable analysis run
-        varRunInfo = finalNames[displayName].copy()
-        
-        # get the various names
-        technical_name, b_variable_technical_name, \
-                explanationName = _get_name_info_for_variable(displayName, varRunInfo)
-        
-        # make sure that it's possible to load this variable
-        if not(aFile.file_object.is_loadable_type(technical_name)) or not(bFile.file_object.is_loadable_type(b_variable_technical_name)) :
-            LOG.warn(displayName + " is of a type that cannot be loaded using current file handling libraries included with Glance." +
-                    " Skipping " + displayName + ".")
-            continue
-        
-        LOG.info('analyzing: ' + explanationName)
-        
-        # load the variable data
-        aData = load_variable_data(aFile.file_object, technical_name,
-                                   dataFilter = varRunInfo[FILTER_FUNCTION_A_KEY] if FILTER_FUNCTION_A_KEY in varRunInfo else None,
-                                   variableToFilterOn = varRunInfo[VAR_FILTER_NAME_A_KEY] if VAR_FILTER_NAME_A_KEY in varRunInfo else None,
-                                   variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_A_KEY] if VAR_FILTER_FUNCTION_A_KEY in varRunInfo else None,
-                                   altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_A_KEY]).file_object if VAR_FILTER_ALT_FILE_A_KEY in varRunInfo else None,
-                                   fileDescriptionForDisplay = "file A")
-        bData = load_variable_data(bFile.file_object, b_variable_technical_name,
-                                   dataFilter = varRunInfo[FILTER_FUNCTION_B_KEY] if FILTER_FUNCTION_B_KEY in varRunInfo else None,
-                                   variableToFilterOn = varRunInfo[VAR_FILTER_NAME_B_KEY] if VAR_FILTER_NAME_B_KEY in varRunInfo else None,
-                                   variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_B_KEY] if VAR_FILTER_FUNCTION_B_KEY in varRunInfo else None,
-                                   altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_B_KEY]).file_object if VAR_FILTER_ALT_FILE_B_KEY in varRunInfo else None,
-                                   fileDescriptionForDisplay = "file B")
-        
-        # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
-        include_images_for_this_variable = ((not(DO_MAKE_IMAGES_KEY in runInfo)) or (runInfo[DO_MAKE_IMAGES_KEY]))
-        if DO_MAKE_IMAGES_KEY in varRunInfo :
-            include_images_for_this_variable = varRunInfo[DO_MAKE_IMAGES_KEY]
-        do_not_test_with_lon_lat = (not include_images_for_this_variable) or (len(lon_lat_data.keys()) <= 0)
-        
-        # handle vector data
-        isVectorData = ( (MAGNITUDE_VAR_NAME_KEY   in varRunInfo) and (DIRECTION_VAR_NAME_KEY   in varRunInfo) and
-                         (MAGNITUDE_B_VAR_NAME_KEY in varRunInfo) and (DIRECTION_B_VAR_NAME_KEY in varRunInfo) )
-        
-        # check if this data can be displayed but
-        # don't compare lon/lat sizes if we won't be plotting
-        if ( (aData.shape == bData.shape) 
-             and 
-             ( do_not_test_with_lon_lat
-              or
-              ((aData.shape == good_shape_from_lon_lat) and (bData.shape == good_shape_from_lon_lat)) ) ) :
+        try:
+            # pull out the information for this variable analysis run
+            varRunInfo = finalNames[displayName].copy()
             
-            # check to see if there is a directory to put information about this variable in,
-            # if not then create it
-            variableDir = os.path.join(pathsTemp[OUT_FILE_KEY], './' + displayName)
-            varRunInfo[VARIABLE_DIRECTORY_KEY] = variableDir
-            varRunInfo[VAR_REPORT_PATH_KEY] = quote(os.path.join(displayName, 'index.html'))
-            LOG.debug ("Directory selected for variable information: " + varRunInfo[VAR_REPORT_PATH_KEY])
-            setup_dir_if_needed(variableDir, "variable")
+            # get the various names
+            technical_name, b_variable_technical_name, \
+                    explanationName = _get_name_info_for_variable(displayName, varRunInfo)
             
-            # form the doc and config paths relative to where the variable is
-            upwardPath = './'
-            for number in range(len(displayName.split('/'))) : # TODO this is not general to windows
-                upwardPath = os.path.join(upwardPath, '../')
-            varRunInfo[DOCUMENTATION_PATH_KEY]   = quote(os.path.join(upwardPath, 'doc.html'))
-            if CONFIG_FILE_NAME_KEY in runInfo :
-                varRunInfo[CONFIG_FILE_PATH_KEY] = quote(os.path.join(upwardPath, runInfo[CONFIG_FILE_NAME_KEY]))
+            # make sure that it's possible to load this variable
+            if not(aFile.file_object.is_loadable_type(technical_name)) or not(bFile.file_object.is_loadable_type(b_variable_technical_name)) :
+                LOG.warn(displayName + " is of a type that cannot be loaded using current file handling libraries included with Glance." +
+                        " Skipping " + displayName + ".")
+                continue
             
-            # figure out the masks we want, and then do our statistical analysis
-            mask_a_to_use = None if do_not_test_with_lon_lat else lon_lat_data[A_FILE_KEY][INVALID_MASK_KEY]
-            mask_b_to_use = None if do_not_test_with_lon_lat else lon_lat_data[B_FILE_KEY][INVALID_MASK_KEY]
-            LOG.debug("Analyzing " + displayName + " statistically.")
-            variable_stats = statistics.StatisticalAnalysis.withSimpleData(aData, bData,
-                                                                           varRunInfo[FILL_VALUE_KEY], varRunInfo[FILL_VALUE_ALT_IN_B_KEY],
-                                                                           mask_a_to_use, mask_b_to_use,
-                                                                           varRunInfo[EPSILON_KEY], varRunInfo[EPSILON_PERCENT_KEY])
+            LOG.info('analyzing: ' + explanationName)
             
-            # add a little additional info to our variable run info before we squirrel it away
-            varRunInfo[TIME_INFO_KEY] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
-            didPass, epsilon_failed_fraction, \
-                     non_finite_fail_fraction, \
-                     r_squared_value = variable_stats.check_pass_or_fail(epsilon_failure_tolerance=varRunInfo[EPSILON_FAIL_TOLERANCE_KEY] if EPSILON_FAIL_TOLERANCE_KEY in varRunInfo else numpy.nan,
-                                                epsilon_failure_tolerance_default=defaultValues[EPSILON_FAIL_TOLERANCE_KEY],
-                                                non_finite_data_tolerance=varRunInfo[NONFINITE_TOLERANCE_KEY]  if NONFINITE_TOLERANCE_KEY in varRunInfo else numpy.nan,
-                                                non_finite_data_tolerance_default=defaultValues[NONFINITE_TOLERANCE_KEY],
-                                                total_data_failure_tolerance=varRunInfo[TOTAL_FAIL_TOLERANCE_KEY] if TOTAL_FAIL_TOLERANCE_KEY in varRunInfo else numpy.nan,
-                                                total_data_failure_tolerance_default=defaultValues[TOTAL_FAIL_TOLERANCE_KEY],
-                                                min_acceptable_r_squared=varRunInfo[MIN_OK_R_SQUARED_COEFF_KEY] if MIN_OK_R_SQUARED_COEFF_KEY in varRunInfo else numpy.nan,
-                                                min_acceptable_r_squared_default=defaultValues[MIN_OK_R_SQUARED_COEFF_KEY],
-                                                )
+            # load the variable data
+            aData = load_variable_data(aFile.file_object, technical_name,
+                                       dataFilter = varRunInfo[FILTER_FUNCTION_A_KEY] if FILTER_FUNCTION_A_KEY in varRunInfo else None,
+                                       variableToFilterOn = varRunInfo[VAR_FILTER_NAME_A_KEY] if VAR_FILTER_NAME_A_KEY in varRunInfo else None,
+                                       variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_A_KEY] if VAR_FILTER_FUNCTION_A_KEY in varRunInfo else None,
+                                       altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_A_KEY]).file_object if VAR_FILTER_ALT_FILE_A_KEY in varRunInfo else None,
+                                       fileDescriptionForDisplay = "file A")
+            bData = load_variable_data(bFile.file_object, b_variable_technical_name,
+                                       dataFilter = varRunInfo[FILTER_FUNCTION_B_KEY] if FILTER_FUNCTION_B_KEY in varRunInfo else None,
+                                       variableToFilterOn = varRunInfo[VAR_FILTER_NAME_B_KEY] if VAR_FILTER_NAME_B_KEY in varRunInfo else None,
+                                       variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_B_KEY] if VAR_FILTER_FUNCTION_B_KEY in varRunInfo else None,
+                                       altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_B_KEY]).file_object if VAR_FILTER_ALT_FILE_B_KEY in varRunInfo else None,
+                                       fileDescriptionForDisplay = "file B")
             
-            varRunInfo[DID_VARIABLE_PASS_KEY] = didPass
-            # update the overall pass status
-            if didPass is not None :
-                didPassAll = didPassAll & didPass
+            # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
+            include_images_for_this_variable = ((not(DO_MAKE_IMAGES_KEY in runInfo)) or (runInfo[DO_MAKE_IMAGES_KEY]))
+            if DO_MAKE_IMAGES_KEY in varRunInfo :
+                include_images_for_this_variable = varRunInfo[DO_MAKE_IMAGES_KEY]
+            do_not_test_with_lon_lat = (not include_images_for_this_variable) or (len(lon_lat_data.keys()) <= 0)
             
-            # based on the settings and whether the variable passsed or failed,
-            # should we include images for this variable?
-            if (DO_IMAGES_ONLY_ON_FAIL_KEY in varRunInfo) and varRunInfo[DO_IMAGES_ONLY_ON_FAIL_KEY] :
-                include_images_for_this_variable = include_images_for_this_variable and (not didPass)
-                varRunInfo[DO_MAKE_IMAGES_KEY] = include_images_for_this_variable
+            # handle vector data
+            isVectorData = ( (MAGNITUDE_VAR_NAME_KEY   in varRunInfo) and (DIRECTION_VAR_NAME_KEY   in varRunInfo) and
+                             (MAGNITUDE_B_VAR_NAME_KEY in varRunInfo) and (DIRECTION_B_VAR_NAME_KEY in varRunInfo) )
             
-            # to hold the names of any images created
-            image_names = {
-                            ORIGINAL_IMAGES_KEY: [ ],
-                            COMPARED_IMAGES_KEY: [ ]
-                            }
-            
-            # create the images for this variable
-            if (include_images_for_this_variable) :
+            # check if this data can be displayed but
+            # don't compare lon/lat sizes if we won't be plotting
+            if ( (aData.shape == bData.shape) 
+                 and 
+                 ( do_not_test_with_lon_lat
+                  or
+                  ((aData.shape == good_shape_from_lon_lat) and (bData.shape == good_shape_from_lon_lat)) ) ) :
                 
-                plotFunctionGenerationObjects = [ ]
+                # check to see if there is a directory to put information about this variable in,
+                # if not then create it
+                variableDir = os.path.join(pathsTemp[OUT_FILE_KEY], './' + displayName)
+                varRunInfo[VARIABLE_DIRECTORY_KEY] = variableDir
+                varRunInfo[VAR_REPORT_PATH_KEY] = quote(os.path.join(displayName, 'index.html'))
+                LOG.debug ("Directory selected for variable information: " + varRunInfo[VAR_REPORT_PATH_KEY])
+                setup_dir_if_needed(variableDir, "variable")
                 
-                # if there's magnitude and direction data, figure out the u and v, otherwise these will be None
-                aUData, aVData = get_UV_info_from_magnitude_direction_info (aFile.file_object,
-                                                                            varRunInfo[MAGNITUDE_VAR_NAME_KEY] if (MAGNITUDE_VAR_NAME_KEY) in varRunInfo else None,
-                                                                            varRunInfo[DIRECTION_VAR_NAME_KEY] if (DIRECTION_VAR_NAME_KEY) in varRunInfo else None,
-                                                                            lon_lat_data[A_FILE_KEY][INVALID_MASK_KEY]
-                                                                            if (A_FILE_KEY in lon_lat_data) and (INVALID_MASK_KEY in lon_lat_data[A_FILE_KEY]) else None)
-                bUData, bVData = get_UV_info_from_magnitude_direction_info (bFile.file_object,
-                                                                            varRunInfo[MAGNITUDE_B_VAR_NAME_KEY] if (MAGNITUDE_B_VAR_NAME_KEY) in varRunInfo else None,
-                                                                            varRunInfo[DIRECTION_B_VAR_NAME_KEY] if (DIRECTION_B_VAR_NAME_KEY) in varRunInfo else None,
-                                                                            lon_lat_data[B_FILE_KEY][INVALID_MASK_KEY]
-                                                                            if (B_FILE_KEY in lon_lat_data) and (INVALID_MASK_KEY in lon_lat_data[B_FILE_KEY]) else None)
+                # form the doc and config paths relative to where the variable is
+                upwardPath = './'
+                for number in range(len(displayName.split('/'))) : # TODO this is not general to windows
+                    upwardPath = os.path.join(upwardPath, '../')
+                varRunInfo[DOCUMENTATION_PATH_KEY]   = quote(os.path.join(upwardPath, 'doc.html'))
+                if CONFIG_FILE_NAME_KEY in runInfo :
+                    varRunInfo[CONFIG_FILE_PATH_KEY] = quote(os.path.join(upwardPath, runInfo[CONFIG_FILE_NAME_KEY]))
                 
-                # if the data is the same size, we can always make our basic statistical comparison plots
-                if (aData.shape == bData.shape) :
-                    plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
+                # figure out the masks we want, and then do our statistical analysis
+                mask_a_to_use = None if do_not_test_with_lon_lat else lon_lat_data[A_FILE_KEY][INVALID_MASK_KEY]
+                mask_b_to_use = None if do_not_test_with_lon_lat else lon_lat_data[B_FILE_KEY][INVALID_MASK_KEY]
+                LOG.debug("Analyzing " + displayName + " statistically.")
+                variable_stats = statistics.StatisticalAnalysis.withSimpleData(aData, bData,
+                                                                               varRunInfo[FILL_VALUE_KEY], varRunInfo[FILL_VALUE_ALT_IN_B_KEY],
+                                                                               mask_a_to_use, mask_b_to_use,
+                                                                               varRunInfo[EPSILON_KEY], varRunInfo[EPSILON_PERCENT_KEY])
                 
-                # if the bin and tuple are defined, try to analyze the data as complex
-                # multidimentional information requiring careful sampling
-                if (BIN_INDEX_KEY in varRunInfo) and (TUPLE_INDEX_KEY in varRunInfo) :
-                    plotFunctionGenerationObjects.append(plotcreate.BinTupleAnalysisFunctionFactory())
+                # add a little additional info to our variable run info before we squirrel it away
+                varRunInfo[TIME_INFO_KEY] = datetime.datetime.ctime(datetime.datetime.now())  # todo is this needed?
+                didPass, epsilon_failed_fraction, \
+                         non_finite_fail_fraction, \
+                         r_squared_value = variable_stats.check_pass_or_fail(epsilon_failure_tolerance=varRunInfo[EPSILON_FAIL_TOLERANCE_KEY] if EPSILON_FAIL_TOLERANCE_KEY in varRunInfo else numpy.nan,
+                                                    epsilon_failure_tolerance_default=defaultValues[EPSILON_FAIL_TOLERANCE_KEY],
+                                                    non_finite_data_tolerance=varRunInfo[NONFINITE_TOLERANCE_KEY]  if NONFINITE_TOLERANCE_KEY in varRunInfo else numpy.nan,
+                                                    non_finite_data_tolerance_default=defaultValues[NONFINITE_TOLERANCE_KEY],
+                                                    total_data_failure_tolerance=varRunInfo[TOTAL_FAIL_TOLERANCE_KEY] if TOTAL_FAIL_TOLERANCE_KEY in varRunInfo else numpy.nan,
+                                                    total_data_failure_tolerance_default=defaultValues[TOTAL_FAIL_TOLERANCE_KEY],
+                                                    min_acceptable_r_squared=varRunInfo[MIN_OK_R_SQUARED_COEFF_KEY] if MIN_OK_R_SQUARED_COEFF_KEY in varRunInfo else numpy.nan,
+                                                    min_acceptable_r_squared_default=defaultValues[MIN_OK_R_SQUARED_COEFF_KEY],
+                                                    )
+                
+                varRunInfo[DID_VARIABLE_PASS_KEY] = didPass
+                # update the overall pass status
+                if didPass is not None :
+                    didPassAll = didPassAll & didPass
+                
+                # based on the settings and whether the variable passsed or failed,
+                # should we include images for this variable?
+                if (DO_IMAGES_ONLY_ON_FAIL_KEY in varRunInfo) and varRunInfo[DO_IMAGES_ONLY_ON_FAIL_KEY] :
+                    include_images_for_this_variable = include_images_for_this_variable and (not didPass)
+                    varRunInfo[DO_MAKE_IMAGES_KEY] = include_images_for_this_variable
+                
+                # to hold the names of any images created
+                image_names = {
+                                ORIGINAL_IMAGES_KEY: [ ],
+                                COMPARED_IMAGES_KEY: [ ]
+                                }
+                
+                # create the images for this variable
+                if (include_images_for_this_variable) :
                     
-                else : # if it's not bin/tuple, there are lots of other posibilities
+                    plotFunctionGenerationObjects = [ ]
                     
-                    # if it's vector data with longitude and latitude, quiver plot it on the Earth
-                    if isVectorData and (not do_not_test_with_lon_lat) :
-                        plotFunctionGenerationObjects.append(plotcreate.MappedQuiverPlotFunctionFactory())
+                    # if there's magnitude and direction data, figure out the u and v, otherwise these will be None
+                    aUData, aVData = get_UV_info_from_magnitude_direction_info (aFile.file_object,
+                                                                                varRunInfo[MAGNITUDE_VAR_NAME_KEY] if (MAGNITUDE_VAR_NAME_KEY) in varRunInfo else None,
+                                                                                varRunInfo[DIRECTION_VAR_NAME_KEY] if (DIRECTION_VAR_NAME_KEY) in varRunInfo else None,
+                                                                                lon_lat_data[A_FILE_KEY][INVALID_MASK_KEY]
+                                                                                if (A_FILE_KEY in lon_lat_data) and (INVALID_MASK_KEY in lon_lat_data[A_FILE_KEY]) else None)
+                    bUData, bVData = get_UV_info_from_magnitude_direction_info (bFile.file_object,
+                                                                                varRunInfo[MAGNITUDE_B_VAR_NAME_KEY] if (MAGNITUDE_B_VAR_NAME_KEY) in varRunInfo else None,
+                                                                                varRunInfo[DIRECTION_B_VAR_NAME_KEY] if (DIRECTION_B_VAR_NAME_KEY) in varRunInfo else None,
+                                                                                lon_lat_data[B_FILE_KEY][INVALID_MASK_KEY]
+                                                                                if (B_FILE_KEY in lon_lat_data) and (INVALID_MASK_KEY in lon_lat_data[B_FILE_KEY]) else None)
                     
-                    # if the data is one dimensional we can plot it as lines
-                    elif   (len(aData.shape) is 1) : 
-                        plotFunctionGenerationObjects.append(plotcreate.LinePlotsFunctionFactory())
+                    # if the data is the same size, we can always make our basic statistical comparison plots
+                    if (aData.shape == bData.shape) :
+                        plotFunctionGenerationObjects.append(plotcreate.BasicComparisonPlotsFunctionFactory())
                     
-                    # if the data is 2D we have some options based on the type of data
-                    elif (len(aData.shape) is 2) :
+                    # if the bin and tuple are defined, try to analyze the data as complex
+                    # multidimentional information requiring careful sampling
+                    if (BIN_INDEX_KEY in varRunInfo) and (TUPLE_INDEX_KEY in varRunInfo) :
+                        plotFunctionGenerationObjects.append(plotcreate.BinTupleAnalysisFunctionFactory())
                         
-                        # if the data is not mapped to a longitude and latitude, just show it as an image
-                        if (do_not_test_with_lon_lat) :
-                            plotFunctionGenerationObjects.append(plotcreate.IMShowPlotFunctionFactory())
+                    else : # if it's not bin/tuple, there are lots of other posibilities
                         
-                        # if it's 2D and mapped to the Earth, contour plot it on the earth
-                        else :
-                            plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
+                        # if it's vector data with longitude and latitude, quiver plot it on the Earth
+                        if isVectorData and (not do_not_test_with_lon_lat) :
+                            plotFunctionGenerationObjects.append(plotcreate.MappedQuiverPlotFunctionFactory())
+                        
+                        # if the data is one dimensional we can plot it as lines
+                        elif   (len(aData.shape) is 1) : 
+                            plotFunctionGenerationObjects.append(plotcreate.LinePlotsFunctionFactory())
+                        
+                        # if the data is 2D we have some options based on the type of data
+                        elif (len(aData.shape) is 2) :
+                            
+                            # if the data is not mapped to a longitude and latitude, just show it as an image
+                            if (do_not_test_with_lon_lat) :
+                                plotFunctionGenerationObjects.append(plotcreate.IMShowPlotFunctionFactory())
+                            
+                            # if it's 2D and mapped to the Earth, contour plot it on the earth
+                            else :
+                                plotFunctionGenerationObjects.append(plotcreate.MappedContourPlotFunctionFactory())
+                    
+                    # plot our lon/lat related info
+                    image_names[ORIGINAL_IMAGES_KEY], image_names[COMPARED_IMAGES_KEY] = \
+                        plot.plot_and_save_comparison_figures \
+                                (aData, bData,
+                                 plotFunctionGenerationObjects,
+                                 varRunInfo[VARIABLE_DIRECTORY_KEY],
+                                 displayName,
+                                 varRunInfo[EPSILON_KEY],
+                                 varRunInfo[FILL_VALUE_KEY],
+                                 missingValueAltInB = varRunInfo[FILL_VALUE_ALT_IN_B_KEY] if FILL_VALUE_ALT_IN_B_KEY in varRunInfo else None,
+                                 lonLatDataDict=lon_lat_data,
+                                 dataRanges     = varRunInfo[DISPLAY_RANGES_KEY]       if DISPLAY_RANGES_KEY       in varRunInfo else None,
+                                 dataRangeNames = varRunInfo[DISPLAY_RANGE_NAMES_KEY]  if DISPLAY_RANGE_NAMES_KEY  in varRunInfo else None,
+                                 dataColors     = varRunInfo[DISPLAY_RANGE_COLORS_KEY] if DISPLAY_RANGE_COLORS_KEY in varRunInfo else None,
+                                 makeSmall=True,
+                                 doFork=runInfo[DO_MAKE_FORKS_KEY],
+                                 shouldClearMemoryWithThreads=runInfo[DO_CLEAR_MEM_THREADED_KEY],
+                                 shouldUseSharedRangeForOriginal=runInfo[USE_SHARED_ORIG_RANGE_KEY],
+                                 doPlotSettingsDict = varRunInfo,
+                                 aUData=aUData, aVData=aVData,
+                                 bUData=bUData, bVData=bVData,
+                                 binIndex=      varRunInfo[BIN_INDEX_KEY]       if BIN_INDEX_KEY       in varRunInfo else None,
+                                 tupleIndex=    varRunInfo[TUPLE_INDEX_KEY]     if TUPLE_INDEX_KEY     in varRunInfo else None,
+                                 binName=       varRunInfo[BIN_NAME_KEY]        if BIN_NAME_KEY        in varRunInfo else 'bin',
+                                 tupleName=     varRunInfo[TUPLE_NAME_KEY]      if TUPLE_NAME_KEY      in varRunInfo else 'tuple',
+                                 epsilonPercent=varRunInfo[EPSILON_PERCENT_KEY] if EPSILON_PERCENT_KEY in varRunInfo else None,
+                                 fullDPI=       runInfo[DETAIL_DPI_KEY],
+                                 thumbDPI=      runInfo[THUMBNAIL_DPI_KEY],
+                                 units_a=       varRunInfo[VAR_UNITS_A_KEY]     if VAR_UNITS_A_KEY     in varRunInfo else None,
+                                 units_b=       varRunInfo[VAR_UNITS_B_KEY]     if VAR_UNITS_B_KEY     in varRunInfo else None,
+                                )#histRange=     varRunInfo[HISTOGRAM_RANGE_KEY] if HISTOGRAM_RANGE_KEY in varRunInfo else None)
+                    
+                    LOG.info("\tfinished creating figures for: " + explanationName)
                 
-                # plot our lon/lat related info
-                image_names[ORIGINAL_IMAGES_KEY], image_names[COMPARED_IMAGES_KEY] = \
-                    plot.plot_and_save_comparison_figures \
-                            (aData, bData,
-                             plotFunctionGenerationObjects,
-                             varRunInfo[VARIABLE_DIRECTORY_KEY],
-                             displayName,
-                             varRunInfo[EPSILON_KEY],
-                             varRunInfo[FILL_VALUE_KEY],
-                             missingValueAltInB = varRunInfo[FILL_VALUE_ALT_IN_B_KEY] if FILL_VALUE_ALT_IN_B_KEY in varRunInfo else None,
-                             lonLatDataDict=lon_lat_data,
-                             dataRanges     = varRunInfo[DISPLAY_RANGES_KEY]       if DISPLAY_RANGES_KEY       in varRunInfo else None,
-                             dataRangeNames = varRunInfo[DISPLAY_RANGE_NAMES_KEY]  if DISPLAY_RANGE_NAMES_KEY  in varRunInfo else None,
-                             dataColors     = varRunInfo[DISPLAY_RANGE_COLORS_KEY] if DISPLAY_RANGE_COLORS_KEY in varRunInfo else None,
-                             makeSmall=True,
-                             doFork=runInfo[DO_MAKE_FORKS_KEY],
-                             shouldClearMemoryWithThreads=runInfo[DO_CLEAR_MEM_THREADED_KEY],
-                             shouldUseSharedRangeForOriginal=runInfo[USE_SHARED_ORIG_RANGE_KEY],
-                             doPlotSettingsDict = varRunInfo,
-                             aUData=aUData, aVData=aVData,
-                             bUData=bUData, bVData=bVData,
-                             binIndex=      varRunInfo[BIN_INDEX_KEY]       if BIN_INDEX_KEY       in varRunInfo else None,
-                             tupleIndex=    varRunInfo[TUPLE_INDEX_KEY]     if TUPLE_INDEX_KEY     in varRunInfo else None,
-                             binName=       varRunInfo[BIN_NAME_KEY]        if BIN_NAME_KEY        in varRunInfo else 'bin',
-                             tupleName=     varRunInfo[TUPLE_NAME_KEY]      if TUPLE_NAME_KEY      in varRunInfo else 'tuple',
-                             epsilonPercent=varRunInfo[EPSILON_PERCENT_KEY] if EPSILON_PERCENT_KEY in varRunInfo else None,
-                             fullDPI=       runInfo[DETAIL_DPI_KEY],
-                             thumbDPI=      runInfo[THUMBNAIL_DPI_KEY],
-                             units_a=       varRunInfo[VAR_UNITS_A_KEY]     if VAR_UNITS_A_KEY     in varRunInfo else None,
-                             units_b=       varRunInfo[VAR_UNITS_B_KEY]     if VAR_UNITS_B_KEY     in varRunInfo else None,
-                            )#histRange=     varRunInfo[HISTOGRAM_RANGE_KEY] if HISTOGRAM_RANGE_KEY in varRunInfo else None)
-                
-                LOG.info("\tfinished creating figures for: " + explanationName)
+                # create the report page for this variable
+                if (runInfo[DO_MAKE_REPORT_KEY]) :
+                    
+                    # hang on to our good % and other info to describe our comparison
+                    epsilonPassedPercent = (1.0 -  epsilon_failed_fraction) * 100.0
+                    finitePassedPercent  = (1.0 - non_finite_fail_fraction) * 100.0 
+                    variableComparisons[displayName] = {
+                                                        PASSED_EPSILON_PERCENT_KEY: epsilonPassedPercent,
+                                                        FINITE_SIMILAR_PERCENT_KEY: finitePassedPercent,
+                                                        R_SQUARED_COEFF_VALUE_KEY:  r_squared_value,
+                                                        VARIABLE_RUN_INFO_KEY:      varRunInfo
+                                                        }
+                    
+                    LOG.info ('\tgenerating report for: ' + explanationName) 
+                    report.generate_and_save_variable_report(files,
+                                                             varRunInfo, runInfo,
+                                                             variable_stats.dictionary_form(),
+                                                             spatialInfo,
+                                                             image_names,
+                                                             varRunInfo[VARIABLE_DIRECTORY_KEY], "index.html")
             
-            # create the report page for this variable
-            if (runInfo[DO_MAKE_REPORT_KEY]) :
-                
-                # hang on to our good % and other info to describe our comparison
-                epsilonPassedPercent = (1.0 -  epsilon_failed_fraction) * 100.0
-                finitePassedPercent  = (1.0 - non_finite_fail_fraction) * 100.0 
-                variableComparisons[displayName] = {
-                                                    PASSED_EPSILON_PERCENT_KEY: epsilonPassedPercent,
-                                                    FINITE_SIMILAR_PERCENT_KEY: finitePassedPercent,
-                                                    R_SQUARED_COEFF_VALUE_KEY:  r_squared_value,
-                                                    VARIABLE_RUN_INFO_KEY:      varRunInfo
-                                                    }
-                
-                LOG.info ('\tgenerating report for: ' + explanationName) 
-                report.generate_and_save_variable_report(files,
-                                                         varRunInfo, runInfo,
-                                                         variable_stats.dictionary_form(),
-                                                         spatialInfo,
-                                                         image_names,
-                                                         varRunInfo[VARIABLE_DIRECTORY_KEY], "index.html")
-        
-        # if we can't compare the variable, we should tell the user 
-        else :
-            message = (explanationName + ' ' + 
-                     'could not be compared. This may be because the data for this variable does not match in shape ' +
-                     'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
-                     + str(bData.shape) + ')')
-            if do_not_test_with_lon_lat :
-                message = message + '.'
+            # if we can't compare the variable, we should tell the user 
             else :
-                message = (message + ' or the data may not match the shape of the selected '
-                     + 'longitude ' + str(good_shape_from_lon_lat) + ' and '
-                     + 'latitude '  + str(good_shape_from_lon_lat) + ' variables.')
-            LOG.warn(message)
-        
+                message = (explanationName + ' ' + 
+                         'could not be compared. This may be because the data for this variable does not match in shape ' +
+                         'between the two files (file A data shape: ' + str(aData.shape) + '; file B data shape: '
+                         + str(bData.shape) + ')')
+                if do_not_test_with_lon_lat :
+                    message = message + '.'
+                else :
+                    message = (message + ' or the data may not match the shape of the selected '
+                         + 'longitude ' + str(good_shape_from_lon_lat) + ' and '
+                         + 'latitude '  + str(good_shape_from_lon_lat) + ' variables.')
+                LOG.warn(message)
+        except ValueErrorStringToFloat as e:
+            LOG.warn("Unable to compare "+displayName+": "+str(e))
+
     # the end of the loop to examine all the variables
     
     # generate our general report pages once we've analyzed all the variables
