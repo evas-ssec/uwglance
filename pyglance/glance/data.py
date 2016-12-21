@@ -160,6 +160,23 @@ class DataObject (object) :
         
         return DataObject(self.data.copy(), fillValue=self.fill_value, ignoreMask=self.masks.ignore_mask,
                  overrideFillValue=self.override_fill_value, defaultFillValue=self.default_fill_value)
+
+    def holding_array(self):
+        """
+        Return a version of myself where self.data is always an array.
+
+        Suitable for code paths that insist on an array. 
+
+        If self.data is already an array, returns self.
+        If self.data is a simple scalar, copies myself, changing the copy's
+        self.data to be an array with a single value, and return the copy.
+        """
+        if len(self.data.shape) != 0:
+            return self
+        copy = self.copy()
+        copy.data = np.array([self.data.item()])
+        copy.self_analysis()
+        return copy
     
     def self_analysis(self, re_do_analysis=False) :
         """
