@@ -476,7 +476,7 @@ class nc (object):
 
             if needed_dtype is not None :
                 # now figure out where all the corrupted values are, and shift them up to be positive
-                needs_fix_mask = (scaled_data_copy < 0.0) & (scaled_data_copy != missing_val)
+                needs_fix_mask = (scaled_data_copy < add_offset) & (scaled_data_copy != missing_val)
                 # we are adding the 2's complement, but first we're scaling it appropriately
                 scaled_data_copy[needs_fix_mask] += ((np.iinfo(np.uint16).max + 1.0) * scale_factor) + add_offset
 

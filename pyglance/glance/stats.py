@@ -136,7 +136,7 @@ class MissingValueStatistics (StatisticalData) :
             self.is_one_data_set = True
             self.desc_text     = dataSetDescription
             noData = len(dataObject.data.shape) <= 0
-            
+
             # figure out some basic statistics
             self.missing_count    = np.sum(dataObject.masks.missing_mask)
             self.missing_fraction = float(self.missing_count) / float(dataObject.data.size) if not noData else np.nan
@@ -277,7 +277,7 @@ class FiniteDataStatistics (StatisticalData) :
         # if we have a comparison object analyze the data associated with that comparison
         elif diffInfoObject is not None :
 
-            no_data = len(diffInfoObject.a_data_object.data.shape) <= 0
+            noData = len(diffInfoObject.a_data_object.data.shape) <= 0
 
             # analyze each of the original data sets that are being compared
             self.a_finite_stats = FiniteDataStatistics(dataObject=diffInfoObject.a_data_object, dataSetDescription="a")
@@ -285,15 +285,15 @@ class FiniteDataStatistics (StatisticalData) :
             
             # calculate some common statistics
             self.common_finite_count = np.sum(diffInfoObject.a_data_object.masks.valid_mask & diffInfoObject.b_data_object.masks.valid_mask) \
-                                        if not no_data else 0
+                                        if not noData else 0
             # use an exclusive or to check which points are finite in only one of the two data sets
             self.finite_in_only_one_count = np.sum((diffInfoObject.a_data_object.masks.valid_mask ^ diffInfoObject.b_data_object.masks.valid_mask) \
                                                     & ~diffInfoObject.diff_data_object.masks.ignore_mask) \
-                                            if not no_data else 0
+                                            if not noData else 0
             self.common_finite_fraction      = float(self.common_finite_count)      / float(diffInfoObject.a_data_object.data.size) \
-                                                if not no_data else np.nan
+                                                if not noData else np.nan
             self.finite_in_only_one_fraction = float(self.finite_in_only_one_count) / float(diffInfoObject.a_data_object.data.size) \
-                                                if not no_data else np.nan
+                                                if not noData else np.nan
             
         else:
             raise ValueError ("No data set was given when requesting statistical analysis of finite values.")
@@ -406,7 +406,7 @@ class NotANumberStatistics (StatisticalData) :
             self.is_one_data_set = True
             self.desc_text       = dataSetDescription
             noData = len(dataObject.data.shape) <= 0
-            
+
             # get some basic statistics
             self.nan_count = np.sum(dataObject.masks.non_finite_mask)
             self.nan_fraction = float(self.nan_count) / float(dataObject.data.size) if not noData else np.nan
@@ -750,8 +750,8 @@ class NumericalComparisonStatistics (StatisticalData) :
         self.mismatch_points_count      = np.sum(diffInfoObject.diff_data_object.masks.mismatch_mask)
         
         # calculate some more complex statistics, be careful not to divide by zero
-        self.mismatch_points_fraction      = float(self.mismatch_points_count)      / float(aData.size)              if not noData                    else np.nan
-        self.diff_outside_epsilon_fraction = float(self.diff_outside_epsilon_count) / float(total_num_finite_values) if (total_num_finite_values > 0) else np.nan
+        self.mismatch_points_fraction      = float(self.mismatch_points_count)      / float(aData.size)              if not noData                    else 0.0
+        self.diff_outside_epsilon_fraction = float(self.diff_outside_epsilon_count) / float(total_num_finite_values) if (total_num_finite_values > 0) else 0.0
         self.perfect_match_fraction        = float(self.perfect_match_count)        / float(total_num_finite_values) if (total_num_finite_values > 0) else np.nan
         
         # if desired, do the basic analysis
@@ -799,7 +799,7 @@ class NumericalComparisonStatistics (StatisticalData) :
         
         # if everything's invalid, stop now
         noData = np.sum(valid_mask) <= 0
-        
+
         # calculate and return statistics
         root_mean_square_value = delta.calculate_root_mean_square(diffData, valid_mask) if not noData else np.nan
         tempDiffData           = diffData[valid_mask] if not noData else None
@@ -916,19 +916,19 @@ class StatisticalAnalysis (StatisticalData) :
         
         also returns information about the fractions of failure
         """
-        
+
         passValues = [ ]
         
         # test the epsilon value tolerance
         
         # get the tolerance for failures compared to epsilon
         epsilonTolerance = epsilon_failure_tolerance if epsilon_failure_tolerance is not np.nan else epsilon_failure_tolerance_default
-        
+
         # did we fail based on the epsilon?
         failed_fraction = self.comparison.diff_outside_epsilon_fraction
         passed_epsilon  = None if (epsilonTolerance is None) else (failed_fraction <= epsilonTolerance)
         passValues.append(passed_epsilon)
-        
+
         # test the nonfinite tolerance
         
         # get the tolerance for failures in amount of nonfinite data (in spatially valid areas)
@@ -938,7 +938,7 @@ class StatisticalAnalysis (StatisticalData) :
         non_finite_diff_fraction = self.finiteData.finite_in_only_one_fraction
         passed_nonfinite         = None if (nonfiniteTolerance is None) else (non_finite_diff_fraction <= nonfiniteTolerance)
         passValues.append(passed_nonfinite)
-        
+
         # test if the total failed percentage is acceptable
         
         # get the total percentage of failed data that is acceptable
@@ -947,17 +947,17 @@ class StatisticalAnalysis (StatisticalData) :
         # did we fail based on all data failures?
         passed_all_percentage = None if (totalFailTolerance is None) else ((non_finite_diff_fraction + failed_fraction) <= totalFailTolerance)
         passValues.append(passed_all_percentage)
-        
+
         # test the r-squared correlation coefficent
         
         # get the minimum acceptable r-squared correlation coefficient
         min_r_squared = min_acceptable_r_squared if (min_acceptable_r_squared is not np.nan) else min_acceptable_r_squared_default
-        
+
         # did we fail based on the r-squared correlation coefficient?
         r_squared_value  = None if (min_r_squared is None) else self.comparison.r_squared_correlation
         passed_r_squared = None if (min_r_squared is None) else (r_squared_value >= min_r_squared)
         passValues.append(passed_r_squared)
-        
+
         # figure out the overall pass/fail result
         didPass = None
         for passValue in passValues :

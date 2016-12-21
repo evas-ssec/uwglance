@@ -180,13 +180,12 @@ class DataObject (object) :
                 self.masks.ignore_mask = np.zeros(shape, dtype=np.bool)
             
             # find the non-finite values
-            #non_finite_mask = ~np.isfinite(self.data) & ~self.masks.ignore_mask
-            #non_finite_mask = ~ (np.isfinite(self.data) | self.masks.ignore_mask)
-            non_finite_mask = np.zeros(shape, dtype=np.bool)
-            np.isfinite(self.data, non_finite_mask)
-            np.logical_or(non_finite_mask, self.masks.ignore_mask, non_finite_mask)
-            np.logical_not(non_finite_mask, non_finite_mask)
-            
+            non_finite_mask = ~ (np.isfinite(self.data) | self.masks.ignore_mask)
+            #non_finite_mask = np.zeros(shape, dtype=np.bool)
+            #np.isfinite(self.data, non_finite_mask)
+            #np.logical_or(non_finite_mask, self.masks.ignore_mask, non_finite_mask)
+            #np.logical_not(non_finite_mask, non_finite_mask)
+
             # find and mark the missing values
             missing_mask = np.zeros(shape, dtype=np.bool)
             # if the data has a fill value, mark where the missing data is
@@ -204,7 +203,7 @@ class DataObject (object) :
                 np.logical_or(self.masks.ignore_mask, valid_mask, valid_mask)
                 np.logical_not(valid_mask, valid_mask)
             else :
-                np.array([ ], dtype=np.bool)
+                valid_mask = np.array([ ], dtype=np.bool)
             
             # set our masks
             self.masks = BasicMaskSetObject(self.masks.ignore_mask, valid_mask,
