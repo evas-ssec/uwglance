@@ -460,6 +460,8 @@ class nc (object):
 
             LOG.debug("fixing unsigned values in variable " + name)
 
+            print ("********* another test *********")
+
             # load the scale factor and add offset
             scale_factor = 1.0
             add_offset = 0.0
@@ -478,7 +480,7 @@ class nc (object):
                 # now figure out where all the corrupted values are, and shift them up to be positive
                 needs_fix_mask = (scaled_data_copy < add_offset) & (scaled_data_copy != missing_val)
                 # we are adding the 2's complement, but first we're scaling it appropriately
-                scaled_data_copy[needs_fix_mask] += ((np.iinfo(np.uint16).max + 1.0) * scale_factor) + add_offset
+                scaled_data_copy[needs_fix_mask] += ((np.iinfo(np.uint16).max + 1.0) * scale_factor)
 
         return scaled_data_copy
     
