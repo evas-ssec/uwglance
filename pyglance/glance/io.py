@@ -460,8 +460,6 @@ class nc (object):
 
             LOG.debug("fixing unsigned values in variable " + name)
 
-            print ("********* another test *********")
-
             # load the scale factor and add offset
             scale_factor = 1.0
             add_offset = 0.0
