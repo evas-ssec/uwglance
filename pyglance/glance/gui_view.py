@@ -251,7 +251,8 @@ class GlanceGUIView (QtGui.QWidget) :
         grid_layout.addWidget(QtGui.QLabel("variable name:"), currentRow, 1)
         variableSelection = QtGui.QComboBox()
         variableSelection.setDisabled(True)
-        variableSelection.activated.connect(partial(self.reportVariableSelected, file_prefix=file_prefix))
+        variableSelection.currentIndexChanged.connect(partial(self.reportVariableSelected, file_prefix=file_prefix))
+        variableSelection.lastSelected = None
         self.widgetInfo[file_prefix]['variable'] = variableSelection
         grid_layout.addWidget(variableSelection, currentRow, 2, 1, 3)
         
@@ -515,14 +516,30 @@ class GlanceGUIView (QtGui.QWidget) :
     
     def reportVariableSelected (self, file_prefix=None) :
         """
-        when a variable is selected for one of the files, report it to any user update listeners
+        when a variable is selected for one of the files, report it to any user update listener
         """
         
         selectionText = self.widgetInfo[file_prefix]['variable'].currentText()
-        
+
+        lastSelected = self.widgetInfo[file_prefix]['variable'].lastSelected
+        if selectionText == lastSelected:
+            return
+
         # let our listeners know the user selected a variable
         for listener in self.userUpdateListeners :
             listener.userSelectedVariable(file_prefix, selectionText)
+
+        # If both files had the same named variable selected, try to
+        # keep them in sync.  We only do this for A so that by manipulating
+        # B, the use can desync them if they wish.
+        if file_prefix == A_CONST:
+            other = B_CONST
+            if self.widgetInfo[other]['variable'].currentText() == lastSelected:
+                i = self.widgetInfo[other]['variable'].findText(selectionText)
+                if i != -1:
+                    i = self.widgetInfo[other]['variable'].setCurrentIndex(i)
+
+        self.widgetInfo[file_prefix]['variable'].lastSelected = selectionText
     
     def reportOverrideChange (self, file_prefix=None) :
         """
