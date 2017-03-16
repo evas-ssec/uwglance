@@ -224,6 +224,9 @@ def open_and_process_files (fileNames):
     
     return files
 
+class ValueErrorStringToFloat(Exception):
+    pass
+
 def load_variable_data(fileObject, variableNameInFile,
                        forceDType=None,
                        dataFilter=None,
@@ -252,6 +255,8 @@ def load_variable_data(fileObject, variableNameInFile,
             variableData = numpy.array(fileObject[variableNameInFile]) if forceDType is None else numpy.array(fileObject[variableNameInFile], dtype=forceDType)
             variableData = variableData.astype(numpy.uint8) if correctForAWIPS else variableData
         except Exception, ex :
+            if type(ex) is ValueError and str(ex) == "could not convert string to float: ":
+                raise ValueErrorStringToFloat(str(ex))
             import traceback
             exceptionToRaise = ValueError('Unable to retrieve ' + variableNameInFile + ' data. The variable name' + 
                       ' may not exist in this file or an error may have occured while attempting to' +
