@@ -1155,7 +1155,7 @@ glance inspectStats A.hdf
     # set the options available to the user on the command line
     parser = optparse.OptionParser(usage)
     config_organizer.set_up_command_line_options(parser)
-    
+
     # parse the uers options from the command line
     options, args = parser.parse_args()
     if options.self_test:
