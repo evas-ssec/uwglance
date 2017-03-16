@@ -1355,6 +1355,13 @@ class jpss_adl(object):
 
 def open(pathname, allowWrite=False):
     suffix = os.path.splitext(pathname)[1][1:].lower()
+
+    # Just test we can open the file so we automatically raise a suitable
+    # error if we can't access it.
+    from __builtin__ import open
+    with open(pathname):
+        pass
+
     if (not suffix) or (suffix not in globals()):
         # this ican be used to specify a format on the command line by setting the
         # environment variable FORMAT, for example:
