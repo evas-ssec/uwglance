@@ -1216,7 +1216,12 @@ glance inspectStats A.hdf
          glance stats hdffile1 hdffile2
          glance stats --epsilon=0.00001 A.hdf B.hdf baseline_cmask_seviri_cloud_mask:0.002:
          glance -w stats --epsilon=0.00001 A.hdf A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
-        """ 
+        """
+        if len(args) < 2:
+            LOG.warn("Expected two paths to files to compare. "
+                     "Unable to generate comparison statistics without two file paths.")
+            return 1
+
         afn, bfn = args[:2]
         do_doc = (options.verbose or options.debug)
         
@@ -1306,7 +1311,12 @@ glance inspectStats A.hdf
         """
         
         tempOptions = config_organizer.convert_options_to_dict(options)
-        
+
+        if len(args) < 2 :
+            LOG.warn("Expected two paths to files to compare. "
+                     "Unable to generate a comparison report or comparison plots without two file paths.")
+            return 1
+
         a_path = clean_path(args[0])
         b_path = clean_path(args[1])
         
@@ -1325,7 +1335,13 @@ glance inspectStats A.hdf
          glance    inspectStats A.hdf
          glance    inspectStats A.hdf baseline_cmask_seviri_cloud_mask
          glance -w inspectStats A.hdf imager_prof_retr_abi_total_precipitable_water_low::-999
-        """ 
+        """
+
+        if len(args) < 1:
+            LOG.warn("Expected a path to a file to inspect. "
+                     "Unable to generate inspection statistics without a file path.")
+            return 1
+
         afn = args[0]
         do_doc = (options.verbose or options.debug)
         
@@ -1384,7 +1400,12 @@ glance inspectStats A.hdf
          glance inspect_report --longitude=lon_variable_name --latitude=lat_variable_name A.hdf variable_name
          glance inspect_report --reportonly A.hdf
         """
-        
+
+        if len(args) < 1:
+            LOG.warn("Expected a path to a files to inspect. "
+                     "Unable to generate a comparison report without a file path.")
+            return 1
+
         tempOptions = config_organizer.convert_options_to_dict(options)
         
         # args[0] is the path of the file to be analyzed, an other args should be variable names
@@ -1422,7 +1443,12 @@ glance inspectStats A.hdf
          glance colocateData --longitude=lon_variable_name --latitude=lat_variable_name A.hdf B.hdf variable_name
          glance colocateData --llepsilon=0.0001 A.nc B.hdf
         """
-        
+
+        if len(args) < 2:
+            LOG.warn("Expected two paths to files to colocate. "
+                     "Unable to generate colocation information without two file paths.")
+            return 1
+
         # TODO, is this really needed?
         options.imagesOnly = False
         options.htmlOnly   = False

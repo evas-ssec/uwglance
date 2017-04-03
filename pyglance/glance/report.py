@@ -44,9 +44,8 @@ def _make_and_save_page (fullFilePath, templateFileNameToUse, **kwargs) :
     return
 
 def make_formatted_display_string(displayData, customDisplayFormat=None) :
-    '''
-    given a piece of data return a display string
-    '''
+    """given a piece of data return a display string
+    """
     displayString = ''
     formatStr = customDisplayFormat
     

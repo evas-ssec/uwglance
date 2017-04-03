@@ -128,6 +128,7 @@ class DataObject (object) :
     data       - the raw array of data (generally this should be a numpy array)
     fill_value - the fill value used in the data array
     masks      - the set of masks that apply to this data
+    is_scalar  - this data object represents a single scalar value that has been coerced into an analyzable format
     
     override_fill_value - should the fill_value be used rather than the default_fill_value
                           (this defaults to True so the fill_value is used, insuring backwards compatability)
@@ -150,33 +151,29 @@ class DataObject (object) :
         
         self.override_fill_value = overrideFillValue
         self.default_fill_value  = defaultFillValue
-        
+
+        self.is_scalar = False
         self.have_analyzed = False
-    
+
+        if len(self.data.shape) <= 0 :
+            self.is_scalar = True
+            self.data = np.array([self.data.item()])
+
+            ignore_mask_temp = ignoreMask
+            if ignore_mask_temp is not None:
+                ignore_mask_temp = np.array([self.masks.ignore_mask.item()])
+            self.masks = BasicMaskSetObject(ignore_mask_temp)
+
     def copy (self) :
         """
         return a copy of this data object
         """
-        
-        return DataObject(self.data.copy(), fillValue=self.fill_value, ignoreMask=self.masks.ignore_mask,
+
+        copy_temp = DataObject(self.data.copy(), fillValue=self.fill_value, ignoreMask=self.masks.ignore_mask,
                  overrideFillValue=self.override_fill_value, defaultFillValue=self.default_fill_value)
+        copy_temp.is_scalar = self.is_scalar
 
-    def holding_array(self):
-        """
-        Return a version of myself where self.data is always an array.
-
-        Suitable for code paths that insist on an array. 
-
-        If self.data is already an array, returns self.
-        If self.data is a simple scalar, copies myself, changing the copy's
-        self.data to be an array with a single value, and return the copy.
-        """
-        if len(self.data.shape) != 0:
-            return self
-        copy = self.copy()
-        copy.data = np.array([self.data.item()])
-        copy.self_analysis()
-        return copy
+        return copy_temp
     
     def self_analysis(self, re_do_analysis=False) :
         """
@@ -198,10 +195,6 @@ class DataObject (object) :
             
             # find the non-finite values
             non_finite_mask = ~ (np.isfinite(self.data) | self.masks.ignore_mask)
-            #non_finite_mask = np.zeros(shape, dtype=np.bool)
-            #np.isfinite(self.data, non_finite_mask)
-            #np.logical_or(non_finite_mask, self.masks.ignore_mask, non_finite_mask)
-            #np.logical_not(non_finite_mask, non_finite_mask)
 
             # find and mark the missing values
             missing_mask = np.zeros(shape, dtype=np.bool)
@@ -262,11 +255,14 @@ class DataObject (object) :
 
         Intended strictly for human viewing, not parsing!
         """
+        shape_msg = str(self.data.shape)
+
         if self.data.size == 1:
-            return str(self.data.shape) + " = " + str(self.data.item())
-        return str(self.data.shape)
 
+            shape_msg = str(self.data.shape) if not self.is_scalar else "a single scalar value"
+            shape_msg += " = " + str(self.data.item())
 
+        return shape_msg
 
 class DiffInfoObject (object) :
     """
@@ -418,7 +414,7 @@ class DiffInfoObject (object) :
         
         # we can't continue if we don't have a fill value
         assert(fill_data_value is not None)
-        
+
         # construct our diff'ed data set
         raw_diff = np.zeros(shape, dtype=sharedType)
         raw_diff[~valid_in_both] = fill_data_value # throw away invalid data

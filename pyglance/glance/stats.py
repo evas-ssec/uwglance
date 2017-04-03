@@ -594,7 +594,7 @@ class GeneralStatistics (StatisticalData) :
             # if we should also do extra stats, do so
             if (doExtras) :
                 self.num_data_points = dataObject.masks.missing_mask.size if not noData else 0
-                self.shape           = dataObject.masks.missing_mask.shape
+                self.shape           = dataObject.masks.missing_mask.shape if not dataObject.is_scalar else "a single scalar value"
             
         # if we have a comparison object analyze the data associated with that comparison
         elif diffInfoObject is not None :
@@ -610,6 +610,14 @@ class GeneralStatistics (StatisticalData) :
             self.epsilon_percent = diffInfoObject.epsilon_percent
             self.num_data_points = diffInfoObject.a_data_object.masks.missing_mask.size if not noData else 0
             self.shape           = diffInfoObject.a_data_object.masks.missing_mask.shape
+            # if we have at least one scalar, we need to build the shape info differently
+            if diffInfoObject.a_data_object.is_scalar or diffInfoObject.b_data_object.is_scalar :
+                if diffInfoObject.a_data_object.is_scalar and diffInfoObject.b_data_object.is_scalar :
+                    self.shape = "a single scalar value"
+                elif diffInfoObject.a_data_object.is_scalar :
+                    self.shape = "a single scalar value in A and " + str(diffInfoObject.b_data_object.masks.missing_mask.shape) + " in B"
+                elif diffInfoObject.b_data_object.is_scalar :
+                    self.shape = str(diffInfoObject.a_data_object.masks.missing_mask.shape) + " in A and a single scalar value in B"
             # also calculate the invalid points
             self.spatially_invalid_pts_ignored_in_a = np.sum(diffInfoObject.a_data_object.masks.ignore_mask)
             self.spatially_invalid_pts_ignored_in_b = np.sum(diffInfoObject.b_data_object.masks.ignore_mask)
@@ -1064,8 +1072,6 @@ class StatisticalInspectionAnalysis (StatisticalData) :
         """
         build and set all of the statistics sets
         """
-
-        dataObject = dataObject.holding_array()
         
         self.general      = GeneralStatistics(     dataObject=dataObject,
                                                            doExtras=True)
