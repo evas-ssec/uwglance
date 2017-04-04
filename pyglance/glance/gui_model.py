@@ -193,7 +193,15 @@ class GlanceGUIModel (object) :
         while (tempVariable.find("nwp_") >= 0) :
             tempIndex    = tempIndex + 1
             tempVariable = variableList[tempIndex]
-        
+        # if we have a variable selected in the other slot, try to match
+        temp_to_match = None
+        if ( (filePrefix == A_CONST) & (self.fileData[B_CONST].ALL_VARIABLES is not None) ) :
+            temp_to_match = self.fileData[B_CONST].variable
+        if ( (filePrefix == B_CONST) & (self.fileData[A_CONST].ALL_VARIABLES is not None) ) :
+            temp_to_match = self.fileData[A_CONST].variable
+        if temp_to_match is not None :
+            if temp_to_match in variableList :
+                tempVariable = temp_to_match
         
         LOG.debug ("selected variable: " + str(tempVariable))
         
@@ -326,11 +334,22 @@ class GlanceGUIModel (object) :
         Note: if an input value is left at it's default (None or nan) then it's assumed that it was not externally changed
         """
         
-        didUpdate = False
+        didUpdate = False       # whether or not we updated anything
+        newBVar   = None        # None if we don't need to update the B variable to match the A variable, or a variable name if we do
         
         # update the variable selection if needed
         if (newVariableText is not None) and (newVariableText != self.fileData[file_prefix].variable) :
             if newVariableText in self.fileData[file_prefix].ALL_VARIABLES :
+
+                # figure out if we need to update the B file variable selection to match the A file variable selection
+                # Note: we will only do this if the user already had the same variable selected for both files and
+                # file B has the new selection available
+                previous_variable = self.fileData[file_prefix].variable
+                if ( (file_prefix == A_CONST) & (self.fileData[B_CONST].variable == previous_variable) &
+                     (self.fileData[B_CONST].ALL_VARIABLES is not None) ) :
+                    if (newVariableText in self.fileData[B_CONST].ALL_VARIABLES) :
+                        newBVar = newVariableText
+
                 LOG.debug("Setting file " + file_prefix + " variable selection to: " + newVariableText)
                 self.fileData[file_prefix].variable = str(newVariableText)
                 didUpdate = True
@@ -364,6 +383,11 @@ class GlanceGUIModel (object) :
                 listener.fileDataUpdate(file_prefix, self.fileData[file_prefix].file.path, tempVariableName,
                                                      tempDataObject.override_fill_value,   self._select_fill_value(file_prefix),
                                                      tempDataObject.describe_shape(),       attribute_list=tempAttrsList)
+
+        # if we need to update the B file to keep it in sync with the A file variable, do so
+        if newBVar is not None :
+            LOG.debug("Syncing file " + B_CONST + " variable selection to: " + newVariableText)
+            self.updateFileDataSelection(B_CONST, newVariableText=newVariableText)
     
     def _select_fill_value (self, file_prefix) :
         """

@@ -251,8 +251,7 @@ class GlanceGUIView (QtGui.QWidget) :
         grid_layout.addWidget(QtGui.QLabel("variable name:"), currentRow, 1)
         variableSelection = QtGui.QComboBox()
         variableSelection.setDisabled(True)
-        variableSelection.currentIndexChanged.connect(partial(self.reportVariableSelected, file_prefix=file_prefix))
-        variableSelection.lastSelected = "InvalidStringThatShouldNeverExist"
+        variableSelection.activated.connect(partial(self.reportVariableSelected, file_prefix=file_prefix))
         self.widgetInfo[file_prefix]['variable'] = variableSelection
         grid_layout.addWidget(variableSelection, currentRow, 2, 1, 3)
         
@@ -518,28 +517,12 @@ class GlanceGUIView (QtGui.QWidget) :
         """
         when a variable is selected for one of the files, report it to any user update listener
         """
-        
-        selectionText = self.widgetInfo[file_prefix]['variable'].currentText()
 
-        lastSelected = self.widgetInfo[file_prefix]['variable'].lastSelected
-        if selectionText == lastSelected:
-            return
+        selectionText = self.widgetInfo[file_prefix]['variable'].currentText()
 
         # let our listeners know the user selected a variable
         for listener in self.userUpdateListeners :
             listener.userSelectedVariable(file_prefix, selectionText)
-
-        # If both files had the same named variable selected, try to
-        # keep them in sync.  We only do this for A so that by manipulating
-        # B, the use can desync them if they wish.
-        if file_prefix == A_CONST:
-            other = B_CONST
-            if self.widgetInfo[other]['variable'].currentText() == lastSelected:
-                i = self.widgetInfo[other]['variable'].findText(selectionText)
-                if i != -1:
-                    i = self.widgetInfo[other]['variable'].setCurrentIndex(i)
-
-        self.widgetInfo[file_prefix]['variable'].lastSelected = selectionText
     
     def reportOverrideChange (self, file_prefix=None) :
         """
@@ -891,32 +874,14 @@ class GlanceGUIView (QtGui.QWidget) :
         
         # if we got a new variable list, set up the appropriate drop down list
         if variable_list is not None :
-            # Cache now, because clear/addItems will change it as a side effect
-            last_selected = self.widgetInfo[file_prefix]['variable'].lastSelected
 
             # set up the list of selectable variables for analysis
             self.widgetInfo[file_prefix]['variable'].clear()
             self.widgetInfo[file_prefix]['variable'].addItems(variable_list)
-
-            # If the new file has the same variable name we were just
-            # displaying, default to it.
-            i = self.widgetInfo[file_prefix]['variable'].findText(last_selected)
-            if i != -1:
-                selected_variable = last_selected
-            else:
-                # That didn't work? Well, can we find a variable name
-                # matching what the other field is displaying?
-                if file_prefix == A_CONST: other = B_CONST
-                else:                      other = A_CONST
-                other_string = self.widgetInfo[other]['variable'].currentText()
-                i = self.widgetInfo[file_prefix]['variable'].findText(other_string)
-                if i != -1:
-                    selected_variable = last_selected
         
         # set the selected variable
         tempPosition = self.widgetInfo[file_prefix]['variable'].findText(selected_variable)
         self.widgetInfo[file_prefix]['variable'].setCurrentIndex(tempPosition)
-        self.widgetInfo[file_prefix]['variable'].lastSelected = selected_variable
         
         # set the override
         self.widgetInfo[file_prefix]['override'].setChecked(use_fill_override)
