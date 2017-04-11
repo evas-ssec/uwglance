@@ -254,15 +254,23 @@ def create_complex_scatter_plot(dataList, title, xLabel, yLabel, epsilon=None, u
     at least one data set must be given or no image will be created.
     """
 
-    # TODO, there is currently no cutoff at this level for data size, this should only affect the bin-tuple analysis
-    
+
+
     # make the figure
     figure = plt.figure()
     axes = figure.add_subplot(111)
-    
+
     # if we have no data, stop now
-    if (dataList is None) or (len(dataList) <= 0) :
-        return figure;
+    if (dataList is None) or (len(dataList) <= 0):
+        return None;
+
+    # If there is no data to be plotted or only one point, don't try to plot
+    sumDataSize = 0
+    for dataX, dataY, badMask, goodColor, badColor, goodLabel, badLabel in dataList:
+        sumDataSize += dataX.size
+    if (sumDataSize <= 1):
+        LOG.debug("Not enough data to make a meaningful scatter plot figure.")
+        return None
     
     # look at the stuff in each of the data sets and plot that set
     for dataX, dataY, badMask, goodColor, badColor, goodLabel, badLabel in dataList :
@@ -324,6 +332,10 @@ def create_density_scatter_plot(dataX, dataY,
     """
     build a density scatter plot of the X data vs the Y data
     """
+
+    if (dataX is None) or (dataX.size <= 1) :
+        LOG.debug("Not enough data to make a meaningful density scatter plot figure.")
+        return None
 
     # make the figure
     figure = plt.figure()
@@ -387,6 +399,10 @@ def create_density_scatter_plot(dataX, dataY,
 
 # build a hexbin plot of the x,y points and show the density of the point distribution
 def create_hexbin_plot(dataX, dataY, title, xLabel, yLabel, epsilon=None, units_x=None, units_y=None) :
+
+    if (dataX is None) or (dataX.size <= 1) :
+        LOG.debug("Not enough data to make a meaningful hexbin figure.")
+        return None
 
     # if we have too much data, stop now
     if dataX.size > MAX_HEX_PLOT_DATA :
@@ -469,13 +485,14 @@ def _draw_x_equals_y_line(axes, color='k', style='--', epsilon=None, epsilonColo
 
 # build a histogram figure of the given data with the given title and number of bins
 def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, units=None, rangeList=None) :
-    
+
+    if (data is None) or (data.size <= 1) :
+        LOG.debug("Not enough data to make a meaningful histogram figure.")
+        return None
+
     # make the figure
     figure = plt.figure()
     axes = figure.add_subplot(111)
-    
-    if (data is None) or (len(data) <= 0) :
-        return figure
     
     if rangeList is not None :
         assert len(rangeList) == 2
@@ -547,15 +564,19 @@ def create_histogram(data, bins, title, xLabel, yLabel, displayStats=False, unit
 def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxes, title,
                           invalidMask=None, colorMap=None, tagData=None,
                           dataRanges=None, dataRangeNames=None, dataRangeColors=None, units=None, **kwargs) :
-    
-    # make a clean version of our lon/lat
-    latitudeClean  = ma.array(latitude,  mask=~invalidMask)
-    longitudeClean = ma.array(longitude, mask=~invalidMask)
-    
+
     # build the plot
     figure = plt.figure()
     axes = figure.add_subplot(111)
-    
+
+    if (data is None) or (data.size <= 1) or (invalidMask is not None and data[~invalidMask].size <= 1):
+        LOG.debug("Not enough data to make a meaningful mapped figure.")
+        return figure
+
+    # make a clean version of our lon/lat
+    latitudeClean = ma.array(latitude, mask=~invalidMask)
+    longitudeClean = ma.array(longitude, mask=~invalidMask)
+
     # build extra info to go to the map plotting function
     kwargs = { }
     
@@ -634,7 +655,11 @@ def create_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxe
 # TODO, this method needs an input colormap so the mismatch plot can be the right color
 def create_quiver_mapped_figure(data, latitude, longitude, baseMapInstance, boundingAxes, title,
                           invalidMask=None, tagData=None, uData=None, vData=None, units=None,  **kwargs) :
-    
+
+    if (data is None) or (data.size <= 1) or (invalidMask is not None and data[~invalidMask].size <= 1):
+        LOG.debug("Not enough data to make a meaningful quiver mapped figure.")
+        return None
+
     # make a clean version of our lon/lat/data
     latitudeClean  =  latitude[~invalidMask]
     longitudeClean = longitude[~invalidMask]
@@ -678,12 +703,12 @@ def create_raw_image_plot(data, figureTitle, hideAxesLabels=True) :
     """
     for drawing rgb and rgba images we want an uncomplicated version of this call
     """
-    
+
     # build the plot
     figure = plt.figure()
     axes = figure.add_subplot(111)
-    
-    if (data is not None) :
+
+    if (data is not None) and (data.size > 1) :
         # draw our data
         im = plt.imshow(data)
     
@@ -708,11 +733,15 @@ def create_simple_figure(data, figureTitle, invalidMask=None, tagData=None,
     """
     
     cleanData = ma.array(data, mask=invalidMask)
-    
+
     # build the plot
     figure = plt.figure()
     axes = figure.add_subplot(111)
-    
+
+    if (data is None) or (data.size <= 1) or (invalidMask is not None and data[~invalidMask].size <= 1):
+        LOG.debug("Not enough data to make a meaningful simple figure.")
+        return figure
+
     # build extra info to go to the map plotting function
     kwargs = { } 
     
