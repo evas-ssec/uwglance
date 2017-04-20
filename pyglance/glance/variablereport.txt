@@ -1,5 +1,6 @@
 <%doc>
-This Mako template is intended to create a variable specific report page for Glance.
+This Mako template is intended to create a variable comparison report page for
+Glance's report generation.
 
 Created by Eva Schiffer Nov 2011.
 Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
@@ -167,4 +168,8 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     
     </%block>
     
+</%block>
+
+<%block name="attrsTitle">
+<h3>Variable Attributes</h3>
 </%block>

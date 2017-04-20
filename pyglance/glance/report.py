@@ -64,7 +64,8 @@ def generate_and_save_summary_report(files,
                                      runInfo,
                                      variables,
                                      spatial={},
-                                     varNames={}) :
+                                     varNames={},
+                                     globalAttrs={},) :
     """
     given two files, and information about them, save a summary of their comparison
     The summary report, in html format will be saved to the given outputPath/outputFile
@@ -135,6 +136,18 @@ def generate_and_save_summary_report(files,
                     SHARED_VARIABLE_NAMES_KEY: sharedVars
                    }
     all entries in the varNames dictionary are optional.
+
+    globalAttrs should be a dictionary of global attributes for the file, in the form
+        globalAttrs = {
+                        A_FILE_TITLE_KEY:
+                            {
+                                <AttrName>: attr value,
+                            },
+                        B_FILE_TITLE_KEY:
+                            {
+                                <AttrName>: attr value,
+                            },
+                    }
     """
     
     # pack up all the data needed to build the summary report
@@ -153,7 +166,8 @@ def generate_and_save_summary_report(files,
                FILES_INFO_DICT_KEY:        files,
                SPATIAL_INFO_DICT_KEY:      spatial,
                VARIABLE_NAMES_DICT_KEY:    varNamesToUse,
-               VARIABLE_RUN_INFO_DICT_KEY: variables 
+               VARIABLE_RUN_INFO_DICT_KEY: variables,
+               ATTRS_INFO_DICT_KEY:        globalAttrs,
                }
               
     _make_and_save_page((outputPath + "/" + reportFileName), 'mainreport.txt', **kwargs)
@@ -188,7 +202,8 @@ def generate_and_save_variable_report(files,
                                       statGroups,
                                       spatial,
                                       imageNames,
-                                      outputPath, reportFileName
+                                      outputPath, reportFileName,
+                                      variableAttrs={ },
                                       ) :
     """
     given two files and information about the comparison of one of their variables,
@@ -267,7 +282,19 @@ def generate_and_save_variable_report(files,
     although it is assumed that if you include an entry for A_FILE_TITLE_KEY or
     B_FILE_TITLE_KEY it will have both of the expected keys in its dictionary
     (ie. both NUMBER_INVALID_PTS_KEY and PERCENT_INVALID_PTS_KEY)
-    
+
+    variableAttrs should be a dictionary of variable attributes for the files, in the form
+        variableAttrs = {
+                            A_FILE_TITLE_KEY:
+                                {
+                                    <AttrName>: attr value,
+                                },
+                            B_FILE_TITLE_KEY:
+                                {
+                                    <AttrName>: attr value,
+                                },
+                        }
+
     """
     
     # pack up all the data for a report on a particular variable
@@ -282,7 +309,8 @@ def generate_and_save_variable_report(files,
                FILES_INFO_DICT_KEY :     files,
                STATS_INFO_DICT_KEY:      statGroups,
                SPATIAL_INFO_DICT_KEY:    spatial,
-               IMAGE_NAME_INFO_DICT_KEY: imageNames
+               IMAGE_NAME_INFO_DICT_KEY: imageNames,
+               ATTRS_INFO_DICT_KEY:      variableAttrs,
                }
     
     _make_and_save_page((outputPath + "/" + reportFileName), 'variablereport.txt', **kwargs)
@@ -295,7 +323,8 @@ def generate_and_save_inspect_variable_report(files,
                                               statGroups,
                                               spatial,
                                               imageNames,
-                                              outputPath, reportFileName
+                                              outputPath, reportFileName,
+                                              variableAttrs={ },
                                               ) :
     """
     given a file and information about one of the variables in that file,
@@ -346,7 +375,15 @@ def generate_and_save_inspect_variable_report(files,
                      }
     note: the assumption will be made that smaller versions of these images exist
     in the form small.filename 
-    
+
+
+    variableAttrs should be a dictionary of variable attributes for the file, in the form
+        variableAttrs = {
+                            A_FILE_TITLE_KEY:
+                                {
+                                    <AttrName>: attr value,
+                                },
+                        }
     """
     
     # pack up all the data for a report on a particular variable
@@ -361,7 +398,8 @@ def generate_and_save_inspect_variable_report(files,
                FILES_INFO_DICT_KEY :     files,
                STATS_INFO_DICT_KEY:      statGroups,
                SPATIAL_INFO_DICT_KEY:    spatial,
-               IMAGE_NAME_INFO_DICT_KEY: imageNames
+               IMAGE_NAME_INFO_DICT_KEY: imageNames,
+               ATTRS_INFO_DICT_KEY:      variableAttrs,
                }
     
     _make_and_save_page((outputPath + "/" + reportFileName), 'inspectvariablereport.txt', **kwargs)
@@ -373,12 +411,13 @@ def generate_and_save_inspection_summary_report(files,
                                                 runInfo,
                                                 variables,
                                                 spatial={},
-                                                varNames={}) :
+                                                varNames={},
+                                                globalAttrs={},) :
     """
-    given two files, and information about them, save a summary of their comparison
+    given a file, and information about it, save a summary report about the file
     The summary report, in html format will be saved to the given outputPath/outputFile
     
-    Variables should be a dictionary keyed on the name of each compared variable and containing the
+    Variables should be a dictionary keyed on the name of each variable and containing the
     % of data values that were judged to be "similar enough" between file A and B (according
     to the epsilon originally inputed for the comparison) and the epsilon used for the comparison
         variables[var_name] = {
@@ -420,6 +459,14 @@ def generate_and_save_inspection_summary_report(files,
         varNames = {
                         POSSIBLE_NAMES_KEY: listOfAllVarsInFile,
                     }
+
+    globalAttrs should be a dictionary of global attributes for the file, in the form
+        globalAttrs = {
+                        A_FILE_TITLE_KEY:
+                            {
+                                <AttrName>: attr value,
+                            },
+                    }
     """
     
     # pack up all the data needed to build the summary report
@@ -432,10 +479,11 @@ def generate_and_save_inspection_summary_report(files,
     # build the full kwargs with all the info
     kwargs = {
                 RUN_INFO_DICT_KEY: runInfo,
-                FILES_INFO_DICT_KEY: files,
-                SPATIAL_INFO_DICT_KEY: spatial,
-                VARIABLE_NAMES_DICT_KEY: varNamesToUse,
-                VARIABLE_RUN_INFO_DICT_KEY: variables 
+                FILES_INFO_DICT_KEY:        files,
+                SPATIAL_INFO_DICT_KEY:      spatial,
+                VARIABLE_NAMES_DICT_KEY:    varNamesToUse,
+                VARIABLE_RUN_INFO_DICT_KEY: variables,
+                ATTRS_INFO_DICT_KEY:        globalAttrs,
                }
               
     _make_and_save_page((outputPath + "/" + reportFileName), 'inspectmainreport.txt', **kwargs)

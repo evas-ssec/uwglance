@@ -13,6 +13,7 @@ Copyright (c) 2009 University of Wisconsin SSEC. All rights reserved.
 
 import os, sys, logging, re, datetime
 from numpy import *
+import numpy
 from urllib import quote
 
 import matplotlib
@@ -426,14 +427,18 @@ def inspect_library_call (a_path, var_list=[ ],
     if aFile.file_object is None:
         LOG.warn("Unable to continue with examination because file (" + pathsTemp[A_FILE_KEY] + ") could not be opened.")
         sys.exit(1)
-    
+
     # get information about the names the user requested
     nameStats = {}
     finalNames, nameStats[POSSIBLE_NAMES_KEY] = config_organizer.resolve_names_one_file(aFile.file_object,
                                                                                         defaultValues, # TODO, might need a different default set
                                                                                         requestedNames,
                                                                                         usedConfigFile)
-    
+
+    # get info on the global attributes
+    globalAttrInfo = {}
+    globalAttrInfo[A_FILE_TITLE_KEY] = aFile.file_object.get_global_attributes()
+
     LOG.debug("output dir: " + str(pathsTemp[OUT_FILE_KEY]))
     
     # return for lon_lat_data variables will be in the form 
@@ -479,7 +484,11 @@ def inspect_library_call (a_path, var_list=[ ],
                                    variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_A_KEY] if VAR_FILTER_FUNCTION_A_KEY in varRunInfo else None,
                                    altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_A_KEY]).file_object if VAR_FILTER_ALT_FILE_A_KEY in varRunInfo else None,
                                    fileDescriptionForDisplay = "file A")
-        
+
+        # get variable attribute information for this variable
+        attributeInfo = { }
+        attributeInfo[A_FILE_TITLE_KEY] = aFile.file_object.get_variable_attributes(technical_name)
+
         # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
         include_images_for_this_variable = ((not(DO_MAKE_IMAGES_KEY in runInfo)) or (runInfo[DO_MAKE_IMAGES_KEY]))
         if DO_MAKE_IMAGES_KEY in varRunInfo :
@@ -599,7 +608,8 @@ def inspect_library_call (a_path, var_list=[ ],
                 LOG.info ('\tgenerating report for: ' + explanationName) 
                 report.generate_and_save_inspect_variable_report(files, varRunInfo, runInfo,
                                                                  variable_stats, spatialInfo, image_names,
-                                                                 varRunInfo[VARIABLE_DIRECTORY_KEY], "index.html")
+                                                                 varRunInfo[VARIABLE_DIRECTORY_KEY], "index.html",
+                                                                 variableAttrs=attributeInfo,)
         
         # if we can't do anything with the variable, we should tell the user 
         else :
@@ -626,7 +636,8 @@ def inspect_library_call (a_path, var_list=[ ],
                                                             runInfo,
                                                             variableInspections,
                                                             spatialInfo,
-                                                            nameStats)
+                                                            nameStats,
+                                                            globalAttrs=globalAttrInfo,)
         
         # make the glossary
         LOG.info ('generating glossary')
@@ -701,7 +712,12 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                            defaultValues,
                                                            requestedNames,
                                                            usedConfigFile)
-    
+
+    # get info on the global attributes
+    globalAttrInfo = {}
+    globalAttrInfo[A_FILE_TITLE_KEY] = aFile.file_object.get_global_attributes()
+    globalAttrInfo[B_FILE_TITLE_KEY] = bFile.file_object.get_global_attributes()
+
     LOG.debug("output dir: " + str(pathsTemp[OUT_FILE_KEY]))
     
     # return for lon_lat_data variables will be in the form 
@@ -769,7 +785,12 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                        variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_B_KEY] if VAR_FILTER_FUNCTION_B_KEY in varRunInfo else None,
                                        altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_B_KEY]).file_object if VAR_FILTER_ALT_FILE_B_KEY in varRunInfo else None,
                                        fileDescriptionForDisplay = "file B")
-            
+
+            # get variable attribute information for this variable
+            attributeInfo = {}
+            attributeInfo[A_FILE_TITLE_KEY] = aFile.file_object.get_variable_attributes(technical_name)
+            attributeInfo[B_FILE_TITLE_KEY] = bFile.file_object.get_variable_attributes(b_variable_technical_name)
+
             # pre-check if this data should be plotted and if it should be compared to the longitude and latitude
             include_images_for_this_variable = ((not(DO_MAKE_IMAGES_KEY in runInfo)) or (runInfo[DO_MAKE_IMAGES_KEY]))
             if DO_MAKE_IMAGES_KEY in varRunInfo :
@@ -944,7 +965,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                              variable_stats.dictionary_form(),
                                                              spatialInfo,
                                                              image_names,
-                                                             varRunInfo[VARIABLE_DIRECTORY_KEY], "index.html")
+                                                             varRunInfo[VARIABLE_DIRECTORY_KEY], "index.html",
+                                                             variableAttrs=attributeInfo,)
             
             # if we can't compare the variable, we should tell the user 
             else :
@@ -977,7 +999,8 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
                                                 runInfo,
                                                 variableComparisons, 
                                                 spatialInfo,
-                                                nameStats)
+                                                nameStats,
+                                                globalAttrs=globalAttrInfo,)
         
         # make the glossary
         LOG.info ('generating glossary')

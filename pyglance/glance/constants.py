@@ -232,6 +232,7 @@ SPATIAL_INFO_DICT_KEY      = 'spatial'
 IMAGE_NAME_INFO_DICT_KEY   = 'imageNames'
 VARIABLE_NAMES_DICT_KEY    = 'varNames'
 VARIABLE_RUN_INFO_DICT_KEY = 'variables'
+ATTRS_INFO_DICT_KEY        = 'attributesInfo'
 
 DEFINITIONS_INFO_KEY       = 'definitions'
 

@@ -358,7 +358,7 @@ class hdf (object):
         toReturn = None
         
         if caseInsensitive :
-            self.attributeCache.get_global_attributes()
+            toReturn = self.attributeCache.get_global_attributes()
         else :
             toReturn = self._hdf.attributes()
         
@@ -633,13 +633,13 @@ class nc (object):
         toReturn = None
         
         if caseInsensitive :
-            self.attributeCache.get_global_attributes()
+            toReturn = self.attributeCache.get_global_attributes()
         else :
             toReturn = { }
             tempAttrKeys = self._nc.ncattrs()
             for attrKey in tempAttrKeys :
                 toReturn[attrKey] = getattr(self._nc, attrKey)
-        
+
         return toReturn
     
     def get_global_attribute(self, attributeName, caseInsensitive=True) :
@@ -835,7 +835,7 @@ class h5(object):
         toReturn = None
         
         if caseInsensitive :
-            self.attributeCache.get_global_attributes()
+            toReturn = self.attributeCache.get_global_attributes()
         else :
             toReturn = self._h5.attrs
         

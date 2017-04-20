@@ -156,7 +156,54 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
         </%block>
         
         <%block name="comparedData"></%block>
-        
+
+
+        <%block name="attrsInfo">
+
+            % if attributesInfo is not None and len(attributesInfo.keys()) > 0 :
+
+                ## make a list of all the attributes we need to display
+                <%
+                    allAttrKeys = set()
+                    for fileKey in attributesInfo.keys() :
+                        for attrKey in attributesInfo[fileKey].keys() :
+                            allAttrKeys.add(attrKey)
+                %>
+
+                <%block name="attrsTitle">
+                <h3>Attributes</h3>
+                </%block>
+
+                <table border="1px solid black">
+                    <tr>
+                        <th>Attribute Name</th>
+                        ## loop to add headers for all files
+                        % for fileKey in sorted(attributesInfo.keys()) :
+                            <th>${fileKey} value</th>
+                        % endfor
+                    </tr>
+                    ## loop to put a line in the table for each attribute
+                    % for attrKey in sorted(allAttrKeys) :
+                        <tr>
+                            <td>${attrKey}</td>
+                            ## loop to add values for each of the files
+                            % for fileKey in sorted(attributesInfo.keys()) :
+                                % if attrKey in attributesInfo[fileKey] :
+                                    <td>${attributesInfo[fileKey][attrKey]}</td>
+                                % else :
+                                    <td></td>
+                                % endif
+                            % endfor
+
+                        </tr>
+                    % endfor
+
+                </table>
+
+            % endif
+
+        </%block>
+
     </body>
     
 </html>

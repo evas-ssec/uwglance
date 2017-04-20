@@ -113,9 +113,10 @@ def _plot_tag_data_simple(tagData, axes) :
             # get the current limits of the plot
             tempXLim = axes.get_xlim()
             tempYLim = axes.get_ylim()
-            
+
             # if there aren't a lot of points, plot them individually
             if (numMismatchPoints < 50000) | ((numMismatchPoints < 200000) & (percentBad < 2.0)) :
+                markerSize = 1 if numMismatchPoints > 10000 else 2
                 (height, width) = tagData.shape
                 tempX = [ ]
                 tempY = [ ]
@@ -124,7 +125,11 @@ def _plot_tag_data_simple(tagData, axes) :
                         if tagData[h, w] :
                             tempX.append(w)
                             tempY.append(h)
-                pTemp = plot(tempX, tempY, '.', markersize=0.1, color='#00ff00')
+                # if we have only a few points, make them more obvious with purple circles
+                if numMismatchPoints < 500 :
+                    pTemp = plot(tempX, tempY, 'o', color='#993399', markersize=5)
+                # plot the green mismatch points
+                pTemp = plot(tempX, tempY, '.', markersize=markerSize, color='#00ff00')
             
             # if there are a lot of points, plot them as an overall mask
             else :
@@ -180,13 +185,13 @@ def _plot_tag_data_mapped(bMap, tagData, x, y, addExplinationLabel=True) :
             percentBad = (float(numMismatchPoints) / float(totalNumPoints)) * 100.0
             LOG.debug('\t\tnumber  of mismatch points: ' + str(numMismatchPoints))
             LOG.debug('\t\tpercent of mismatch points: ' + str(percentBad))
-            
+
             # if there are very few points, make them easier to notice
             # by plotting some colored circles underneath them
-            if (percentBad < 0.25) or (totalNumPoints < 20) :
+            if (percentBad < 0.25) or (numMismatchPoints < 20) :
                 neededHighlighting = True
                 p = bMap.plot(newX, newY, 'o', color='#993399', markersize=5)
-            elif (percentBad < 1.0) or (totalNumPoints < 200) :
+            elif (percentBad < 1.0) or (numMismatchPoints < 200) :
                 neededHighlighting = True
                 p = bMap.plot(newX, newY, 'o', color='#993399', markersize=3)
             
