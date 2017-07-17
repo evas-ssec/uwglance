@@ -167,8 +167,8 @@ LAT_FILL_VALUE_KEY         = 'lat_fill'
 
 # constants for the files structure
 
-A_FILE_TITLE_KEY           = 'file A'
-B_FILE_TITLE_KEY           = 'file B'
+A_FILE_TITLE_KEY           = 'File A'
+B_FILE_TITLE_KEY           = 'File B'
 PATH_KEY                   = 'path'
 LAST_MODIFIED_KEY          = 'lastModifiedTime'
 MD5SUM_KEY                 = 'md5sum'

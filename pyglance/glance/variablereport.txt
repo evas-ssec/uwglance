@@ -60,7 +60,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     % if (len(imageNames[constants.ORIGINAL_IMAGES_KEY]) > 0) :
         <h3>Original Data</h3>
         <p>
-            % for image in imageNames[constants.ORIGINAL_IMAGES_KEY]:
+            % for image in sorted(imageNames[constants.ORIGINAL_IMAGES_KEY]):
                 <a href="./${image}"><img src="small.${image}"></a>
             % endfor
         </p>
@@ -142,7 +142,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
     % if (len(imageNames[constants.COMPARED_IMAGES_KEY]) > 0) and (not hideComparisonImages) :
         <p>
             <% inSubSet = False %>
-            % for image in imageNames[constants.COMPARED_IMAGES_KEY] :
+            % for image in sorted(imageNames[constants.COMPARED_IMAGES_KEY]) :
                 ## if we have a plain image, display it
                 % if (type(image) is str) :
                     % if inSubSet :

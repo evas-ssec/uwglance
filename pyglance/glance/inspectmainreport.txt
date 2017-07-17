@@ -70,7 +70,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
         <p>
             The following variables were present in the file: <br>
             <blockquote>
-                % for varName in possVars :
+                % for varName in sorted(possVars) :
                     ${varName} <br>
                 % endfor
             </blockquote>

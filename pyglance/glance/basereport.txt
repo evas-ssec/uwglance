@@ -179,7 +179,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
                         <th>Attribute Name</th>
                         ## loop to add headers for all files
                         % for fileKey in sorted(attributesInfo.keys()) :
-                            <th>${fileKey} value</th>
+                            <th>${fileKey} Value</th>
                         % endfor
                     </tr>
                     ## loop to put a line in the table for each attribute

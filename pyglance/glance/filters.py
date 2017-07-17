@@ -95,7 +95,7 @@ def flatten_data_into_bins (data, ranges, new_values, missing_value, return_data
     return new_data
 
 def extract_bit_from_packed_mask (data, index_of_bit_to_extract,
-                                  (truth_value, false_value),
+                                  truth_value, false_value,
                                   return_data_type) :
     """
     Extract a one bit boolean mask from a larger packed data set. The bit that

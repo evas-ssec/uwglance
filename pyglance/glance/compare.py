@@ -477,13 +477,18 @@ def inspect_library_call (a_path, var_list=[ ],
         
         LOG.info('analyzing: ' + explanationName)
         
-        # load the variable data
-        aData = load_variable_data(aFile.file_object, technical_name,
-                                   dataFilter = varRunInfo[FILTER_FUNCTION_A_KEY] if FILTER_FUNCTION_A_KEY in varRunInfo else None,
-                                   variableToFilterOn = varRunInfo[VAR_FILTER_NAME_A_KEY] if VAR_FILTER_NAME_A_KEY in varRunInfo else None,
-                                   variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_A_KEY] if VAR_FILTER_FUNCTION_A_KEY in varRunInfo else None,
-                                   altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_A_KEY]).file_object if VAR_FILTER_ALT_FILE_A_KEY in varRunInfo else None,
-                                   fileDescriptionForDisplay = "file A")
+        # load the variable data if we can
+        try :
+            aData = load_variable_data(aFile.file_object, technical_name,
+                                       dataFilter = varRunInfo[FILTER_FUNCTION_A_KEY] if FILTER_FUNCTION_A_KEY in varRunInfo else None,
+                                       variableToFilterOn = varRunInfo[VAR_FILTER_NAME_A_KEY] if VAR_FILTER_NAME_A_KEY in varRunInfo else None,
+                                       variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_A_KEY] if VAR_FILTER_FUNCTION_A_KEY in varRunInfo else None,
+                                       altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_A_KEY]).file_object if VAR_FILTER_ALT_FILE_A_KEY in varRunInfo else None,
+                                       fileDescriptionForDisplay = "file A")
+        except Exception as e :
+            LOG.warn(displayName + " data could not be loaded. This variable will not be included in the output report. " +
+                     "The following error was encountered while trying to load this variable:\n" + str(e))
+            continue
 
         # get variable attribute information for this variable
         attributeInfo = { }
@@ -773,18 +778,24 @@ def reportGen_library_call (a_path, b_path, var_list=[ ],
             LOG.info('analyzing: ' + explanationName)
             
             # load the variable data
-            aData = load_variable_data(aFile.file_object, technical_name,
-                                       dataFilter = varRunInfo[FILTER_FUNCTION_A_KEY] if FILTER_FUNCTION_A_KEY in varRunInfo else None,
-                                       variableToFilterOn = varRunInfo[VAR_FILTER_NAME_A_KEY] if VAR_FILTER_NAME_A_KEY in varRunInfo else None,
-                                       variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_A_KEY] if VAR_FILTER_FUNCTION_A_KEY in varRunInfo else None,
-                                       altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_A_KEY]).file_object if VAR_FILTER_ALT_FILE_A_KEY in varRunInfo else None,
-                                       fileDescriptionForDisplay = "file A")
-            bData = load_variable_data(bFile.file_object, b_variable_technical_name,
-                                       dataFilter = varRunInfo[FILTER_FUNCTION_B_KEY] if FILTER_FUNCTION_B_KEY in varRunInfo else None,
-                                       variableToFilterOn = varRunInfo[VAR_FILTER_NAME_B_KEY] if VAR_FILTER_NAME_B_KEY in varRunInfo else None,
-                                       variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_B_KEY] if VAR_FILTER_FUNCTION_B_KEY in varRunInfo else None,
-                                       altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_B_KEY]).file_object if VAR_FILTER_ALT_FILE_B_KEY in varRunInfo else None,
-                                       fileDescriptionForDisplay = "file B")
+            try:
+                aData = load_variable_data(aFile.file_object, technical_name,
+                                           dataFilter = varRunInfo[FILTER_FUNCTION_A_KEY] if FILTER_FUNCTION_A_KEY in varRunInfo else None,
+                                           variableToFilterOn = varRunInfo[VAR_FILTER_NAME_A_KEY] if VAR_FILTER_NAME_A_KEY in varRunInfo else None,
+                                           variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_A_KEY] if VAR_FILTER_FUNCTION_A_KEY in varRunInfo else None,
+                                           altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_A_KEY]).file_object if VAR_FILTER_ALT_FILE_A_KEY in varRunInfo else None,
+                                           fileDescriptionForDisplay = "file A")
+                bData = load_variable_data(bFile.file_object, b_variable_technical_name,
+                                           dataFilter = varRunInfo[FILTER_FUNCTION_B_KEY] if FILTER_FUNCTION_B_KEY in varRunInfo else None,
+                                           variableToFilterOn = varRunInfo[VAR_FILTER_NAME_B_KEY] if VAR_FILTER_NAME_B_KEY in varRunInfo else None,
+                                           variableBasedFilter = varRunInfo[VAR_FILTER_FUNCTION_B_KEY] if VAR_FILTER_FUNCTION_B_KEY in varRunInfo else None,
+                                           altVariableFileObject = dataobj.FileInfo(varRunInfo[VAR_FILTER_ALT_FILE_B_KEY]).file_object if VAR_FILTER_ALT_FILE_B_KEY in varRunInfo else None,
+                                           fileDescriptionForDisplay = "file B")
+            except Exception as e:
+                LOG.warn(
+                    displayName + " data could not be loaded. This variable will not be included in the output report. " +
+                    "The following error was encountered while trying to load this variable:\n" + str(e))
+                continue
 
             # get variable attribute information for this variable
             attributeInfo = {}

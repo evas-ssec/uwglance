@@ -135,7 +135,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
         <p>
             The following variables were common to both files: <br>
             <blockquote>
-                % for varName in sharedVars :
+                % for varName in sorted(sharedVars) :
                     ${varName} <br>
                 % endfor
             </blockquote>
@@ -159,7 +159,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
             <p>
                 Variables only found in file A:
                 <blockquote>
-                    %for varName in uniqueToAVars :
+                    %for varName in sorted(uniqueToAVars) :
                         ${varName} <br>
                     % endfor
                 </blockquote>
@@ -170,7 +170,7 @@ Copyright (c) 2011 University of Wisconsin SSEC. All rights reserved.
             <p>
                 Variables only found in file B:
                 <blockquote>
-                    %for varName in uniqueToBVars :
+                    %for varName in sorted(uniqueToBVars) :
                         ${varName} <br>
                     % endfor
                 </blockquote>

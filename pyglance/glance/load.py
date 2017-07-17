@@ -245,7 +245,7 @@ def load_variable_data(fileObject, variableNameInFile,
     
     variableData     = None
     exceptionToRaise = None
-    
+
     # get the data for the variable
     LOG.debug("loading basic data for variable " + variableNameInFile + " from " + fileDescriptionForDisplay)
     if fileObject is None :
@@ -265,7 +265,7 @@ def load_variable_data(fileObject, variableNameInFile,
     # if we ended up with an exception, raise that now
     if exceptionToRaise is not None :
         raise exceptionToRaise
-    
+
     # apply the basic filter if there is one
     if dataFilter is not None :
         LOG.debug ("applying filter function to data from " + fileDescriptionForDisplay + " for variable " + variableNameInFile)

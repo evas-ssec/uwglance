@@ -235,7 +235,8 @@ def resolve_names_one_file(fileObject, defaultValues,
                 finalNames[name][VAR_UNITS_A_KEY] = fileObject.get_attribute(name, io.UNITS_CONSTANT)
                 
         # otherwise just do the ones the user asked for
-        else : 
+        else :
+
             # check each of the names the user asked for to see if it's among the possible names
             for dispName in requestedNames :
                 
@@ -245,7 +246,7 @@ def resolve_names_one_file(fileObject, defaultValues,
                 # get the variable name 
                 if VARIABLE_TECH_NAME_KEY in currNameInfo :
                     name = currNameInfo[VARIABLE_TECH_NAME_KEY]
-                    
+
                     if (name in possibleNames) :
                         finalNames[dispName] = defaultValues.copy() 
                         finalNames[dispName][DISPLAY_NAME_KEY] = dispName
